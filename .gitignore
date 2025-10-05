@@ -1,0 +1,21 @@
+# Python
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables (secrets!)
+.env
+
+# Database
+*.db
+*.sqlite3
+
+# Node/React
+node_modules/
+build/
+dist/
+
+# OS files
+.DS_Store
