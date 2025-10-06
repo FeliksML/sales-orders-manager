@@ -1,11 +1,14 @@
 import os
 from dotenv import load_dotenv
 import psycopg2
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
 
 load_dotenv()
 
 database_url = os.getenv("DATABASE_URL")
-
+engine = create_engine(database_url)
+Base = declarative_base()
 def get_db_connection():
     return psycopg2.connect(database_url)
 
