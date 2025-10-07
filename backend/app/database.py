@@ -16,9 +16,6 @@ def get_db_connection():
 
 
 if __name__ == "__main__":
-    try:
-        conn = get_db_connection()
-        print("Database connection successful!")
-        conn.close()
-    except Exception as e:
-        print(f"Database connection failed: {e}")
+    
+    Base.metadata.create_all(bind=engine)
+    print("✅ Tables created successfully!")

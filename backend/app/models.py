@@ -1,12 +1,12 @@
 from .database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary
 
 class User(Base):
     __tablename__ = 'users'
 
     userid = Column(Integer, primary_key=True)
     email = Column(String(255), unique=True, nullable=False)
-    password = Column(String(255),nullable=False)
+    password = Column(LargeBinary, nullable=False)
     salesid = Column(Integer, unique=True, nullable=False)
     name = Column(String(255), nullable=False)
 

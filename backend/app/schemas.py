@@ -5,3 +5,7 @@ class UserSignup(BaseModel):
     password : str
     salesid : int
     name : str
+
+class UserLogin(BaseModel):
+    email : str
+    password : str
