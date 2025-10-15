@@ -184,7 +184,7 @@ function Login() {
           style={{
             background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)'
           }}
-          className="w-full text-white font-bold px-4 py-3 rounded-lg hover:opacity-90 shadow-md transition-opacity"
+          className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md"
         >
           Login
         </button>
