@@ -1,9 +1,48 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 
 function Login() {
+  const rippleRef = useRef(null)
   return (
     <>
    <style>{`
+   /* Ripple effect styles */
+.ripple-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.ripple-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  width: 0;
+  height: 0;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.ripple-container.active .ripple-circle {
+  animation: ripple-animation 0.6s ease-out;
+}
+
+@keyframes ripple-animation {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.5;
+  }
+  100% {
+    width: 300px;
+    height: 300px;
+    opacity: 0;
+  }
+}
   /* CSS Custom Property for rotation using turns */
   @property --rotation {
     syntax: "<angle>";
@@ -181,11 +220,31 @@ function Login() {
         </div>
         
         <button 
+        onClick={(e) => {
+  const button = e.currentTarget
+  const rippleContainer = rippleRef.current
+  const circle = rippleContainer.querySelector('.ripple-circle')
+  
+  const rect = button.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const y = e.clientY - rect.top
+  
+  circle.style.left = x + 'px'
+  circle.style.top = y + 'px'
+  
+  rippleContainer.classList.remove('active')
+  void rippleContainer.offsetWidth
+  rippleContainer.classList.add('active')
+}}
           style={{
-            background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)'
+            background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)',
+            position: 'relative'
           }}
           className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md"
         >
+        <div className="ripple-container" ref={rippleRef}>
+          <span className="ripple-circle"></span>
+        </div>
           Login
         </button>
         <p className="text-gray-300 mt-3 px-4 py-3">Don't have an account? <a className="text-blue-300 cursor-pointer hover:underline">Sign up</a></p>
