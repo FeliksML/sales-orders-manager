@@ -23,14 +23,148 @@ function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  // Field-level errors
+  const [fieldErrors, setFieldErrors] = useState({
+    name: "",
+    salesid: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [touchedFields, setTouchedFields] = useState({
+    name: false,
+    salesid: false,
+    email: false,
+    password: false,
+    confirmPassword: false,
+  });
+  const [checkingSalesId, setCheckingSalesId] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
   const passwordChecks = {
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
     lowercase: /[a-z]/.test(password),
     number: /[0-9]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
   };
 
   const allPasswordChecksPassed = Object.values(passwordChecks).every(Boolean);
+
+  // Validation functions
+  const validateName = (value) => {
+    if (!value.trim()) return "Name is required";
+    if (value.trim().length < 2) return "Name must be at least 2 characters";
+    if (!/^[a-zA-Z\s'-]+$/.test(value)) return "Name can only contain letters, spaces, hyphens, and apostrophes";
+    return "";
+  };
+
+  const validateSalesId = (value) => {
+    if (!value.trim()) return "Sales ID is required";
+    if (!/^\d{5}$/.test(value)) return "Sales ID must be exactly 5 digits";
+    return "";
+  };
+
+  // Check if Sales ID already exists in database
+  const checkSalesIdAvailability = async (salesId) => {
+    if (validateSalesId(salesId) !== "") return; // Don't check if format is invalid
+
+    setCheckingSalesId(true);
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/auth/check-salesid/${salesId}`);
+      const data = await response.json();
+
+      if (data.exists) {
+        setFieldErrors(prev => ({ ...prev, salesid: "This Sales ID is already registered" }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, salesid: "" }));
+      }
+    } catch (error) {
+      console.error("Error checking Sales ID:", error);
+      // Don't show error to user, just log it
+    } finally {
+      setCheckingSalesId(false);
+    }
+  };
+
+  // Check if Email already exists in database
+  const checkEmailAvailability = async (emailValue) => {
+    if (validateEmail(emailValue) !== "") return; // Don't check if format is invalid
+
+    setCheckingEmail(true);
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/auth/check-email/${encodeURIComponent(emailValue)}`);
+      const data = await response.json();
+
+      if (data.exists) {
+        setFieldErrors(prev => ({ ...prev, email: "This email is already registered. Please login instead." }));
+      } else {
+        setFieldErrors(prev => ({ ...prev, email: "" }));
+      }
+    } catch (error) {
+      console.error("Error checking email:", error);
+      // Don't show error to user, just log it
+    } finally {
+      setCheckingEmail(false);
+    }
+  };
+
+  const validateEmail = (value) => {
+    if (!value.trim()) return "Email is required";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return "Please enter a valid email address";
+    return "";
+  };
+
+  const validatePassword = (value) => {
+    if (!value) return "Password is required";
+    if (!allPasswordChecksPassed) return "Password does not meet all requirements";
+    return "";
+  };
+
+  const validateConfirmPassword = (value) => {
+    if (!value) return "Please confirm your password";
+    if (value !== password) return "Passwords don't match";
+    return "";
+  };
+
+  // Handle field blur events
+  const handleFieldBlur = async (field, value) => {
+    setTouchedFields(prev => ({ ...prev, [field]: true }));
+
+    let error = "";
+    switch (field) {
+      case "name":
+        error = validateName(value);
+        setFieldErrors(prev => ({ ...prev, [field]: error }));
+        break;
+      case "salesid":
+        error = validateSalesId(value);
+        setFieldErrors(prev => ({ ...prev, [field]: error }));
+        // Check database availability if format is valid
+        if (error === "") {
+          await checkSalesIdAvailability(value);
+        }
+        break;
+      case "email":
+        error = validateEmail(value);
+        setFieldErrors(prev => ({ ...prev, [field]: error }));
+        // Check database availability if format is valid
+        if (error === "") {
+          await checkEmailAvailability(value);
+        }
+        break;
+      case "password":
+        error = validatePassword(value);
+        setFieldErrors(prev => ({ ...prev, [field]: error }));
+        break;
+      case "confirmPassword":
+        error = validateConfirmPassword(value);
+        setFieldErrors(prev => ({ ...prev, [field]: error }));
+        break;
+      default:
+        break;
+    }
+  };
 
   // Password strength calculation
   const getPasswordStrength = () => {
@@ -41,8 +175,8 @@ function Signup() {
     if (passwordChecks.uppercase) score++;
     if (passwordChecks.lowercase) score++;
     if (passwordChecks.number) score++;
+    if (passwordChecks.special) score++;
     if (password.length >= 12) score++;
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++; // Special char
 
     if (score <= 2) return { score: 33, label: "Weak", color: "#ef4444" };
     if (score <= 4) return { score: 66, label: "Medium", color: "#f59e0b" };
@@ -54,11 +188,18 @@ function Signup() {
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const isFormValid =
-    name.trim() !== "" &&
-    salesid.trim() !== "" &&
-    isEmailValid &&
-    allPasswordChecksPassed &&
-    password === confirm_password &&
+    validateName(name) === "" &&
+    validateSalesId(salesid) === "" &&
+    validateEmail(email) === "" &&
+    validatePassword(password) === "" &&
+    validateConfirmPassword(confirm_password) === "" &&
+    !fieldErrors.name &&
+    !fieldErrors.salesid &&
+    !fieldErrors.email &&
+    !fieldErrors.password &&
+    !fieldErrors.confirmPassword &&
+    !checkingSalesId &&
+    !checkingEmail &&
     agreedToTerms;
 
   const handleSubmit = async (e) => {
@@ -67,6 +208,16 @@ function Signup() {
     // Clear previous messages
     setError("");
     setSuccess("");
+
+    // Check for any field errors
+    if (fieldErrors.salesid) {
+      setError("Cannot register: " + fieldErrors.salesid);
+      return;
+    }
+    if (fieldErrors.email) {
+      setError("Cannot register: " + fieldErrors.email);
+      return;
+    }
 
     // Validate all fields
     if (!name.trim()) {
@@ -93,11 +244,33 @@ function Signup() {
     setIsLoading(true);
 
     try {
-      await signup(email, password, name, salesid);
-      setSuccess("Account created successfully! Redirecting to login...");
-      setTimeout(() => {
-        navigate("/login");
-      }, 1500);
+      const result = await signup(email, password, name, salesid);
+
+      // Check if backend returned an error
+      if (result && result.error) {
+        setError(result.error);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if email verification is required
+      if (result && result.verification_required) {
+        if (result.email_sent) {
+          setSuccess(
+            `Account created successfully! A verification email has been sent to ${email}. Please check your inbox (and spam folder) to verify your account.`
+          );
+        } else {
+          setSuccess(
+            `Account created successfully! However, we couldn't send the verification email. Please contact support or try signing up again.`
+          );
+        }
+        // Don't auto-redirect, let user verify email first
+      } else {
+        setSuccess("Account created successfully! Redirecting to login...");
+        setTimeout(() => {
+          navigate("/login");
+        }, 1500);
+      }
     } catch (err) {
       setError(err.message || "Network error. Please check your connection and try again.");
     } finally {
@@ -108,6 +281,11 @@ function Signup() {
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && isFormValid && !isLoading) {
       handleSubmit(e);
+    }
+    // Clear errors on Escape key
+    if (e.key === "Escape") {
+      setError("");
+      setSuccess("");
     }
   };
 
@@ -252,7 +430,7 @@ function Signup() {
       `}</style>
 
       <div
-        className="min-h-screen flex flex-col items-center justify-center"
+        className="min-h-screen flex flex-col items-center justify-center px-4 py-8 sm:px-6 lg:px-8"
         style={{
           background: `
             radial-gradient(circle at 25% 25%, rgba(30, 58, 138, 0.3), transparent 25%),
@@ -264,12 +442,12 @@ function Signup() {
           `,
         }}
       >
-        <div className="absolute top-8 left-8 text-right">
+        <div className="absolute top-4 left-4 sm:top-8 sm:left-8 text-right">
           <h1
-            className="text-5xl font-bold"
+            className="text-3xl sm:text-4xl lg:text-5xl font-bold"
             style={{
               color: "rgba(255, 255, 255, 0.9)",
-              WebkitTextStroke: "1px rgba(255, 255, 255, 0.3)",
+              WebkitTextStroke: "0.5px rgba(255, 255, 255, 0.3)",
               textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
               filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
               position: "relative",
@@ -277,6 +455,7 @@ function Signup() {
           >
             Sales Order
             <span
+              className="hidden sm:inline-block"
               style={{
                 position: "absolute",
                 right: "-32px",
@@ -290,10 +469,10 @@ function Signup() {
             ></span>
           </h1>
           <p
-            className="text-white text-2xl tracking-widest"
+            className="text-white text-lg sm:text-xl lg:text-2xl tracking-widest"
             style={{
               color: "rgba(255, 255, 255, 0.9)",
-              WebkitTextStroke: "1px rgba(255, 255, 255, 0.3)",
+              WebkitTextStroke: "0.5px rgba(255, 255, 255, 0.3)",
               textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
               filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
             }}
@@ -303,7 +482,7 @@ function Signup() {
         </div>
 
         <div
-          className="flex flex-col items-center justify-center p-8 rounded-3xl shadow-2xl"
+          className="w-full max-w-md flex flex-col items-center justify-center p-6 sm:p-8 rounded-3xl shadow-2xl mt-24 sm:mt-0"
           style={{
             backgroundColor: "rgba(0, 15, 33, 0.25)",
             backdropFilter: "blur(20px)",
@@ -312,7 +491,7 @@ function Signup() {
               "0 8px 32px rgba(0, 0, 0, 0.37), inset 0 0 80px rgba(0, 200, 255, 0.1)",
           }}
         >
-          <h1 className="text-white text-4xl font-bold mb-6">Sign Up</h1>
+          <h1 className="text-white text-3xl sm:text-4xl font-bold mb-6">Sign Up</h1>
 
           <div className="w-full mb-4">
             <label htmlFor="name_input" className="text-gray-300 mb-1 block">Name</label>
@@ -323,36 +502,71 @@ function Signup() {
                 type="text"
                 name="name_input"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (touchedFields.name) {
+                    handleFieldBlur("name", e.target.value);
+                  }
+                }}
+                onBlur={(e) => handleFieldBlur("name", e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Enter your name"
                 disabled={isLoading}
                 autoFocus
                 aria-label="Full name"
                 aria-required="true"
-                aria-invalid={!name.trim() && error ? "true" : "false"}
+                aria-invalid={touchedFields.name && fieldErrors.name ? "true" : "false"}
               />
             </div>
+            {touchedFields.name && fieldErrors.name && (
+              <p className="text-red-400 text-sm mt-1" role="alert">{fieldErrors.name}</p>
+            )}
           </div>
 
           <div className="w-full mb-4">
-            <label htmlFor="salesid_input" className="text-gray-300 mb-1 block">Sales-id</label>
-            <div className="magic-ring">
+            <label htmlFor="salesid_input" className="text-gray-300 mb-1 block">
+              Sales ID
+              <span className="text-gray-400 text-xs ml-2">(exactly 5 digits)</span>
+            </label>
+            <div className="magic-ring relative">
               <input
                 id="salesid_input"
-                className="input-base w-full px-4 py-3"
+                className="input-base w-full px-4 py-3 pr-10"
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 name="salesid_input"
                 value={salesid}
-                onChange={(e) => setSalesid(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, ""); // Only allow digits
+                  setSalesid(value);
+                  if (touchedFields.salesid) {
+                    handleFieldBlur("salesid", value);
+                  }
+                }}
+                onBlur={(e) => handleFieldBlur("salesid", e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Enter your sales-id"
+                placeholder="e.g., 12345"
                 disabled={isLoading}
+                maxLength={5}
                 aria-label="Sales ID"
                 aria-required="true"
-                aria-invalid={!salesid.trim() && error ? "true" : "false"}
+                aria-invalid={touchedFields.salesid && fieldErrors.salesid ? "true" : "false"}
               />
+              {checkingSalesId && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Checking availability">
+                  <Loader2 className="animate-spin text-blue-400" size={20} />
+                </div>
+              )}
+              {!checkingSalesId && touchedFields.salesid && salesid.length === 5 && !fieldErrors.salesid && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Sales ID available">
+                  <Check className="text-green-500" size={20} />
+                </div>
+              )}
             </div>
+            {touchedFields.salesid && fieldErrors.salesid && (
+              <p className="text-red-400 text-sm mt-1" role="alert">{fieldErrors.salesid}</p>
+            )}
           </div>
 
           <div className="w-full mb-4">
@@ -364,26 +578,39 @@ function Signup() {
                 type="email"
                 name="email_input"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (touchedFields.email) {
+                    handleFieldBlur("email", e.target.value);
+                  }
+                }}
+                onBlur={(e) => handleFieldBlur("email", e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Enter your email"
                 disabled={isLoading}
                 aria-label="Email address"
                 aria-required="true"
-                aria-invalid={email && !isEmailValid ? "true" : "false"}
-                aria-describedby={email && !isEmailValid ? "email-error" : undefined}
+                aria-invalid={touchedFields.email && fieldErrors.email ? "true" : "false"}
               />
-              {email && isEmailValid && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Valid email">
+              {checkingEmail && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Checking email availability">
+                  <Loader2 className="animate-spin text-blue-400" size={20} />
+                </div>
+              )}
+              {!checkingEmail && email && isEmailValid && !fieldErrors.email && touchedFields.email && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Email available">
                   <Check className="text-green-500" size={20} />
                 </div>
               )}
-              {email && !isEmailValid && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Invalid email">
+              {!checkingEmail && email && touchedFields.email && fieldErrors.email && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Invalid or taken email">
                   <X className="text-red-500" size={20} />
                 </div>
               )}
             </div>
+            {touchedFields.email && fieldErrors.email && (
+              <p className="text-red-400 text-sm mt-1" role="alert">{fieldErrors.email}</p>
+            )}
           </div>
 
           <div className="w-full mb-6">
@@ -395,12 +622,23 @@ function Signup() {
                 type={showPassword ? "text" : "password"}
                 name="password_input"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (touchedFields.password) {
+                    handleFieldBlur("password", e.target.value);
+                  }
+                }}
+                onBlur={(e) => {
+                  setPasswordFocused(false);
+                  handleFieldBlur("password", e.target.value);
+                }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setPasswordFocused(true)}
-                onBlur={() => setPasswordFocused(false)}
                 placeholder="Enter your password"
                 disabled={isLoading}
+                aria-label="Password"
+                aria-required="true"
+                aria-invalid={touchedFields.password && fieldErrors.password ? "true" : "false"}
               />
               <button
                 onClick={(e) => {
@@ -411,6 +649,7 @@ function Signup() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10"
                 type="button"
                 tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -475,8 +714,19 @@ function Signup() {
                     )}
                     <span>One number</span>
                   </li>
+                  <li className="flex items-center gap-2 text-gray-200">
+                    {passwordChecks.special ? (
+                      <Check className="text-green-500" size={16} />
+                    ) : (
+                      <X className="text-red-500" size={16} />
+                    )}
+                    <span>One special character (!@#$%^&*...)</span>
+                  </li>
                 </ul>
               </div>
+            )}
+            {touchedFields.password && fieldErrors.password && !passwordFocused && (
+              <p className="text-red-400 text-sm mt-1" role="alert">{fieldErrors.password}</p>
             )}
           </div>
 
@@ -491,15 +741,17 @@ function Signup() {
                 value={confirm_password}
                 onChange={(e) => {
                   setConfirmPassword(e.target.value);
-                  if (password !== e.target.value) {
-                    setError("Passwords don't match!");
-                  } else {
-                    setError("");
+                  if (touchedFields.confirmPassword) {
+                    handleFieldBlur("confirmPassword", e.target.value);
                   }
                 }}
+                onBlur={(e) => handleFieldBlur("confirmPassword", e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Confirm your password"
                 disabled={isLoading}
+                aria-label="Confirm password"
+                aria-required="true"
+                aria-invalid={touchedFields.confirmPassword && fieldErrors.confirmPassword ? "true" : "false"}
               />
               <button
                 onClick={(e) => {
@@ -510,30 +762,42 @@ function Signup() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10"
                 type="button"
                 tabIndex={-1}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
                 {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+            {touchedFields.confirmPassword && fieldErrors.confirmPassword && (
+              <p className="text-red-400 text-sm mt-1" role="alert">{fieldErrors.confirmPassword}</p>
+            )}
           </div>
 
           <div className="w-full mb-4">
-            <label className="flex items-start gap-2 cursor-pointer">
+            <label className="flex items-start gap-2 cursor-pointer group">
               <input
                 type="checkbox"
                 checked={agreedToTerms}
                 onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="w-4 h-4 mt-0.5 rounded border-gray-400 bg-transparent cursor-pointer flex-shrink-0"
+                onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Enter") {
+                    e.preventDefault();
+                    setAgreedToTerms(!agreedToTerms);
+                  }
+                }}
+                className="w-4 h-4 mt-0.5 rounded border-gray-400 bg-transparent cursor-pointer flex-shrink-0 focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-transparent"
                 disabled={isLoading}
+                aria-label="Agree to terms and privacy policy"
+                aria-required="true"
               />
-              <span className="text-gray-300 text-sm">
+              <span className="text-gray-300 text-sm sm:text-base">
                 I agree to the{" "}
-                <a href="/terms" className="text-blue-300 hover:underline" target="_blank" rel="noopener noreferrer">
+                <Link to="/terms" className="text-blue-300 hover:underline focus:outline-none focus:ring-2 focus:ring-cyan-400 rounded">
                   Terms of Service
-                </a>{" "}
+                </Link>{" "}
                 and{" "}
-                <a href="/privacy" className="text-blue-300 hover:underline" target="_blank" rel="noopener noreferrer">
+                <Link to="/privacy" className="text-blue-300 hover:underline focus:outline-none focus:ring-2 focus:ring-cyan-400 rounded">
                   Privacy Policy
-                </a>
+                </Link>
               </span>
             </label>
           </div>
@@ -579,7 +843,7 @@ function Signup() {
               position: "relative",
               cursor: !isFormValid || isLoading ? "not-allowed" : "pointer",
             }}
-            className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md flex items-center justify-center gap-2"
+            className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md flex items-center justify-center gap-2 text-base sm:text-lg"
           >
             <div className="ripple-container" ref={rippleRef}>
               <span className="ripple-circle"></span>
@@ -587,14 +851,15 @@ function Signup() {
             {isLoading ? (
               <>
                 <Loader2 className="animate-spin" size={20} />
-                <span>Creating Account...</span>
+                <span className="hidden sm:inline">Creating Account...</span>
+                <span className="sm:hidden">Creating...</span>
               </>
             ) : (
               "Sign Up"
             )}
           </button>
 
-          <p className="text-gray-300 mt-3 px-4 py-3">
+          <p className="text-gray-300 mt-3 px-4 py-3 text-sm sm:text-base text-center">
             Have an account? <Link to="/login" className="text-blue-300 cursor-pointer hover:underline">Log in</Link>
           </p>
         </div>

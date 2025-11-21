@@ -1,5 +1,5 @@
 from .database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary, DateTime
 
 class User(Base):
     __tablename__ = 'users'
@@ -9,6 +9,9 @@ class User(Base):
     password = Column(LargeBinary, nullable=False)
     salesid = Column(Integer, unique=True, nullable=False)
     name = Column(String(255), nullable=False)
+    email_verified = Column(Boolean, default=False, nullable=False)
+    verification_token = Column(String(255), nullable=True)
+    verification_token_expiry = Column(DateTime, nullable=True)
 
 class Order(Base):
     __tablename__ = 'orders'

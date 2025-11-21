@@ -4,3 +4,7 @@ psycopg2-binary
 python-dotenv
 sqlalchemy
 bcrypt
+fastapi-mail
+pydantic[email]
+jinja2
+aiofiles

@@ -36,6 +36,11 @@ export const AuthProvider = ({ children }) => {
 
     const data = await response.json()
 
+    // Check for email verification error
+    if (data.error) {
+      throw new Error(data.error)
+    }
+
     if (!response.ok || data.message === 'Incorrect Login or Password') {
       throw new Error(data.message || 'Invalid email or password')
     }
