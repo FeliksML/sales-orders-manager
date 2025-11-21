@@ -1,11 +1,14 @@
 import { useState, useRef } from "react";
 import { Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 function Signup() {
   const navigate = useNavigate();
+  const { signup } = useAuth();
   const rippleRef = useRef(null);
   const passwordRef = useRef(null);
+  const confirmPasswordRef = useRef(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,8 +18,10 @@ function Signup() {
   const [salesid, setSalesid] = useState("");
   const [confirm_password, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const passwordChecks = {
     length: password.length >= 8,
@@ -27,6 +32,25 @@ function Signup() {
 
   const allPasswordChecksPassed = Object.values(passwordChecks).every(Boolean);
 
+  // Password strength calculation
+  const getPasswordStrength = () => {
+    if (!password) return { score: 0, label: "", color: "" };
+
+    let score = 0;
+    if (passwordChecks.length) score++;
+    if (passwordChecks.uppercase) score++;
+    if (passwordChecks.lowercase) score++;
+    if (passwordChecks.number) score++;
+    if (password.length >= 12) score++;
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++; // Special char
+
+    if (score <= 2) return { score: 33, label: "Weak", color: "#ef4444" };
+    if (score <= 4) return { score: 66, label: "Medium", color: "#f59e0b" };
+    return { score: 100, label: "Strong", color: "#10b981" };
+  };
+
+  const passwordStrength = getPasswordStrength();
+
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const isFormValid =
@@ -34,7 +58,8 @@ function Signup() {
     salesid.trim() !== "" &&
     isEmailValid &&
     allPasswordChecksPassed &&
-    password === confirm_password;
+    password === confirm_password &&
+    agreedToTerms;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -68,24 +93,13 @@ function Signup() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, salesid, name }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Signup failed. Please try again.");
-      } else {
-        setSuccess("Account created successfully! Redirecting to login...");
-        setTimeout(() => {
-          navigate("/login");
-        }, 1500);
-      }
+      await signup(email, password, name, salesid);
+      setSuccess("Account created successfully! Redirecting to login...");
+      setTimeout(() => {
+        navigate("/login");
+      }, 1500);
     } catch (err) {
-      setError("Network error. Please check your connection and try again.");
+      setError(err.message || "Network error. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -301,9 +315,10 @@ function Signup() {
           <h1 className="text-white text-4xl font-bold mb-6">Sign Up</h1>
 
           <div className="w-full mb-4">
-            <label className="text-gray-300 mb-1 block">Name</label>
+            <label htmlFor="name_input" className="text-gray-300 mb-1 block">Name</label>
             <div className="magic-ring">
               <input
+                id="name_input"
                 className="input-base w-full px-4 py-3"
                 type="text"
                 name="name_input"
@@ -312,14 +327,19 @@ function Signup() {
                 onKeyDown={handleKeyDown}
                 placeholder="Enter your name"
                 disabled={isLoading}
+                autoFocus
+                aria-label="Full name"
+                aria-required="true"
+                aria-invalid={!name.trim() && error ? "true" : "false"}
               />
             </div>
           </div>
 
           <div className="w-full mb-4">
-            <label className="text-gray-300 mb-1 block">Sales-id</label>
+            <label htmlFor="salesid_input" className="text-gray-300 mb-1 block">Sales-id</label>
             <div className="magic-ring">
               <input
+                id="salesid_input"
                 className="input-base w-full px-4 py-3"
                 type="text"
                 name="salesid_input"
@@ -328,15 +348,19 @@ function Signup() {
                 onKeyDown={handleKeyDown}
                 placeholder="Enter your sales-id"
                 disabled={isLoading}
+                aria-label="Sales ID"
+                aria-required="true"
+                aria-invalid={!salesid.trim() && error ? "true" : "false"}
               />
             </div>
           </div>
 
           <div className="w-full mb-4">
-            <label className="text-gray-300 mb-1 block">Email Address</label>
-            <div className="magic-ring">
+            <label htmlFor="email_input" className="text-gray-300 mb-1 block">Email Address</label>
+            <div className="magic-ring relative">
               <input
-                className="input-base w-full px-4 py-3"
+                id="email_input"
+                className="input-base w-full px-4 py-3 pr-10"
                 type="email"
                 name="email_input"
                 value={email}
@@ -344,7 +368,21 @@ function Signup() {
                 onKeyDown={handleKeyDown}
                 placeholder="Enter your email"
                 disabled={isLoading}
+                aria-label="Email address"
+                aria-required="true"
+                aria-invalid={email && !isEmailValid ? "true" : "false"}
+                aria-describedby={email && !isEmailValid ? "email-error" : undefined}
               />
+              {email && isEmailValid && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Valid email">
+                  <Check className="text-green-500" size={20} />
+                </div>
+              )}
+              {email && !isEmailValid && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10" aria-label="Invalid email">
+                  <X className="text-red-500" size={20} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -377,6 +415,28 @@ function Signup() {
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+
+            {/* Password Strength Meter */}
+            {password && (
+              <div className="w-full mt-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-gray-400">Password Strength:</span>
+                  <span className="text-xs font-medium" style={{ color: passwordStrength.color }}>
+                    {passwordStrength.label}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-300 ease-out rounded-full"
+                    style={{
+                      width: `${passwordStrength.score}%`,
+                      backgroundColor: passwordStrength.color
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {passwordFocused && (
               <div
                 className="w-full mt-2 mb-4 px-4 py-3 rounded-lg border border-cyan-400/40 bg-[rgba(10,22,40,0.6)] backdrop-blur-md shadow-sm text-sm text-gray-200"
@@ -422,10 +482,11 @@ function Signup() {
 
           <div className="w-full mb-6">
             <label className="text-gray-300 mb-1 block">Confirm Password</label>
-            <div className="magic-ring">
+            <div className="magic-ring relative">
               <input
-                className="input-base w-full px-4 py-3"
-                type="password"
+                ref={confirmPasswordRef}
+                className="input-base w-full px-4 py-3 pr-12"
+                type={showConfirmPassword ? "text" : "password"}
                 name="confirm_password_input"
                 value={confirm_password}
                 onChange={(e) => {
@@ -440,11 +501,53 @@ function Signup() {
                 placeholder="Confirm your password"
                 disabled={isLoading}
               />
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowConfirmPassword(!showConfirmPassword);
+                  confirmPasswordRef.current.focus();
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10"
+                type="button"
+                tabIndex={-1}
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
           </div>
 
-          {error && <p className="text-red-400 mb-3">{error}</p>}
-          {success && <p className="text-green-400 mb-3">{success}</p>}
+          <div className="w-full mb-4">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="w-4 h-4 mt-0.5 rounded border-gray-400 bg-transparent cursor-pointer flex-shrink-0"
+                disabled={isLoading}
+              />
+              <span className="text-gray-300 text-sm">
+                I agree to the{" "}
+                <a href="/terms" className="text-blue-300 hover:underline" target="_blank" rel="noopener noreferrer">
+                  Terms of Service
+                </a>{" "}
+                and{" "}
+                <a href="/privacy" className="text-blue-300 hover:underline" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </a>
+              </span>
+            </label>
+          </div>
+
+          {error && (
+            <p className="text-red-400 mb-3" role="alert" aria-live="assertive">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="text-green-400 mb-3" role="status" aria-live="polite">
+              {success}
+            </p>
+          )}
 
           <button
             onClick={(e) => {

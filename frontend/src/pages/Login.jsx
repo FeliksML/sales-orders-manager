@@ -1,12 +1,68 @@
 import { useState, useRef } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { useAuth } from "../contexts/AuthContext"
 
 function Login() {
+  const navigate = useNavigate()
+  const { login } = useAuth()
   const rippleRef = useRef(null)
+  const passwordRef = useRef(null)
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  
+  const [success, setSuccess] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  const isFormValid = isEmailValid && password.trim() !== ""
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    // Clear previous messages
+    setError("")
+    setSuccess("")
+
+    // Validate fields
+    if (!isEmailValid) {
+      setError("Please enter a valid email address")
+      return
+    }
+    if (!password.trim()) {
+      setError("Please enter your password")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      await login(email, password)
+      setSuccess("Login successful! Redirecting...")
+
+      if (rememberMe) {
+        localStorage.setItem("rememberMe", "true")
+      }
+
+      setTimeout(() => {
+        navigate("/dashboard")
+      }, 1500)
+    } catch (err) {
+      setError(err.message || "Network error. Please check your connection and try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && isFormValid && !isLoading) {
+      handleSubmit(e)
+    }
+  }
+
   return (
     <>
       <style>{`
@@ -208,78 +264,129 @@ function Login() {
           <h1 className="text-white text-4xl font-bold mb-6">Login</h1>
           
           <div className="w-full mb-4">
-            <label className="text-gray-300 mb-1 block">Email Address</label>
+            <label htmlFor="email_input" className="text-gray-300 mb-1 block">Email Address</label>
             <div className="magic-ring">
               <input
+                id="email_input"
                 className="input-base w-full px-4 py-3"
                 type="email"
                 name="email_input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Enter your email"
+                disabled={isLoading}
+                autoFocus
+                aria-label="Email address"
+                aria-required="true"
+                aria-invalid={email && !isEmailValid ? "true" : "false"}
               />
             </div>
           </div>
-          
-          <div className="w-full mb-6">
-            <label className="text-gray-300 mb-1 block">Password</label>
-            <div className="magic-ring">
-              <input 
-                className="input-base w-full px-4 py-3"
-                type="password" 
+
+          <div className="w-full mb-4">
+            <label htmlFor="password_input" className="text-gray-300 mb-1 block">Password</label>
+            <div className="magic-ring relative">
+              <input
+                id="password_input"
+                ref={passwordRef}
+                className="input-base w-full px-4 py-3 pr-12"
+                type={showPassword ? "text" : "password"}
                 name="password_input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Enter your password"
+                disabled={isLoading}
+                aria-label="Password"
+                aria-required="true"
               />
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  setShowPassword(!showPassword)
+                  passwordRef.current.focus()
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10"
+                type="button"
+                tabIndex={-1}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
           </div>
 
-          {error && <p className="text-red-400 mb-3">{error}</p>}
+          <div className="w-full mb-4 flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-400 bg-transparent cursor-pointer"
+                disabled={isLoading}
+              />
+              <span className="text-gray-300 text-sm">Remember me</span>
+            </label>
+            <Link to="/forgot-password" className="text-blue-300 text-sm hover:underline">
+              Forgot password?
+            </Link>
+          </div>
 
-          <button 
+          {error && (
+            <p className="text-red-400 mb-3" role="alert" aria-live="assertive">
+              {error}
+            </p>
+          )}
+          {success && (
+            <p className="text-green-400 mb-3" role="status" aria-live="polite">
+              {success}
+            </p>
+          )}
+
+          <button
             onClick={(e) => {
               // Ripple effect
-              const button = e.currentTarget
-              const rippleContainer = rippleRef.current
-              const circle = rippleContainer.querySelector('.ripple-circle')
-              
-              const rect = button.getBoundingClientRect()
-              const x = e.clientX - rect.left
-              const y = e.clientY - rect.top
-              
-              circle.style.left = x + 'px'
-              circle.style.top = y + 'px'
-              
-              rippleContainer.classList.remove('active')
-              void rippleContainer.offsetWidth
-              rippleContainer.classList.add('active')
-              
-              // Login request
-              fetch("http://127.0.0.1:8000/auth/login", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({email, password})
-              })
-              .then(response => response.json())
-              .then(data => {
-                if (data.message === "Incorrect Login or Password") {
-                  setError(data.message)
-                } else {
-                  console.log("Login successful!")
-                }
-              })
+              if (!isLoading && isFormValid) {
+                const button = e.currentTarget
+                const rippleContainer = rippleRef.current
+                const circle = rippleContainer.querySelector('.ripple-circle')
+
+                const rect = button.getBoundingClientRect()
+                const x = e.clientX - rect.left
+                const y = e.clientY - rect.top
+
+                circle.style.left = x + 'px'
+                circle.style.top = y + 'px'
+
+                rippleContainer.classList.remove('active')
+                void rippleContainer.offsetWidth
+                rippleContainer.classList.add('active')
+              }
+
+              handleSubmit(e)
             }}
+            disabled={!isFormValid || isLoading}
             style={{
-              background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)',
-              position: 'relative'
+              background: !isFormValid || isLoading
+                ? 'linear-gradient(90deg, #6b7280 0%, #4b5563 100%)'
+                : 'linear-gradient(90deg, #2563eb 0%, #059669 100%)',
+              position: 'relative',
+              cursor: !isFormValid || isLoading ? 'not-allowed' : 'pointer'
             }}
-            className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md"
+            className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md flex items-center justify-center gap-2"
           >
             <div className="ripple-container" ref={rippleRef}>
               <span className="ripple-circle"></span>
             </div>
-            Login
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                <span>Logging in...</span>
+              </>
+            ) : (
+              "Login"
+            )}
           </button>
 
           <p className="text-gray-300 mt-3 px-4 py-3">
