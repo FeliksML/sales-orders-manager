@@ -1,4 +1,5 @@
 import { useState, useRef } from "react"
+import { Link } from "react-router-dom"
 
 function Login() {
   const rippleRef = useRef(null)
@@ -282,7 +283,7 @@ function Login() {
           </button>
 
           <p className="text-gray-300 mt-3 px-4 py-3">
-            Don't have an account? <a className="text-blue-300 cursor-pointer hover:underline">Sign up</a>
+            Don't have an account? <Link to="/signup" className="text-blue-300 cursor-pointer hover:underline">Sign up</Link>
           </p>
         </div>
       </div>

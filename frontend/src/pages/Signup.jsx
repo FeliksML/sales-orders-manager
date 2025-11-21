@@ -1,18 +1,102 @@
-import { useState, useRef } from "react"
-import { Eye, EyeOff } from "lucide-react"
+import { useState, useRef } from "react";
+import { Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 
 function Signup() {
-  const rippleRef = useRef(null)
-  const passwordRef = useRef(null)
-  
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [name, setName] = useState("")
-  const [salesid, setSalesid] = useState("")
-  const [confirm_password, setConfirmPassword] = useState("")
-  const [showPassord, setShowPassword] = useState(false)
-  
+  const navigate = useNavigate();
+  const rippleRef = useRef(null);
+  const passwordRef = useRef(null);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [name, setName] = useState("");
+  const [salesid, setSalesid] = useState("");
+  const [confirm_password, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const passwordChecks = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+  };
+
+  const allPasswordChecksPassed = Object.values(passwordChecks).every(Boolean);
+
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const isFormValid =
+    name.trim() !== "" &&
+    salesid.trim() !== "" &&
+    isEmailValid &&
+    allPasswordChecksPassed &&
+    password === confirm_password;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Clear previous messages
+    setError("");
+    setSuccess("");
+
+    // Validate all fields
+    if (!name.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+    if (!salesid.trim()) {
+      setError("Please enter your sales ID");
+      return;
+    }
+    if (!isEmailValid) {
+      setError("Please enter a valid email address");
+      return;
+    }
+    if (!allPasswordChecksPassed) {
+      setError("Password does not meet requirements");
+      return;
+    }
+    if (password !== confirm_password) {
+      setError("Passwords don't match!");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, salesid, name }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "Signup failed. Please try again.");
+      } else {
+        setSuccess("Account created successfully! Redirecting to login...");
+        setTimeout(() => {
+          navigate("/login");
+        }, 1500);
+      }
+    } catch (err) {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && isFormValid && !isLoading) {
+      handleSubmit(e);
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -135,9 +219,9 @@ function Signup() {
           z-index: 3;
           color: #e5e7eb;
         }
-        
+
         .input-base:focus {
-          box-shadow: 
+          box-shadow:
             0 0 0 3px rgba(0, 200, 255, 0.2),
             inset 0 0 20px rgba(0, 200, 255, 0.15);
         }
@@ -153,7 +237,7 @@ function Signup() {
         }
       `}</style>
 
-      <div 
+      <div
         className="min-h-screen flex flex-col items-center justify-center"
         style={{
           background: `
@@ -163,52 +247,55 @@ function Signup() {
             radial-gradient(circle at 25% 75%, rgba(5, 150, 105, 0.18), transparent 30%),
             radial-gradient(ellipse 1200px 800px at 50% 50%, rgba(20, 125, 190, 0.08), transparent 50%),
             linear-gradient(142deg, #1e40af, #0d4f8b 30%, #067a5b 70%, #059669)
-          `
+          `,
         }}
       >
-        <div className="absolute top-8 left-8 text-right"> 
-          <h1 
+        <div className="absolute top-8 left-8 text-right">
+          <h1
             className="text-5xl font-bold"
             style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              WebkitTextStroke: '1px rgba(255, 255, 255, 0.3)',
-              textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
-              filter: 'drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))',
-              position: 'relative',
+              color: "rgba(255, 255, 255, 0.9)",
+              WebkitTextStroke: "1px rgba(255, 255, 255, 0.3)",
+              textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
+              filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
+              position: "relative",
             }}
           >
             Sales Order
-            <span style={{
-              position: 'absolute',
-              right: '-32px',
-              top: '60%',
-              transform: 'translateY(-50%)',
-              width: '28px',
-              height: '28px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #059669 100%)',
-              clipPath: 'polygon(0% 0%, 100% 50%, 0% 100%)'
-            }}></span>
+            <span
+              style={{
+                position: "absolute",
+                right: "-32px",
+                top: "60%",
+                transform: "translateY(-50%)",
+                width: "28px",
+                height: "28px",
+                background: "linear-gradient(135deg, #2563eb 0%, #059669 100%)",
+                clipPath: "polygon(0% 0%, 100% 50%, 0% 100%)",
+              }}
+            ></span>
           </h1>
-          <p 
-            className="text-white text-2xl tracking-widest" 
+          <p
+            className="text-white text-2xl tracking-widest"
             style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              WebkitTextStroke: '1px rgba(255, 255, 255, 0.3)',
-              textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
-              filter: 'drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))'
+              color: "rgba(255, 255, 255, 0.9)",
+              WebkitTextStroke: "1px rgba(255, 255, 255, 0.3)",
+              textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
+              filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
             }}
           >
             MANAGER
           </p>
         </div>
 
-        <div 
+        <div
           className="flex flex-col items-center justify-center p-8 rounded-3xl shadow-2xl"
           style={{
-            backgroundColor:'rgba(0, 15, 33, 0.25)', 
-            backdropFilter: 'blur(20px)', 
-            border: '1px solid rgba(0, 200, 255, 0.3)', 
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.37), inset 0 0 80px rgba(0, 200, 255, 0.1)'
+            backgroundColor: "rgba(0, 15, 33, 0.25)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(0, 200, 255, 0.3)",
+            boxShadow:
+              "0 8px 32px rgba(0, 0, 0, 0.37), inset 0 0 80px rgba(0, 200, 255, 0.1)",
           }}
         >
           <h1 className="text-white text-4xl font-bold mb-6">Sign Up</h1>
@@ -218,25 +305,29 @@ function Signup() {
             <div className="magic-ring">
               <input
                 className="input-base w-full px-4 py-3"
-                type="name"
+                type="text"
                 name="name_input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Enter your name"
+                disabled={isLoading}
               />
             </div>
           </div>
-          
+
           <div className="w-full mb-4">
             <label className="text-gray-300 mb-1 block">Sales-id</label>
             <div className="magic-ring">
               <input
                 className="input-base w-full px-4 py-3"
-                type="salesid"
+                type="text"
                 name="salesid_input"
                 value={salesid}
                 onChange={(e) => setSalesid(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Enter your sales-id"
+                disabled={isLoading}
               />
             </div>
           </div>
@@ -250,119 +341,163 @@ function Signup() {
                 name="email_input"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Enter your email"
+                disabled={isLoading}
               />
             </div>
           </div>
-          
+
           <div className="w-full mb-6">
             <label className="text-gray-300 mb-1 block">Password</label>
             <div className="magic-ring relative">
               <input
-                ref={passwordRef}   
+                ref={passwordRef}
                 className="input-base w-full px-4 py-3 pr-12"
-                type={showPassord ? "text" : "password"} 
+                type={showPassword ? "text" : "password"}
                 name="password_input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
                 placeholder="Enter your password"
+                disabled={isLoading}
               />
               <button
                 onClick={(e) => {
-                  e.preventDefault()
-                  setShowPassword(!showPassord)
-                  passwordRef.current.focus()
+                  e.preventDefault();
+                  setShowPassword(!showPassword);
+                  passwordRef.current.focus();
                 }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white z-10"
                 type="button"
                 tabIndex={-1}
               >
-                {showPassord ? <EyeOff size={20} /> : <Eye size={20} />}
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
             </div>
+            {passwordFocused && (
+              <div
+                className="w-full mt-2 mb-4 px-4 py-3 rounded-lg border border-cyan-400/40 bg-[rgba(10,22,40,0.6)] backdrop-blur-md shadow-sm text-sm text-gray-200"
+              >
+                <p className="text-gray-300 mb-1">Password must contain:</p>
+                <ul className="space-y-1">
+                  <li className="flex items-center gap-2 text-gray-200">
+                    {passwordChecks.length ? (
+                      <Check className="text-green-500" size={16} />
+                    ) : (
+                      <X className="text-red-500" size={16} />
+                    )}
+                    <span>At least 8 characters</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-200">
+                    {passwordChecks.uppercase ? (
+                      <Check className="text-green-500" size={16} />
+                    ) : (
+                      <X className="text-red-500" size={16} />
+                    )}
+                    <span>One uppercase letter</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-200">
+                    {passwordChecks.lowercase ? (
+                      <Check className="text-green-500" size={16} />
+                    ) : (
+                      <X className="text-red-500" size={16} />
+                    )}
+                    <span>One lowercase letter</span>
+                  </li>
+                  <li className="flex items-center gap-2 text-gray-200">
+                    {passwordChecks.number ? (
+                      <Check className="text-green-500" size={16} />
+                    ) : (
+                      <X className="text-red-500" size={16} />
+                    )}
+                    <span>One number</span>
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="w-full mb-6">
             <label className="text-gray-300 mb-1 block">Confirm Password</label>
             <div className="magic-ring">
-              <input 
+              <input
                 className="input-base w-full px-4 py-3"
-                type="password" 
+                type="password"
                 name="confirm_password_input"
                 value={confirm_password}
                 onChange={(e) => {
-                  setConfirmPassword(e.target.value)
+                  setConfirmPassword(e.target.value);
                   if (password !== e.target.value) {
-                    setError("Passwords don't match!")
+                    setError("Passwords don't match!");
                   } else {
-                    setError("")
+                    setError("");
                   }
                 }}
+                onKeyDown={handleKeyDown}
                 placeholder="Confirm your password"
+                disabled={isLoading}
               />
             </div>
           </div>
 
-          {error && <p className="text-green-400 mb-3">{error}</p>}
+          {error && <p className="text-red-400 mb-3">{error}</p>}
+          {success && <p className="text-green-400 mb-3">{success}</p>}
 
-          <button 
+          <button
             onClick={(e) => {
               // Ripple effect
-              const button = e.currentTarget
-              const rippleContainer = rippleRef.current
-              const circle = rippleContainer.querySelector('.ripple-circle')
-              
-              const rect = button.getBoundingClientRect()
-              const x = e.clientX - rect.left
-              const y = e.clientY - rect.top
-              
-              circle.style.left = x + 'px'
-              circle.style.top = y + 'px'
-              
-              rippleContainer.classList.remove('active')
-              void rippleContainer.offsetWidth
-              rippleContainer.classList.add('active')
-              
-              // Validation
-              if (password !== confirm_password) {
-                setError("Passwords don't match!")
-                return
+              if (!isLoading && isFormValid) {
+                const button = e.currentTarget;
+                const rippleContainer = rippleRef.current;
+                const circle = rippleContainer.querySelector(".ripple-circle");
+
+                const rect = button.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                circle.style.left = x + "px";
+                circle.style.top = y + "px";
+
+                rippleContainer.classList.remove("active");
+                void rippleContainer.offsetWidth;
+                rippleContainer.classList.add("active");
               }
-              
-              // Signup request
-              fetch("http://127.0.0.1:8000/auth/signup", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({email, password, salesid, name})
-              })
-              .then(response => response.json())
-              .then(data => {
-                if (data.message === "Incorrect Login or Password") {
-                  setError(data.message)
-                } else {
-                  setError("Login successful!")
-                }
-              })
+
+              handleSubmit(e);
             }}
+            disabled={!isFormValid || isLoading}
             style={{
-              background: 'linear-gradient(90deg, #2563eb 0%, #059669 100%)',
-              position: 'relative'
+              background: !isFormValid || isLoading
+                ? "linear-gradient(90deg, #6b7280 0%, #4b5563 100%)"
+                : "linear-gradient(90deg, #2563eb 0%, #059669 100%)",
+              position: "relative",
+              cursor: !isFormValid || isLoading ? "not-allowed" : "pointer",
             }}
-            className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md"
+            className="w-full text-white font-bold px-4 py-3 transition-transform active:scale-98 rounded-lg hover:opacity-90 shadow-md flex items-center justify-center gap-2"
           >
             <div className="ripple-container" ref={rippleRef}>
               <span className="ripple-circle"></span>
             </div>
-            Sign Up
+            {isLoading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                <span>Creating Account...</span>
+              </>
+            ) : (
+              "Sign Up"
+            )}
           </button>
 
           <p className="text-gray-300 mt-3 px-4 py-3">
-           Have an account? <a className="text-blue-300 cursor-pointer hover:underline">Log in</a>
+            Have an account? <Link to="/login" className="text-blue-300 cursor-pointer hover:underline">Log in</Link>
           </p>
         </div>
       </div>
     </>
-  )
+  );
 }
 
-export default Signup
+export default Signup;
