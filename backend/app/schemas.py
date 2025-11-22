@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from typing import Optional
-from datetime import date
+from typing import Optional, Dict, Any
+from datetime import date, datetime
 
 class UserSignup(BaseModel):
     email : str
@@ -73,6 +73,9 @@ class OrderUpdate(BaseModel):
 class OrderResponse(OrderBase):
     orderid: int
     userid: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    created_by: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -86,3 +89,40 @@ class OrderStats(BaseModel):
     total_tv: int
     total_mobile: int
     total_voice: int
+
+# Audit Trail Schemas
+class AuditLogResponse(BaseModel):
+    auditid: int
+    entity_type: str
+    entity_id: int
+    user_id: int
+    user_name: str
+    action: str
+    field_name: Optional[str] = None
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    snapshot: Optional[Dict[str, Any]] = None
+    change_reason: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class AuditHistoryResponse(BaseModel):
+    order_id: int
+    total_changes: int
+    audit_logs: list[AuditLogResponse]
+
+class RevertRequest(BaseModel):
+    timestamp: datetime
+    reason: Optional[str] = None
+
+class UserActivitySummary(BaseModel):
+    total_actions: int
+    creates: int
+    updates: int
+    deletes: int
+    bulk_operations: int
+    reverts: int
+    period_days: int

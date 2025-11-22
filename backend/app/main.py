@@ -3,6 +3,7 @@ from .auth import router as auth_router
 from .orders import router as orders_router
 from .scheduled_reports import router as scheduled_reports_router
 from .notifications import router as notifications_router
+from .audit import router as audit_router
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from .scheduler import start_scheduler, shutdown_scheduler
@@ -20,6 +21,7 @@ app.include_router(auth_router, prefix="/auth")
 app.include_router(orders_router, prefix="/api/orders", tags=["orders"])
 app.include_router(scheduled_reports_router, prefix="/api/scheduled-reports", tags=["scheduled-reports"])
 app.include_router(notifications_router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(audit_router, prefix="/api/audit", tags=["audit"])
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

@@ -12,6 +12,7 @@ from .auth import get_current_user, verify_recaptcha
 from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
 from .email_service import send_export_email
 from .notification_service import send_order_details_email
+from . import audit_service
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -45,11 +46,22 @@ def create_order(
     """Create a new order for the current user"""
     db_order = Order(
         userid=current_user.userid,
+        created_by=current_user.userid,
         **order.model_dump()
     )
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
+
+    # Log order creation to audit trail
+    audit_service.log_order_creation(
+        db=db,
+        order=db_order,
+        user=current_user,
+        ip_address=None,
+        reason="Order created"
+    )
+
     return db_order
 
 @router.get("/", response_model=List[OrderResponse])
@@ -237,13 +249,30 @@ def update_order(
             detail="Order not found"
         )
 
-    # Only update fields that are provided (not None)
+    # Capture old values before updating
     update_data = order_update.model_dump(exclude_unset=True)
+    old_values = {}
+    new_values = {}
+
     for key, value in update_data.items():
+        old_values[key] = getattr(db_order, key)
+        new_values[key] = value
         setattr(db_order, key, value)
 
     db.commit()
     db.refresh(db_order)
+
+    # Log the update to audit trail
+    audit_service.log_order_update(
+        db=db,
+        order=db_order,
+        old_values=old_values,
+        new_values=new_values,
+        user=current_user,
+        ip_address=None,
+        reason="Order updated"
+    )
+
     return db_order
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -265,6 +294,15 @@ def delete_order(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found"
         )
+
+    # Log deletion before actually deleting
+    audit_service.log_order_deletion(
+        db=db,
+        order=db_order,
+        user=current_user,
+        ip_address=None,
+        reason="Order deleted"
+    )
 
     db.delete(db_order)
     db.commit()
@@ -740,6 +778,18 @@ def bulk_mark_installed(
 
     db.commit()
 
+    # Log bulk operation
+    audit_service.log_bulk_operation(
+        db=db,
+        action='mark_installed',
+        entity_type='order',
+        entity_ids=request.order_ids,
+        user=current_user,
+        field_changes={'install_date': str(yesterday)},
+        ip_address=None,
+        reason="Bulk mark as installed"
+    )
+
     return {
         "message": f"Successfully marked {len(orders)} orders as installed",
         "updated_count": len(orders)
@@ -778,6 +828,18 @@ def bulk_reschedule(
 
     db.commit()
 
+    # Log bulk operation
+    audit_service.log_bulk_operation(
+        db=db,
+        action='reschedule',
+        entity_type='order',
+        entity_ids=request.order_ids,
+        user=current_user,
+        field_changes={'install_date': str(request.new_date)},
+        ip_address=None,
+        reason=f"Bulk rescheduled to {request.new_date}"
+    )
+
     return {
         "message": f"Successfully rescheduled {len(orders)} orders to {request.new_date}",
         "updated_count": len(orders),
@@ -810,6 +872,18 @@ def bulk_delete(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Some orders not found or don't belong to you"
         )
+
+    # Log bulk deletion before deleting
+    audit_service.log_bulk_operation(
+        db=db,
+        action='delete',
+        entity_type='order',
+        entity_ids=request.order_ids,
+        user=current_user,
+        field_changes=None,
+        ip_address=None,
+        reason="Bulk delete"
+    )
 
     # Delete all orders
     deleted_count = len(orders)

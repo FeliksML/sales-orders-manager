@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
+import AuditLog from './AuditLog'
 import { orderService } from '../services/orderService'
 
 function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
@@ -673,6 +674,11 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Audit Trail Section */}
+            <div className="mt-6 p-5 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20">
+              <AuditLog orderId={order.orderid} />
             </div>
           </div>
 
