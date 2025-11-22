@@ -1,5 +1,5 @@
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 function Dashboard() {
   const { user, logout } = useAuth()
@@ -24,6 +24,45 @@ function Dashboard() {
         `
       }}
     >
+      <Link to="/dashboard" className="absolute top-4 left-4 sm:top-8 sm:left-8 text-right cursor-pointer hover:opacity-80 transition-opacity">
+        <h1
+          className="text-3xl sm:text-4xl lg:text-5xl font-bold"
+          style={{
+            color: "rgba(255, 255, 255, 0.9)",
+            WebkitTextStroke: "0.5px rgba(255, 255, 255, 0.3)",
+            textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
+            filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
+            position: "relative",
+          }}
+        >
+          Sales Order
+          <span
+            className="hidden sm:inline-block"
+            style={{
+              position: "absolute",
+              right: "-32px",
+              top: "60%",
+              transform: "translateY(-50%)",
+              width: "28px",
+              height: "28px",
+              background: "linear-gradient(135deg, #2563eb 0%, #059669 100%)",
+              clipPath: "polygon(0% 0%, 100% 50%, 0% 100%)",
+            }}
+          ></span>
+        </h1>
+        <p
+          className="text-white text-lg sm:text-xl lg:text-2xl tracking-widest"
+          style={{
+            color: "rgba(255, 255, 255, 0.9)",
+            WebkitTextStroke: "0.5px rgba(255, 255, 255, 0.3)",
+            textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
+            filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
+          }}
+        >
+          MANAGER
+        </p>
+      </Link>
+
       <div
         className="max-w-2xl w-full p-8 rounded-3xl shadow-2xl"
         style={{
