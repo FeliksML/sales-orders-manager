@@ -1,0 +1,912 @@
+import { useState, useEffect } from 'react'
+import {
+  X, Edit2, Save, Calendar, User, MapPin, Phone, Briefcase, Package,
+  CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
+  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy
+} from 'lucide-react'
+import Card from './ui/Card'
+import AddressAutocomplete from './AddressAutocomplete'
+
+function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [copiedField, setCopiedField] = useState(null)
+  const [errors, setErrors] = useState({})
+  const [formData, setFormData] = useState({})
+
+  useEffect(() => {
+    if (order) {
+      console.log('OrderDetailsModal: Updating formData from order:', order)
+      setFormData({
+        spectrum_reference: order.spectrum_reference || '',
+        customer_account_number: order.customer_account_number || '',
+        customer_security_code: order.customer_security_code || '',
+        job_number: order.job_number || '',
+        business_name: order.business_name || '',
+        customer_name: order.customer_name || '',
+        customer_email: order.customer_email || '',
+        customer_address: order.customer_address || '',
+        customer_phone: order.customer_phone || '',
+        install_date: order.install_date || '',
+        install_time: order.install_time || '',
+        has_internet: order.has_internet || false,
+        has_voice: order.has_voice || 0,
+        has_tv: order.has_tv || false,
+        has_sbc: order.has_sbc || 0,
+        has_mobile: order.has_mobile || 0,
+        mobile_activated: order.mobile_activated || 0,
+        has_wib: order.has_wib || false,
+        notes: order.notes || ''
+      })
+    }
+  }, [order])
+
+  if (!isOpen || !order) return null
+
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }))
+    }
+  }
+
+  const validateForm = () => {
+    const newErrors = {}
+    if (!formData.spectrum_reference.trim()) newErrors.spectrum_reference = 'Required'
+    if (!formData.customer_account_number.trim()) newErrors.customer_account_number = 'Required'
+    if (!formData.business_name.trim()) newErrors.business_name = 'Required'
+    if (!formData.customer_name.trim()) newErrors.customer_name = 'Required'
+    if (!formData.customer_email.trim()) {
+      newErrors.customer_email = 'Required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customer_email)) {
+      newErrors.customer_email = 'Invalid email'
+    }
+    if (!formData.customer_phone.trim()) newErrors.customer_phone = 'Required'
+    if (!formData.install_date) newErrors.install_date = 'Required'
+    if (!formData.install_time.trim()) newErrors.install_time = 'Required'
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSave = async () => {
+    if (!validateForm()) return
+
+    setIsSubmitting(true)
+    try {
+      await onUpdate(order.orderid, formData)
+      // Update local state is already done via formData
+      setIsEditing(false)
+      setShowReschedule(false)
+    } catch (error) {
+      console.error('Failed to update order:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleMarkAsInstalled = async () => {
+    const now = new Date()
+    // Set to 2 days ago to ensure it shows as "Installed" not "Today"
+    const twoDaysAgo = new Date(now)
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+
+    const updatedData = {
+      ...formData,
+      install_date: twoDaysAgo.toISOString().split('T')[0],
+      install_time: now.toTimeString().split(' ')[0].substring(0, 5)
+    }
+
+    setIsSubmitting(true)
+    try {
+      await onUpdate(order.orderid, updatedData)
+      // Update local state to reflect the change immediately
+      setFormData(updatedData)
+    } catch (error) {
+      console.error('Failed to mark as installed:', error)
+      alert('Failed to mark as installed. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteClick = () => {
+    console.log('Delete button clicked for order:', order.orderid)
+    setShowDeleteConfirm(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    console.log('User confirmed deletion, calling onDelete...')
+    setIsSubmitting(true)
+
+    try {
+      await onDelete(order.orderid)
+      console.log('Order deleted successfully')
+      setShowDeleteConfirm(false)
+      onClose()
+    } catch (error) {
+      console.error('Failed to delete order:', error)
+      alert(`Failed to delete order: ${error.message || 'Unknown error'}`)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    console.log('Delete cancelled by user')
+    setShowDeleteConfirm(false)
+  }
+
+  const copyToClipboard = async (text, label) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(label)
+      console.log(`Copied ${label}: ${text}`)
+
+      // Clear the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedField(null)
+      }, 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
+
+  const formatPhoneNumber = (phone) => {
+    // Return empty string if phone is undefined, null, or empty
+    if (!phone) return ''
+
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, '')
+
+    // Format as (XXX) XXX-XXXX if 10 digits
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+    // Format as X-XXX-XXX-XXXX if 11 digits
+    if (cleaned.length === 11) {
+      return `${cleaned.slice(0, 1)}-${cleaned.slice(1, 4)}-${cleaned.slice(4, 7)}-${cleaned.slice(7)}`
+    }
+    // Return as-is if not a standard format
+    return phone
+  }
+
+  // Check if installation is complete (past install date)
+  const installDate = formData.install_date ? new Date(formData.install_date + 'T00:00:00') : new Date()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const isInstalled = installDate < today
+  const isToday = installDate.getTime() === today.getTime()
+  const isPending = installDate > today
+
+  const totalProducts =
+    (formData.has_internet ? 1 : 0) +
+    (formData.has_tv ? 1 : 0) +
+    formData.has_voice +
+    formData.has_mobile +
+    formData.has_sbc +
+    (formData.has_wib ? 1 : 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-5xl max-h-[90vh] flex flex-col">
+        <Card className="relative flex flex-col h-full overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-2xl font-bold text-white">Order Details</h2>
+                {isInstalled && (
+                  <span className="px-3 py-1 rounded-full bg-green-500/20 border border-green-500 text-green-300 text-sm font-medium flex items-center gap-1">
+                    <CheckCircle className="w-4 h-4" />
+                    Installed
+                  </span>
+                )}
+                {isToday && (
+                  <span className="px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500 text-blue-300 text-sm font-medium flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    Today
+                  </span>
+                )}
+                {isPending && (
+                  <span className="px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500 text-yellow-300 text-sm font-medium flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    Pending
+                  </span>
+                )}
+              </div>
+              <p className="text-gray-400 text-sm mt-1">Order #{order.orderid}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!isEditing && !showReschedule && (
+                <>
+                  {isPending && (
+                    <button
+                      onClick={() => setShowReschedule(true)}
+                      className="px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 transition-colors text-yellow-300 hover:text-yellow-200 text-sm font-medium flex items-center gap-1"
+                      title="Reschedule installation"
+                    >
+                      <CalendarClock className="w-4 h-4" />
+                      Reschedule
+                    </button>
+                  )}
+                  {(isPending || isToday) && (
+                    <button
+                      onClick={handleMarkAsInstalled}
+                      disabled={isSubmitting}
+                      className="px-3 py-1.5 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 transition-colors text-green-300 hover:text-green-200 text-sm font-medium flex items-center gap-1 disabled:opacity-50"
+                      title="Mark as installed"
+                    >
+                      <Check className="w-4 h-4" />
+                      Mark Installed
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="p-2 rounded-lg hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
+                    title="Edit order"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+              {(isEditing || showReschedule) && (
+                <button
+                  onClick={() => {
+                    setIsEditing(false)
+                    setShowReschedule(false)
+                    setErrors({})
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white text-sm"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto px-1 custom-scrollbar">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Customer & Installation */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Customer Information Card */}
+                <div className="p-5 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 rounded-lg bg-blue-500/20">
+                      <User className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white">Customer Information</h3>
+                  </div>
+
+                  {isEditing ? (
+                    <div className="space-y-4">
+                      <EditField
+                        icon={Hash}
+                        label="Spectrum Reference"
+                        value={formData.spectrum_reference}
+                        onChange={(v) => handleChange('spectrum_reference', v)}
+                        error={errors.spectrum_reference}
+                        required
+                      />
+                      <EditField
+                        icon={Hash}
+                        label="Account Number"
+                        value={formData.customer_account_number}
+                        onChange={(v) => handleChange('customer_account_number', v)}
+                        error={errors.customer_account_number}
+                        required
+                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <EditField
+                          icon={Shield}
+                          label="Security Code"
+                          value={formData.customer_security_code}
+                          onChange={(v) => handleChange('customer_security_code', v)}
+                        />
+                        <EditField
+                          icon={FileText}
+                          label="Job Number"
+                          value={formData.job_number}
+                          onChange={(v) => handleChange('job_number', v)}
+                        />
+                      </div>
+                      <EditField
+                        icon={Briefcase}
+                        label="Business Name"
+                        value={formData.business_name}
+                        onChange={(v) => handleChange('business_name', v)}
+                        error={errors.business_name}
+                        required
+                      />
+                      <EditField
+                        icon={User}
+                        label="Customer Name"
+                        value={formData.customer_name}
+                        onChange={(v) => handleChange('customer_name', v)}
+                        error={errors.customer_name}
+                        required
+                      />
+                      <EditField
+                        icon={Mail}
+                        label="Email Address"
+                        value={formData.customer_email}
+                        onChange={(v) => handleChange('customer_email', v)}
+                        error={errors.customer_email}
+                        type="email"
+                        required
+                      />
+                      <EditField
+                        icon={Phone}
+                        label="Phone Number"
+                        value={formData.customer_phone}
+                        onChange={(v) => handleChange('customer_phone', v)}
+                        error={errors.customer_phone}
+                        required
+                        type="tel"
+                      />
+                      <div className="pt-2">
+                        <AddressAutocomplete
+                          value={formData.customer_address}
+                          onChange={(v) => handleChange('customer_address', v)}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <InfoRow icon={Hash} label="Spectrum Ref" value={formData.spectrum_reference} highlight onCopy={copyToClipboard} isCopied={copiedField === 'Spectrum Ref'} />
+                      <InfoRow icon={Hash} label="Account #" value={formData.customer_account_number} onCopy={copyToClipboard} isCopied={copiedField === 'Account #'} />
+                      {formData.customer_security_code && (
+                        <InfoRow icon={Shield} label="Security Code" value={formData.customer_security_code} onCopy={copyToClipboard} isCopied={copiedField === 'Security Code'} />
+                      )}
+                      {formData.job_number && (
+                        <InfoRow icon={FileText} label="Job #" value={formData.job_number} onCopy={copyToClipboard} isCopied={copiedField === 'Job #'} />
+                      )}
+                      <InfoRow icon={Briefcase} label="Business" value={formData.business_name} highlight onCopy={copyToClipboard} isCopied={copiedField === 'Business'} />
+                      <InfoRow icon={User} label="Customer" value={formData.customer_name} highlight onCopy={copyToClipboard} isCopied={copiedField === 'Customer'} />
+                      <InfoRow icon={Mail} label="Email" value={formData.customer_email} onCopy={copyToClipboard} isCopied={copiedField === 'Email'} />
+                      <InfoRow icon={Phone} label="Phone" value={formatPhoneNumber(formData.customer_phone)} onCopy={copyToClipboard} isCopied={copiedField === 'Phone'} />
+                      {formData.customer_address && (
+                        <InfoRow icon={MapPin} label="Address" value={formData.customer_address} onCopy={copyToClipboard} isCopied={copiedField === 'Address'} />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Installation Card */}
+                <div className={`p-5 rounded-xl border ${
+                  isInstalled
+                    ? 'bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20'
+                    : isToday
+                    ? 'bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20'
+                    : 'bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border-yellow-500/20'
+                }`}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className={`p-2 rounded-lg ${
+                      isInstalled ? 'bg-green-500/20' : isToday ? 'bg-blue-500/20' : 'bg-yellow-500/20'
+                    }`}>
+                      <Calendar className={`w-5 h-5 ${
+                        isInstalled ? 'text-green-400' : isToday ? 'text-blue-400' : 'text-yellow-400'
+                      }`} />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white">Installation</h3>
+                  </div>
+
+                  {(isEditing || showReschedule) ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <EditField
+                          icon={Calendar}
+                          label="Date"
+                          value={formData.install_date}
+                          onChange={(v) => handleChange('install_date', v)}
+                          error={errors.install_date}
+                          type="date"
+                          required
+                        />
+                        <EditField
+                          icon={Clock}
+                          label="Time"
+                          value={formData.install_time}
+                          onChange={(v) => handleChange('install_time', v)}
+                          error={errors.install_time}
+                          type="time"
+                          required
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <InfoRow
+                        icon={Calendar}
+                        label="Date"
+                        value={new Date(formData.install_date + 'T00:00:00').toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                        highlight
+                      />
+                      <InfoRow icon={Clock} label="Time" value={formData.install_time} highlight />
+
+                      <div className={`mt-4 p-3 rounded-lg flex items-start gap-3 ${
+                        isInstalled
+                          ? 'bg-green-500/10 border border-green-500/30'
+                          : isToday
+                          ? 'bg-blue-500/10 border border-blue-500/30'
+                          : 'bg-yellow-500/10 border border-yellow-500/30'
+                      }`}>
+                        {isInstalled ? (
+                          <>
+                            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-green-300 font-medium">Installation Completed</p>
+                              <p className="text-green-400/70 text-sm mt-1">
+                                Completed on {new Date(formData.install_date + 'T00:00:00').toLocaleDateString()}
+                              </p>
+                            </div>
+                          </>
+                        ) : isToday ? (
+                          <>
+                            <Clock className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5 animate-pulse" />
+                            <div>
+                              <p className="text-blue-300 font-medium">Installation Today</p>
+                              <p className="text-blue-400/70 text-sm mt-1">
+                                Scheduled for {formData.install_time}
+                              </p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <AlertCircle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-yellow-300 font-medium">Upcoming Installation</p>
+                              <p className="text-yellow-400/70 text-sm mt-1">
+                                Scheduled for {new Date(formData.install_date + 'T00:00:00').toLocaleDateString()}
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes Card */}
+                <div className="p-5 rounded-xl bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 rounded-lg bg-purple-500/20">
+                      <FileText className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-white">Notes</h3>
+                  </div>
+                  {isEditing ? (
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => handleChange('notes', e.target.value)}
+                      rows={4}
+                      className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors resize-none"
+                      placeholder="Add any special notes or instructions..."
+                    />
+                  ) : (
+                    <p className="text-gray-300 text-sm leading-relaxed">
+                      {formData.notes || <span className="text-gray-500 italic">No notes added</span>}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column - Products */}
+              <div className="space-y-6">
+                {/* Products Card */}
+                <div className="p-5 rounded-xl bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border border-cyan-500/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-lg bg-cyan-500/20">
+                        <Package className="w-5 h-5 text-cyan-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white">Products</h3>
+                    </div>
+                    <span className="px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold">
+                      {totalProducts}
+                    </span>
+                  </div>
+
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <ProductToggleEdit
+                        icon={Wifi}
+                        label="Internet"
+                        checked={formData.has_internet}
+                        onChange={(v) => handleChange('has_internet', v)}
+                        color="blue"
+                      />
+                      <ProductToggleEdit
+                        icon={Tv}
+                        label="TV Service"
+                        checked={formData.has_tv}
+                        onChange={(v) => handleChange('has_tv', v)}
+                        color="purple"
+                      />
+                      <ProductToggleEdit
+                        icon={Radio}
+                        label="WIB"
+                        checked={formData.has_wib}
+                        onChange={(v) => handleChange('has_wib', v)}
+                        color="green"
+                      />
+                      <ProductCounterEdit
+                        icon={PhoneCall}
+                        label="Voice Lines"
+                        value={formData.has_voice}
+                        onChange={(v) => handleChange('has_voice', v)}
+                        color="orange"
+                      />
+                      <ProductCounterEdit
+                        icon={Smartphone}
+                        label="Mobile Lines"
+                        value={formData.has_mobile}
+                        onChange={(v) => handleChange('has_mobile', v)}
+                        subLabel="Activated"
+                        subValue={formData.mobile_activated}
+                        onSubChange={(v) => handleChange('mobile_activated', Math.min(v, formData.has_mobile))}
+                        showSub={formData.has_mobile > 0}
+                        color="indigo"
+                      />
+                      <ProductCounterEdit
+                        icon={Package}
+                        label="SBC"
+                        value={formData.has_sbc}
+                        onChange={(v) => handleChange('has_sbc', v)}
+                        color="pink"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {formData.has_internet && <ProductBadge icon={Wifi} label="Internet" color="blue" />}
+                      {formData.has_tv && <ProductBadge icon={Tv} label="TV Service" color="purple" />}
+                      {formData.has_wib && <ProductBadge icon={Radio} label="WIB" color="green" />}
+                      {formData.has_voice > 0 && <ProductBadge icon={PhoneCall} label="Voice Lines" count={formData.has_voice} color="orange" />}
+                      {formData.has_mobile > 0 && <ProductBadge icon={Smartphone} label="Mobile Lines" count={formData.has_mobile} color="indigo" />}
+                      {formData.has_sbc > 0 && <ProductBadge icon={Package} label="SBC" count={formData.has_sbc} color="pink" />}
+                      {totalProducts === 0 && (
+                        <div className="text-center py-8 text-gray-500">
+                          <Package className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                          <p className="text-sm">No products</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Activation Progress */}
+                {!isEditing && formData.has_mobile > 0 && (
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 border border-indigo-500/20">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Smartphone className="w-5 h-5 text-indigo-400" />
+                      <h4 className="text-white font-semibold">Mobile Activation</h4>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-400 text-sm">Progress</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-white">{formData.mobile_activated}</span>
+                        <span className="text-gray-400">/ {formData.has_mobile}</span>
+                        {formData.mobile_activated === formData.has_mobile ? (
+                          <CheckCircle className="w-5 h-5 text-green-400 ml-1" />
+                        ) : (
+                          <Clock className="w-5 h-5 text-yellow-400 ml-1" />
+                        )}
+                      </div>
+                    </div>
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-500"
+                        style={{ width: `${(formData.mobile_activated / formData.has_mobile) * 100}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      {formData.mobile_activated === formData.has_mobile
+                        ? 'All lines activated'
+                        : `${formData.has_mobile - formData.mobile_activated} pending activation`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex-shrink-0 flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+            <button
+              onClick={handleDeleteClick}
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-medium transition-colors border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Delete Order
+            </button>
+            {(isEditing || showReschedule) && (
+              <button
+                onClick={handleSave}
+                disabled={isSubmitting}
+                className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </Card>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteConfirm && (
+          <div className="absolute inset-0 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm z-10">
+            <Card className="max-w-md w-full">
+              <div className="p-6">
+                <div className="flex items-start gap-4 mb-6">
+                  <div className="p-3 rounded-full bg-red-500/20">
+                    <AlertCircle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-2">Delete Order?</h3>
+                    <p className="text-gray-300 text-sm leading-relaxed">
+                      Are you sure you want to delete this order? This action cannot be undone and all order data will be permanently removed.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleDeleteCancel}
+                    disabled={isSubmitting}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteConfirm}
+                    disabled={isSubmitting}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete Order'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Custom Scrollbar Styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 10px;
+          margin: 8px 0;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: linear-gradient(
+            180deg,
+            rgba(59, 130, 246, 0.5) 0%,
+            rgba(37, 99, 235, 0.5) 100%
+          );
+          border-radius: 10px;
+          border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(
+            180deg,
+            rgba(59, 130, 246, 0.7) 0%,
+            rgba(37, 99, 235, 0.7) 100%
+          );
+        }
+
+        /* Firefox */
+        .custom-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(59, 130, 246, 0.5) rgba(255, 255, 255, 0.05);
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// Helper components
+function InfoRow({ icon: Icon, label, value, highlight, onCopy, isCopied }) {
+  return (
+    <div className="flex items-start gap-3 py-2 group">
+      <Icon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">{label}</p>
+        <p className={`${highlight ? 'text-white font-medium' : 'text-gray-300'} break-words`}>
+          {value || <span className="text-gray-600 italic">Not set</span>}
+        </p>
+      </div>
+      {value && onCopy && (
+        <button
+          onClick={() => onCopy(value, label)}
+          className={`p-1.5 rounded transition-all flex-shrink-0 ${
+            isCopied
+              ? 'bg-green-500/20 text-green-400 scale-110'
+              : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300'
+          }`}
+          title={isCopied ? 'Copied!' : `Copy ${label}`}
+        >
+          {isCopied ? (
+            <Check className="w-3.5 h-3.5" />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function EditField({ icon: Icon, label, value, onChange, type = 'text', error, required }) {
+  return (
+    <div>
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
+        <Icon className="w-4 h-4" />
+        {label} {required && <span className="text-red-400">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full px-4 py-2.5 rounded-lg bg-white/5 border ${
+          error ? 'border-red-500' : 'border-white/10'
+        } text-white focus:outline-none focus:border-blue-500 transition-colors`}
+      />
+      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+    </div>
+  )
+}
+
+const colorMap = {
+  blue: 'bg-blue-500/10 border-blue-500/30 text-blue-300',
+  purple: 'bg-purple-500/10 border-purple-500/30 text-purple-300',
+  green: 'bg-green-500/10 border-green-500/30 text-green-300',
+  orange: 'bg-orange-500/10 border-orange-500/30 text-orange-300',
+  indigo: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
+  pink: 'bg-pink-500/10 border-pink-500/30 text-pink-300',
+}
+
+const iconColorMap = {
+  blue: 'text-blue-400',
+  purple: 'text-purple-400',
+  green: 'text-green-400',
+  orange: 'text-orange-400',
+  indigo: 'text-indigo-400',
+  pink: 'text-pink-400',
+}
+
+function ProductBadge({ icon: Icon, label, count, color = 'blue' }) {
+  return (
+    <div className={`p-3 rounded-lg border flex items-center justify-between ${colorMap[color]}`}>
+      <div className="flex items-center gap-2">
+        <Icon className={`w-4 h-4 ${iconColorMap[color]}`} />
+        <span className="font-medium text-sm">{label}</span>
+      </div>
+      {count > 0 && (
+        <span className={`px-2 py-0.5 rounded-full bg-white/10 text-xs font-bold ${iconColorMap[color]}`}>
+          {count}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function ProductToggleEdit({ icon: Icon, label, checked, onChange, color = 'blue' }) {
+  return (
+    <div
+      onClick={() => onChange(!checked)}
+      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+        checked ? colorMap[color] : 'bg-white/5 border-white/10 hover:border-white/30'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className={`w-4 h-4 ${checked ? iconColorMap[color] : 'text-gray-400'}`} />
+          <span className={`font-medium text-sm ${checked ? 'text-white' : 'text-gray-300'}`}>{label}</span>
+        </div>
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+          checked ? `${iconColorMap[color]} border-current` : 'border-white/30'
+        }`}>
+          {checked && <Check className="w-3 h-3" />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProductCounterEdit({ icon: Icon, label, value, onChange, subLabel, subValue, onSubChange, showSub, color = 'blue' }) {
+  return (
+    <div className={`p-3 rounded-lg border ${colorMap[color]}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon className={`w-4 h-4 ${iconColorMap[color]}`} />
+          <span className="font-medium text-sm text-white">{label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onChange(Math.max(0, value - 1))}
+            className="w-7 h-7 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold transition-colors"
+          >
+            -
+          </button>
+          <span className="text-white font-bold w-6 text-center">{value}</span>
+          <button
+            type="button"
+            onClick={() => onChange(value + 1)}
+            className={`w-7 h-7 rounded-lg hover:opacity-80 text-white font-bold transition-colors ${
+              color === 'blue' ? 'bg-blue-500' :
+              color === 'purple' ? 'bg-purple-500' :
+              color === 'green' ? 'bg-green-500' :
+              color === 'orange' ? 'bg-orange-500' :
+              color === 'indigo' ? 'bg-indigo-500' :
+              'bg-pink-500'
+            }`}
+          >
+            +
+          </button>
+        </div>
+      </div>
+      {showSub && (
+        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+          <span className="text-xs text-gray-400">{subLabel}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onSubChange(Math.max(0, subValue - 1))}
+              className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors"
+            >
+              -
+            </button>
+            <span className="text-white font-bold w-5 text-center text-sm">{subValue}</span>
+            <button
+              type="button"
+              onClick={() => onSubChange(subValue + 1)}
+              className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default OrderDetailsModal

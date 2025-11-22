@@ -11,8 +11,17 @@ database_url = os.getenv("DATABASE_URL")
 engine = create_engine(database_url)
 Base = declarative_base()
 SessionLocal = sessionmaker(bind=engine)
+
 def get_db_connection():
     return psycopg2.connect(database_url)
+
+# Dependency for FastAPI
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 if __name__ == "__main__":

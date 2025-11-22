@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react'
 
 const AuthContext = createContext(null)
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
@@ -17,7 +19,7 @@ export const AuthProvider = ({ children }) => {
 
   // Check for existing session on mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('authToken')
+    const storedToken = localStorage.getItem('token')
     const storedUser = localStorage.getItem('user')
 
     if (storedToken && storedUser) {
@@ -28,7 +30,7 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const login = async (email, password, recaptchaToken) => {
-    const response = await fetch('http://127.0.0.1:8000/auth/login', {
+    const response = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, recaptcha_token: recaptchaToken })
@@ -45,15 +47,11 @@ export const AuthProvider = ({ children }) => {
       throw new Error(data.message || 'Invalid email or password')
     }
 
-    // Store auth data
-    const authToken = data.token || 'dummy-token' // Replace with actual token from backend
-    const userData = {
-      email: data.email || email,
-      name: data.name || '',
-      salesid: data.salesid || ''
-    }
+    // Store auth data with new token format
+    const authToken = data.access_token
+    const userData = data.user
 
-    localStorage.setItem('authToken', authToken)
+    localStorage.setItem('token', authToken)
     localStorage.setItem('user', JSON.stringify(userData))
 
     setToken(authToken)
@@ -63,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const signup = async (email, password, name, salesid, recaptchaToken) => {
-    const response = await fetch('http://127.0.0.1:8000/auth/signup', {
+    const response = await fetch(`${API_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, salesid, name, recaptcha_token: recaptchaToken })
@@ -79,7 +77,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = () => {
-    localStorage.removeItem('authToken')
+    localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('rememberMe')
     setToken(null)

@@ -28,6 +28,7 @@ class Order(Base):
     # Customer information
     business_name = Column(String(255), nullable=False)
     customer_name = Column(String(255), nullable=False)
+    customer_email = Column(String(255), nullable=False)
     customer_address = Column(String(255))
     customer_phone = Column(String(255), nullable=False)
     

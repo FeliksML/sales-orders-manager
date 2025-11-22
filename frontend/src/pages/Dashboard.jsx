@@ -1,18 +1,95 @@
-import { useAuth } from '../contexts/AuthContext'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone } from 'lucide-react'
+import DashboardHeader from '../components/DashboardHeader'
+import StatCard from '../components/ui/StatCard'
+import OrdersTable from '../components/ui/OrdersTable'
+import OrderCharts from '../components/ui/OrderCharts'
+import LoadingSpinner from '../components/ui/LoadingSpinner'
+import OrderInputModal from '../components/OrderInputModal'
+import OrderDetailsModal from '../components/OrderDetailsModal'
+import { useOrders, useOrderStats } from '../hooks/useOrders'
+import { orderService } from '../services/orderService'
 
 function Dashboard() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { orders, loading: ordersLoading, error: ordersError, refetch } = useOrders()
+  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useOrderStats()
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [submitSuccess, setSubmitSuccess] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState(null)
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
+  const handleOrderSubmit = async (orderData) => {
+    try {
+      await orderService.createOrder(orderData)
+      setIsOrderModalOpen(false)
+      setSubmitSuccess(true)
+
+      // Refetch orders and stats
+      refetch()
+      refetchStats()
+
+      // Hide success message after 3 seconds
+      setTimeout(() => setSubmitSuccess(false), 3000)
+    } catch (error) {
+      console.error('Failed to create order:', error)
+      throw error
+    }
+  }
+
+  const handleOrderClick = (order) => {
+    setSelectedOrder(order)
+    setIsDetailsModalOpen(true)
+  }
+
+  const handleOrderUpdate = async (orderId, orderData) => {
+    try {
+      console.log('Dashboard: Updating order', orderId, 'with data:', orderData)
+      await orderService.updateOrder(orderId, orderData)
+      console.log('Dashboard: Order updated successfully')
+
+      // Refetch orders and stats
+      refetch()
+      refetchStats()
+
+      // Update selected order with new data
+      console.log('Dashboard: Updating selectedOrder state')
+      setSelectedOrder(prev => {
+        const updated = { ...prev, ...orderData }
+        console.log('Dashboard: Previous order:', prev)
+        console.log('Dashboard: Updated order:', updated)
+        return updated
+      })
+
+      setSubmitSuccess(true)
+      setTimeout(() => setSubmitSuccess(false), 3000)
+    } catch (error) {
+      console.error('Failed to update order:', error)
+      throw error
+    }
+  }
+
+  const handleOrderDelete = async (orderId) => {
+    try {
+      console.log('Dashboard: Deleting order', orderId)
+      await orderService.deleteOrder(orderId)
+      console.log('Dashboard: Order deleted successfully')
+
+      // Refetch orders and stats
+      refetch()
+      refetchStats()
+
+      setIsDetailsModalOpen(false)
+      setSubmitSuccess(true)
+      setTimeout(() => setSubmitSuccess(false), 3000)
+    } catch (error) {
+      console.error('Dashboard: Failed to delete order:', error)
+      throw error
+    }
   }
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-8"
+      className="min-h-screen p-4 sm:p-8"
       style={{
         background: `
           radial-gradient(circle at 25% 25%, rgba(30, 58, 138, 0.3), transparent 25%),
@@ -24,93 +101,152 @@ function Dashboard() {
         `
       }}
     >
-      <Link to="/dashboard" className="absolute top-4 left-4 sm:top-8 sm:left-8 text-right cursor-pointer hover:opacity-80 transition-opacity">
-        <h1
-          className="text-3xl sm:text-4xl lg:text-5xl font-bold"
-          style={{
-            color: "rgba(255, 255, 255, 0.9)",
-            WebkitTextStroke: "0.5px rgba(255, 255, 255, 0.3)",
-            textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
-            filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
-            position: "relative",
-          }}
-        >
-          Sales Order
-          <span
-            className="hidden sm:inline-block"
-            style={{
-              position: "absolute",
-              right: "-32px",
-              top: "60%",
-              transform: "translateY(-50%)",
-              width: "28px",
-              height: "28px",
-              background: "linear-gradient(135deg, #2563eb 0%, #059669 100%)",
-              clipPath: "polygon(0% 0%, 100% 50%, 0% 100%)",
-            }}
-          ></span>
-        </h1>
-        <p
-          className="text-white text-lg sm:text-xl lg:text-2xl tracking-widest"
-          style={{
-            color: "rgba(255, 255, 255, 0.9)",
-            WebkitTextStroke: "0.5px rgba(255, 255, 255, 0.3)",
-            textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)",
-            filter: "drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))",
-          }}
-        >
-          MANAGER
-        </p>
-      </Link>
+      <div className="max-w-7xl mx-auto">
+        <DashboardHeader />
 
-      <div
-        className="max-w-2xl w-full p-8 rounded-3xl shadow-2xl"
-        style={{
-          backgroundColor:'rgba(0, 15, 33, 0.25)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 200, 255, 0.3)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.37), inset 0 0 80px rgba(0, 200, 255, 0.1)'
-        }}
-      >
-        <h1 className="text-white text-4xl font-bold mb-6">Dashboard</h1>
+        {/* Success Message */}
+        {submitSuccess && (
+          <div className="mb-6 p-4 rounded-lg bg-green-500/20 border border-green-500 animate-slideDown">
+            <p className="text-green-300 font-medium">
+              ✓ Order created successfully!
+            </p>
+          </div>
+        )}
 
-        <div className="space-y-4 mb-8">
-          <div className="text-gray-300">
-            <p className="text-sm text-gray-400">Welcome back,</p>
-            <p className="text-2xl font-semibold text-white">{user?.name || 'User'}</p>
+        {/* Statistics Section */}
+        <section className="mb-8">
+          <h2 className="text-white text-2xl font-bold mb-4">Overview</h2>
+          {statsLoading ? (
+            <LoadingSpinner />
+          ) : statsError ? (
+            <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+              {statsError}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                title="Total Orders"
+                value={stats?.total_orders || 0}
+                icon={Package}
+                subtitle="All time"
+              />
+              <StatCard
+                title="This Week"
+                value={stats?.this_week || 0}
+                icon={TrendingUp}
+                subtitle="Last 7 days"
+              />
+              <StatCard
+                title="This Month"
+                value={stats?.this_month || 0}
+                icon={Calendar}
+                subtitle="Current month"
+              />
+              <StatCard
+                title="Pending Installs"
+                value={stats?.pending_installs || 0}
+                icon={Calendar}
+                subtitle="Upcoming"
+              />
+            </div>
+          )}
+        </section>
+
+        {/* Product Statistics */}
+        {stats && (
+          <section className="mb-8">
+            <h2 className="text-white text-2xl font-bold mb-4">Products</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                title="Internet"
+                value={stats.total_internet}
+                icon={Wifi}
+              />
+              <StatCard
+                title="TV"
+                value={stats.total_tv}
+                icon={Tv}
+              />
+              <StatCard
+                title="Mobile"
+                value={stats.total_mobile}
+                icon={Smartphone}
+              />
+              <StatCard
+                title="Voice Lines"
+                value={stats.total_voice}
+                icon={Phone}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* Charts Section */}
+        {!ordersLoading && !statsLoading && (
+          <section className="mb-8">
+            <h2 className="text-white text-2xl font-bold mb-4">Analytics</h2>
+            <OrderCharts orders={orders} stats={stats} />
+          </section>
+        )}
+
+        {/* Recent Orders Table */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white text-2xl font-bold">Recent Orders</h2>
+            <button
+              onClick={() => setIsOrderModalOpen(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-lg hover:shadow-xl hover:scale-105 transform duration-200"
+            >
+              + New Order
+            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-              <p className="text-gray-400 text-sm">Email</p>
-              <p className="text-white font-medium">{user?.email}</p>
+          {ordersLoading ? (
+            <LoadingSpinner />
+          ) : ordersError ? (
+            <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+              {ordersError}
             </div>
-            <div className="bg-white/5 p-4 rounded-lg border border-white/10">
-              <p className="text-gray-400 text-sm">Sales ID</p>
-              <p className="text-white font-medium">{user?.salesid || 'N/A'}</p>
-            </div>
-          </div>
-        </div>
+          ) : (
+            <OrdersTable orders={orders} onOrderClick={handleOrderClick} />
+          )}
+        </section>
 
-        <div className="flex gap-4">
-          <button
-            onClick={handleLogout}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
-          >
-            Logout
-          </button>
+        {/* Order Input Modal */}
+        <OrderInputModal
+          isOpen={isOrderModalOpen}
+          onClose={() => setIsOrderModalOpen(false)}
+          onSubmit={handleOrderSubmit}
+        />
 
-          <button
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
-          >
-            View Orders
-          </button>
-        </div>
-
-        <p className="text-gray-400 text-sm mt-8">
-          This is a placeholder dashboard. The full order management features will be implemented next.
-        </p>
+        {/* Order Details Modal */}
+        <OrderDetailsModal
+          order={selectedOrder}
+          isOpen={isDetailsModalOpen}
+          onClose={() => {
+            setIsDetailsModalOpen(false)
+            setSelectedOrder(null)
+          }}
+          onUpdate={handleOrderUpdate}
+          onDelete={handleOrderDelete}
+        />
       </div>
+
+      <style>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

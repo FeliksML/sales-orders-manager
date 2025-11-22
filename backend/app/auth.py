@@ -1,16 +1,71 @@
-from fastapi import APIRouter, Path, HTTPException
+from fastapi import APIRouter, Path, HTTPException, Depends
 from fastapi.responses import JSONResponse
-from .schemas import UserSignup, UserLogin
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from .schemas import UserSignup, UserLogin, UserResponse
 from .models import User
-from .database import SessionLocal
+from .database import SessionLocal, get_db
 from .email_config import send_verification_email
+from sqlalchemy.orm import Session
+from jose import JWTError, jwt
 import bcrypt
 import secrets
 from datetime import datetime, timedelta
 import os
 import httpx
 
+# JWT Configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+security = HTTPBearer()
+
 router = APIRouter()
+
+def create_access_token(data: dict):
+    """Create JWT access token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """Dependency to get current authenticated user"""
+    token = credentials.credentials
+    print(f"🔐 Validating token: {token[:20]}..." if token else "❌ No token received")
+
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        print(f"✅ Token decoded successfully, user_id: {user_id_str}")
+        if user_id_str is None:
+            print("❌ No user_id in token payload")
+            raise credentials_exception
+        user_id = int(user_id_str)  # Convert string back to int
+    except JWTError as e:
+        print(f"❌ JWT decode error: {str(e)}")
+        raise credentials_exception
+    except ValueError:
+        print("❌ Invalid user_id format in token")
+        raise credentials_exception
+
+    user = db.query(User).filter(User.userid == user_id).first()
+    if user is None:
+        print(f"❌ User {user_id} not found in database")
+        raise credentials_exception
+
+    print(f"✅ User authenticated: {user.email}")
+    return user
 
 async def verify_recaptcha(token: str) -> bool:
     """Verify reCAPTCHA token with Google"""
@@ -186,11 +241,25 @@ async def login(user_data: UserLogin):
 
         password_bytes = user_data.password.encode('utf-8')
         if bcrypt.checkpw(password_bytes, user.password):
+            # Create JWT token (sub must be a string)
+            access_token = create_access_token(data={"sub": str(user.userid)})
+
             return {
                 "message": "Welcome!",
-                "email": user.email,
-                "name": user.name,
-                "salesid": str(user.salesid)
+                "access_token": access_token,
+                "token_type": "bearer",
+                "user": {
+                    "email": user.email,
+                    "name": user.name,
+                    "salesid": str(user.salesid),
+                    "userid": user.userid,
+                    "email_verified": user.email_verified
+                }
             }
         else:
             return {"message":"Incorrect Login or Password"}
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    """Get current user information"""
+    return current_user
