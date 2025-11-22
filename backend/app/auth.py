@@ -8,8 +8,47 @@ import bcrypt
 import secrets
 from datetime import datetime, timedelta
 import os
+import httpx
 
 router = APIRouter()
+
+async def verify_recaptcha(token: str) -> bool:
+    """Verify reCAPTCHA token with Google"""
+    if not token:
+        print("❌ No reCAPTCHA token provided")
+        return False
+
+    secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
+    print(f"🔑 Using secret key: {secret_key[:15]}..." if secret_key else "❌ No secret key found in environment")
+
+    # If no secret key is configured, check if it's a test key
+    if not secret_key:
+        # Google's test key for development
+        if token == "test-token" or os.getenv("ENVIRONMENT") == "development":
+            print("⚠️  WARNING: Using development mode - CAPTCHA verification bypassed")
+            return True
+        return False
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://www.google.com/recaptcha/api/siteverify",
+                data={
+                    "secret": secret_key,
+                    "response": token
+                }
+            )
+            result = response.json()
+
+            if result.get("success"):
+                print(f"✓ reCAPTCHA verification successful")
+                return True
+            else:
+                print(f"✗ reCAPTCHA verification failed: {result.get('error-codes', [])}")
+                return False
+    except Exception as e:
+        print(f"✗ reCAPTCHA verification error: {str(e)}")
+        return False
 
 @router.get("/check-salesid/{salesid}")
 def check_salesid(salesid: str = Path(..., min_length=5, max_length=5, pattern=r"^\d{5}$")):
@@ -27,6 +66,13 @@ def check_email(email: str):
 
 @router.post("/signup")
 async def signup(user_data: UserSignup):
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(user_data.recaptcha_token):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "CAPTCHA verification failed. Please try again."}
+        )
+
     # Check for duplicate email and sales ID
     with SessionLocal() as db:
         existing_email = db.query(User).filter(User.email == user_data.email).first()
@@ -120,7 +166,14 @@ def verify_email(token: str):
         )
 
 @router.post("/login")
-def login(user_data: UserLogin):
+async def login(user_data: UserLogin):
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(user_data.recaptcha_token):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "CAPTCHA verification failed. Please try again."}
+        )
+
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == user_data.email).first()
 

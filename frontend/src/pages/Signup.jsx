@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import ReCAPTCHA from "react-google-recaptcha";
 
 function Signup() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ function Signup() {
   const rippleRef = useRef(null);
   const passwordRef = useRef(null);
   const confirmPasswordRef = useRef(null);
+  const recaptchaRef = useRef(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +24,9 @@ function Signup() {
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [signupComplete, setSignupComplete] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState("");
 
   // Field-level errors
   const [fieldErrors, setFieldErrors] = useState({
@@ -200,7 +205,8 @@ function Signup() {
     !fieldErrors.confirmPassword &&
     !checkingSalesId &&
     !checkingEmail &&
-    agreedToTerms;
+    agreedToTerms &&
+    recaptchaToken !== "";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -208,6 +214,12 @@ function Signup() {
     // Clear previous messages
     setError("");
     setSuccess("");
+
+    // Validate CAPTCHA
+    if (!recaptchaToken) {
+      setError("Please complete the CAPTCHA verification");
+      return;
+    }
 
     // Check for any field errors
     if (fieldErrors.salesid) {
@@ -244,7 +256,7 @@ function Signup() {
     setIsLoading(true);
 
     try {
-      const result = await signup(email, password, name, salesid);
+      const result = await signup(email, password, name, salesid, recaptchaToken);
 
       // Check if backend returned an error
       if (result && result.error) {
@@ -255,16 +267,9 @@ function Signup() {
 
       // Check if email verification is required
       if (result && result.verification_required) {
-        if (result.email_sent) {
-          setSuccess(
-            `Account created successfully! A verification email has been sent to ${email}. Please check your inbox (and spam folder) to verify your account.`
-          );
-        } else {
-          setSuccess(
-            `Account created successfully! However, we couldn't send the verification email. Please contact support or try signing up again.`
-          );
-        }
-        // Don't auto-redirect, let user verify email first
+        setUserEmail(email);
+        setSignupComplete(true);
+        // Don't auto-redirect, show email sent screen
       } else {
         setSuccess("Account created successfully! Redirecting to login...");
         setTimeout(() => {
@@ -442,7 +447,7 @@ function Signup() {
           `,
         }}
       >
-        <div className="absolute top-4 left-4 sm:top-8 sm:left-8 text-right">
+        <Link to="/login" className="absolute top-4 left-4 sm:top-8 sm:left-8 text-right cursor-pointer hover:opacity-80 transition-opacity">
           <h1
             className="text-3xl sm:text-4xl lg:text-5xl font-bold"
             style={{
@@ -479,7 +484,7 @@ function Signup() {
           >
             MANAGER
           </p>
-        </div>
+        </Link>
 
         <div
           className="w-full max-w-md flex flex-col items-center justify-center p-6 sm:p-8 rounded-3xl shadow-2xl mt-24 sm:mt-0"
@@ -491,9 +496,59 @@ function Signup() {
               "0 8px 32px rgba(0, 0, 0, 0.37), inset 0 0 80px rgba(0, 200, 255, 0.1)",
           }}
         >
-          <h1 className="text-white text-3xl sm:text-4xl font-bold mb-6">Sign Up</h1>
+          {signupComplete ? (
+            /* Email Sent Success Screen */
+            <>
+              <div className="text-center mb-6">
+                <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                  <Check className="text-green-500" size={40} />
+                </div>
+                <h1 className="text-white text-3xl sm:text-4xl font-bold mb-2">Check Your Email</h1>
+                <p className="text-gray-300 text-lg">Account created successfully!</p>
+              </div>
 
-          <div className="w-full mb-4">
+              <div className="w-full space-y-4">
+                <div className="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4">
+                  <p className="text-gray-300 text-center mb-2">
+                    We've sent a verification link to:
+                  </p>
+                  <p className="text-white font-semibold text-center break-all">
+                    {userEmail}
+                  </p>
+                </div>
+
+                <div className="space-y-2 text-sm text-gray-400">
+                  <p className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-1">1.</span>
+                    <span>Click the verification link in the email</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-1">2.</span>
+                    <span>Check your spam folder if you don't see it</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-blue-400 mt-1">3.</span>
+                    <span>The link expires in 24 hours</span>
+                  </p>
+                </div>
+
+                <Link
+                  to="/login"
+                  className="w-full text-white font-bold px-4 py-3 rounded-lg shadow-md flex items-center justify-center gap-2 text-base sm:text-lg"
+                  style={{
+                    background: "linear-gradient(90deg, #2563eb 0%, #059669 100%)",
+                  }}
+                >
+                  Go to Login
+                </Link>
+              </div>
+            </>
+          ) : (
+            /* Signup Form */
+            <>
+              <h1 className="text-white text-3xl sm:text-4xl font-bold mb-6">Sign Up</h1>
+
+              <div className="w-full mb-4">
             <label htmlFor="name_input" className="text-gray-300 mb-1 block">Name</label>
             <div className="magic-ring">
               <input
@@ -802,6 +857,16 @@ function Signup() {
             </label>
           </div>
 
+          <div className="w-full mb-4 flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+              onChange={(token) => setRecaptchaToken(token || "")}
+              onExpired={() => setRecaptchaToken("")}
+              theme="dark"
+            />
+          </div>
+
           {error && (
             <p className="text-red-400 mb-3" role="alert" aria-live="assertive">
               {error}
@@ -859,9 +924,11 @@ function Signup() {
             )}
           </button>
 
-          <p className="text-gray-300 mt-3 px-4 py-3 text-sm sm:text-base text-center">
-            Have an account? <Link to="/login" className="text-blue-300 cursor-pointer hover:underline">Log in</Link>
-          </p>
+              <p className="text-gray-300 mt-3 px-4 py-3 text-sm sm:text-base text-center">
+                Have an account? <Link to="/login" className="text-blue-300 cursor-pointer hover:underline">Log in</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </>

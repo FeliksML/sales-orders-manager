@@ -2,12 +2,14 @@ import { useState, useRef } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { useAuth } from "../contexts/AuthContext"
+import ReCAPTCHA from "react-google-recaptcha"
 
 function Login() {
   const navigate = useNavigate()
   const { login } = useAuth()
   const rippleRef = useRef(null)
   const passwordRef = useRef(null)
+  const recaptchaRef = useRef(null)
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -16,9 +18,10 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [recaptchaToken, setRecaptchaToken] = useState("")
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-  const isFormValid = isEmailValid && password.trim() !== ""
+  const isFormValid = isEmailValid && password.trim() !== "" && recaptchaToken !== ""
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -26,6 +29,12 @@ function Login() {
     // Clear previous messages
     setError("")
     setSuccess("")
+
+    // Validate CAPTCHA
+    if (!recaptchaToken) {
+      setError("Please complete the CAPTCHA verification")
+      return
+    }
 
     // Validate fields
     if (!isEmailValid) {
@@ -40,7 +49,7 @@ function Login() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      await login(email, password, recaptchaToken)
       setSuccess("Login successful! Redirecting...")
 
       if (rememberMe) {
@@ -216,8 +225,8 @@ function Login() {
           `
         }}
       >
-        <div className="absolute top-8 left-8 text-right"> 
-          <h1 
+        <Link to="/login" className="absolute top-8 left-8 text-right cursor-pointer hover:opacity-80 transition-opacity">
+          <h1
             className="text-5xl font-bold"
             style={{
               color: 'rgba(255, 255, 255, 0.9)',
@@ -239,8 +248,8 @@ function Login() {
               clipPath: 'polygon(0% 0%, 100% 50%, 0% 100%)'
             }}></span>
           </h1>
-          <p 
-            className="text-white text-2xl tracking-widest" 
+          <p
+            className="text-white text-2xl tracking-widest"
             style={{
               color: 'rgba(255, 255, 255, 0.9)',
               WebkitTextStroke: '1px rgba(255, 255, 255, 0.3)',
@@ -250,7 +259,7 @@ function Login() {
           >
             MANAGER
           </p>
-        </div>
+        </Link>
 
         <div 
           className="flex flex-col items-center justify-center p-8 rounded-3xl shadow-2xl"
@@ -331,6 +340,16 @@ function Login() {
             <Link to="/forgot-password" className="text-blue-300 text-sm hover:underline">
               Forgot password?
             </Link>
+          </div>
+
+          <div className="w-full mb-4 flex justify-center">
+            <ReCAPTCHA
+              ref={recaptchaRef}
+              sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY || "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"}
+              onChange={(token) => setRecaptchaToken(token || "")}
+              onExpired={() => setRecaptchaToken("")}
+              theme="dark"
+            />
           </div>
 
           {error && (

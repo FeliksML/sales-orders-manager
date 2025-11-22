@@ -27,11 +27,11 @@ export const AuthProvider = ({ children }) => {
     setLoading(false)
   }, [])
 
-  const login = async (email, password) => {
+  const login = async (email, password, recaptchaToken) => {
     const response = await fetch('http://127.0.0.1:8000/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, recaptcha_token: recaptchaToken })
     })
 
     const data = await response.json()
@@ -62,11 +62,11 @@ export const AuthProvider = ({ children }) => {
     return data
   }
 
-  const signup = async (email, password, name, salesid) => {
+  const signup = async (email, password, name, salesid, recaptchaToken) => {
     const response = await fetch('http://127.0.0.1:8000/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, salesid, name })
+      body: JSON.stringify({ email, password, salesid, name, recaptcha_token: recaptchaToken })
     })
 
     const data = await response.json()
