@@ -1,15 +1,15 @@
 import { Calendar, MapPin, Phone, Mail, Package, Check } from 'lucide-react'
 import { format } from 'date-fns'
+import { getInstallStatus, isDateToday, isDatePast, formatDate, DATE_FORMATS } from '@sales-order-manager/shared'
 import CustomCheckbox from './CustomCheckbox'
 
 function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
-  const installDate = new Date(order.install_date)
-  const isToday = format(installDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-  const isPast = installDate < new Date() && !isToday
-  const isFuture = installDate > new Date()
+  const status = getInstallStatus(order.install_date)
+  const isPast = isDatePast(order.install_date)
+  const isToday = isDateToday(order.install_date)
 
-  const statusColor = isPast ? 'green' : isToday ? 'yellow' : 'blue'
-  const statusText = isPast ? 'Installed' : isToday ? 'Today' : 'Pending'
+  const statusColor = status === 'installed' ? 'green' : status === 'today' ? 'yellow' : 'blue'
+  const statusText = status === 'installed' ? 'Installed' : status === 'today' ? 'Today' : 'Pending'
 
   const products = []
   if (order.has_internet) products.push('Internet')

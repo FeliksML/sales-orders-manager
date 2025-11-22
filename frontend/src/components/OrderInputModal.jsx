@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, User, MapPin, Calendar, Package, FileText, CheckCircle, ArrowRight, ArrowLeft, Mail, Phone } from 'lucide-react'
+import { validateEmail, validatePhone, validateName, validateRequired } from '@sales-order-manager/shared'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 
@@ -48,24 +49,37 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     const newErrors = {}
 
     if (step === STEPS.CUSTOMER) {
-      if (!formData.spectrum_reference.trim()) newErrors.spectrum_reference = 'Required'
-      if (!formData.customer_account_number.trim()) newErrors.customer_account_number = 'Required'
-      if (!formData.business_name.trim()) newErrors.business_name = 'Required'
-      if (!formData.customer_name.trim()) newErrors.customer_name = 'Required'
-      if (!formData.customer_email.trim()) {
-        newErrors.customer_email = 'Required'
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customer_email)) {
-        newErrors.customer_email = 'Invalid email'
-      }
-      if (!formData.customer_phone.trim()) newErrors.customer_phone = 'Required'
-      else if (!/^\+?[\d\s\-()]+$/.test(formData.customer_phone)) {
-        newErrors.customer_phone = 'Invalid phone format'
-      }
+      // Spectrum Reference
+      const spectrumValidation = validateRequired(formData.spectrum_reference, 'Spectrum reference')
+      if (!spectrumValidation.valid) newErrors.spectrum_reference = spectrumValidation.error
+
+      // Account Number
+      const accountValidation = validateRequired(formData.customer_account_number, 'Account number')
+      if (!accountValidation.valid) newErrors.customer_account_number = accountValidation.error
+
+      // Business Name
+      const businessValidation = validateRequired(formData.business_name, 'Business name')
+      if (!businessValidation.valid) newErrors.business_name = businessValidation.error
+
+      // Customer Name
+      const nameValidation = validateName(formData.customer_name)
+      if (!nameValidation.valid) newErrors.customer_name = nameValidation.error
+
+      // Email
+      const emailValidation = validateEmail(formData.customer_email)
+      if (!emailValidation.valid) newErrors.customer_email = emailValidation.error
+
+      // Phone
+      const phoneValidation = validatePhone(formData.customer_phone)
+      if (!phoneValidation.valid) newErrors.customer_phone = phoneValidation.error
     }
 
     if (step === STEPS.INSTALLATION) {
-      if (!formData.install_date) newErrors.install_date = 'Required'
-      if (!formData.install_time.trim()) newErrors.install_time = 'Required'
+      const dateValidation = validateRequired(formData.install_date, 'Install date')
+      if (!dateValidation.valid) newErrors.install_date = dateValidation.error
+
+      const timeValidation = validateRequired(formData.install_time, 'Install time')
+      if (!timeValidation.valid) newErrors.install_time = timeValidation.error
     }
 
     setErrors(newErrors)
