@@ -4,6 +4,7 @@ import {
   Wifi, Tv, Smartphone, Phone, Radio, Server, CheckCircle, Clock, AlertCircle
 } from 'lucide-react'
 import Card from './Card'
+import CustomCheckbox from './CustomCheckbox'
 
 function FilterBar({ onFilterChange, onClearFilters }) {
   const [showFilters, setShowFilters] = useState(false)
@@ -232,61 +233,49 @@ function FilterBar({ onFilterChange, onClearFilters }) {
               </label>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.productTypes.internet}
                     onChange={() => handleProductToggle('internet')}
-                    className="w-4 h-4 text-blue-600 bg-blue-100 border-blue-300 rounded focus:ring-2 focus:ring-blue-500 accent-blue-600"
                   />
                   <Wifi size={16} className="text-blue-600" />
                   <span className="text-sm font-medium text-gray-900">Internet</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.productTypes.tv}
                     onChange={() => handleProductToggle('tv')}
-                    className="w-4 h-4 text-purple-600 bg-purple-100 border-purple-300 rounded focus:ring-2 focus:ring-purple-500 accent-purple-600"
                   />
                   <Tv size={16} className="text-purple-600" />
                   <span className="text-sm font-medium text-gray-900">TV</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.productTypes.mobile}
                     onChange={() => handleProductToggle('mobile')}
-                    className="w-4 h-4 text-green-600 bg-green-100 border-green-300 rounded focus:ring-2 focus:ring-green-500 accent-green-600"
                   />
                   <Smartphone size={16} className="text-green-600" />
                   <span className="text-sm font-medium text-gray-900">Mobile</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.productTypes.voice}
                     onChange={() => handleProductToggle('voice')}
-                    className="w-4 h-4 text-orange-600 bg-orange-100 border-orange-300 rounded focus:ring-2 focus:ring-orange-500 accent-orange-600"
                   />
                   <Phone size={16} className="text-orange-600" />
                   <span className="text-sm font-medium text-gray-900">Voice</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.productTypes.wib}
                     onChange={() => handleProductToggle('wib')}
-                    className="w-4 h-4 text-indigo-600 bg-indigo-100 border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 accent-indigo-600"
                   />
                   <Radio size={16} className="text-indigo-600" />
                   <span className="text-sm font-medium text-gray-900">WIB</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.productTypes.sbc}
                     onChange={() => handleProductToggle('sbc')}
-                    className="w-4 h-4 text-pink-600 bg-pink-100 border-pink-300 rounded focus:ring-2 focus:ring-pink-500 accent-pink-600"
                   />
                   <Server size={16} className="text-pink-600" />
                   <span className="text-sm font-medium text-gray-900">SBC</span>
@@ -302,31 +291,25 @@ function FilterBar({ onFilterChange, onClearFilters }) {
               </label>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.installStatus.installed}
                     onChange={() => handleStatusToggle('installed')}
-                    className="w-4 h-4 text-green-600 bg-green-100 border-green-300 rounded focus:ring-2 focus:ring-green-500 accent-green-600"
                   />
                   <CheckCircle size={16} className="text-green-600" />
                   <span className="text-sm font-medium text-gray-900">Installed</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.installStatus.today}
                     onChange={() => handleStatusToggle('today')}
-                    className="w-4 h-4 text-blue-600 bg-blue-100 border-blue-300 rounded focus:ring-2 focus:ring-blue-500 accent-blue-600"
                   />
                   <Clock size={16} className="text-blue-600" />
                   <span className="text-sm font-medium text-gray-900">Today</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <CustomCheckbox
                     checked={filters.installStatus.pending}
                     onChange={() => handleStatusToggle('pending')}
-                    className="w-4 h-4 text-yellow-600 bg-yellow-100 border-yellow-300 rounded focus:ring-2 focus:ring-yellow-500 accent-yellow-600"
                   />
                   <AlertCircle size={16} className="text-yellow-600" />
                   <span className="text-sm font-medium text-gray-900">Pending</span>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List } from 'lucide-react'
+import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
 import OrdersTable from '../components/ui/OrdersTable'
@@ -11,6 +11,10 @@ import OrderDetailsModal from '../components/OrderDetailsModal'
 import ExportModal from '../components/ExportModal'
 import ScheduledReportsModal from '../components/ScheduledReportsModal'
 import CalendarView from '../components/CalendarView'
+import BulkActionsToolbar from '../components/ui/BulkActionsToolbar'
+import BulkRescheduleModal from '../components/BulkRescheduleModal'
+import BulkDeleteModal from '../components/BulkDeleteModal'
+import BulkExportModal from '../components/BulkExportModal'
 import { useOrders, useOrderStats } from '../hooks/useOrders'
 import { orderService } from '../services/orderService'
 
@@ -27,6 +31,12 @@ function Dashboard() {
   const [isScheduledReportsModalOpen, setIsScheduledReportsModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState('table') // 'table' or 'calendar'
   const [prefilledDate, setPrefilledDate] = useState(null)
+
+  // Bulk operations state
+  const [selectedOrders, setSelectedOrders] = useState([])
+  const [isBulkRescheduleModalOpen, setIsBulkRescheduleModalOpen] = useState(false)
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
+  const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters)
@@ -146,6 +156,54 @@ function Dashboard() {
     }
   }
 
+  // Bulk operations handlers
+  const handleBulkMarkInstalled = async () => {
+    try {
+      await orderService.bulkMarkInstalled(selectedOrders)
+      await Promise.all([refetch(), refetchStats()])
+      setSelectedOrders([])
+      setSubmitSuccess(true)
+      setTimeout(() => setSubmitSuccess(false), 3000)
+    } catch (error) {
+      console.error('Failed to mark orders as installed:', error)
+    }
+  }
+
+  const handleBulkReschedule = async (newDate) => {
+    try {
+      await orderService.bulkReschedule(selectedOrders, newDate)
+      await Promise.all([refetch(), refetchStats()])
+      setSelectedOrders([])
+      setIsBulkRescheduleModalOpen(false)
+      setSubmitSuccess(true)
+      setTimeout(() => setSubmitSuccess(false), 3000)
+    } catch (error) {
+      console.error('Failed to reschedule orders:', error)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    try {
+      await orderService.bulkDelete(selectedOrders)
+      await Promise.all([refetch(), refetchStats()])
+      setSelectedOrders([])
+      setIsBulkDeleteModalOpen(false)
+      setSubmitSuccess(true)
+      setTimeout(() => setSubmitSuccess(false), 3000)
+    } catch (error) {
+      console.error('Failed to delete orders:', error)
+    }
+  }
+
+  const handleBulkExport = async (format) => {
+    try {
+      await orderService.bulkExport(selectedOrders, format)
+      setIsBulkExportModalOpen(false)
+    } catch (error) {
+      console.error('Failed to export orders:', error)
+    }
+  }
+
   return (
     <div
       className="min-h-screen p-4 sm:p-8"
@@ -177,20 +235,32 @@ function Dashboard() {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <h2 className="text-white text-2xl font-bold">Overview</h2>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)]">
               <button
                 onClick={() => setIsScheduledReportsModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-medium rounded-lg transition-all shadow-lg hover:shadow-xl hover:scale-105 transform duration-200"
+                className="flex items-center justify-center gap-2 h-11 px-5 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200 flex-1 text-sm"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.7), rgba(220, 38, 38, 0.7))',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(251, 146, 60, 0.4)',
+                  boxShadow: '0 4px 16px rgba(234, 88, 12, 0.3), inset 0 0 40px rgba(251, 146, 60, 0.1)'
+                }}
               >
-                <Clock size={18} />
-                Scheduled Reports
+                <Clock size={16} />
+                <span className="whitespace-nowrap">Reports</span>
               </button>
               <button
                 onClick={handleExportStats}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium rounded-lg transition-all shadow-lg hover:shadow-xl hover:scale-105 transform duration-200"
+                className="flex items-center justify-center gap-2 h-11 px-5 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200 flex-1 text-sm"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.7), rgba(16, 185, 129, 0.7))',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  boxShadow: '0 4px 16px rgba(22, 163, 74, 0.3), inset 0 0 40px rgba(34, 197, 94, 0.1)'
+                }}
               >
-                <FileBarChart size={18} />
-                Export Report
+                <FileBarChart size={16} />
+                <span className="whitespace-nowrap">Export</span>
               </button>
             </div>
           </div>
@@ -277,25 +347,40 @@ function Dashboard() {
             <h2 className="text-white text-2xl font-bold">Recent Orders</h2>
             <div className="flex items-center gap-3">
               {/* View Toggle */}
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg p-1 border border-white/20">
+              <div className="flex items-center gap-2 rounded-lg p-1 backdrop-blur-md" style={{
+                backgroundColor: 'rgba(0, 15, 33, 0.3)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(0, 200, 255, 0.3)',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}>
                 <button
                   onClick={() => setViewMode('table')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+                  className={`flex items-center justify-center gap-2 h-9 px-4 rounded-md transition-all font-medium ${
                     viewMode === 'table'
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                      ? 'text-white'
+                      : 'text-white/70 hover:text-white'
                   }`}
+                  style={viewMode === 'table' ? {
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                  } : {}}
                 >
                   <List size={18} />
                   Table
                 </button>
                 <button
                   onClick={() => setViewMode('calendar')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all ${
+                  className={`flex items-center justify-center gap-2 h-9 px-4 rounded-md transition-all font-medium ${
                     viewMode === 'calendar'
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'text-white/70 hover:text-white hover:bg-white/10'
+                      ? 'text-white'
+                      : 'text-white/70 hover:text-white'
                   }`}
+                  style={viewMode === 'calendar' ? {
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                  } : {}}
                 >
                   <CalendarDays size={18} />
                   Calendar
@@ -304,7 +389,13 @@ function Dashboard() {
 
               <button
                 onClick={handleExportOrders}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium rounded-lg transition-all shadow-lg hover:shadow-xl hover:scale-105 transform duration-200"
+                className="flex items-center justify-center gap-2 h-11 px-4 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.7), rgba(99, 102, 241, 0.7))',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(168, 85, 247, 0.4)',
+                  boxShadow: '0 4px 16px rgba(147, 51, 234, 0.3), inset 0 0 40px rgba(168, 85, 247, 0.1)'
+                }}
               >
                 <Download size={18} />
                 Export
@@ -314,9 +405,16 @@ function Dashboard() {
                   setPrefilledDate(null)
                   setIsOrderModalOpen(true)
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors shadow-lg hover:shadow-xl hover:scale-105 transform duration-200"
+                className="flex items-center justify-center gap-2 h-11 px-4 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(59, 130, 246, 0.7))',
+                  backdropFilter: 'blur(20px)',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3), inset 0 0 40px rgba(59, 130, 246, 0.1)'
+                }}
               >
-                + New Order
+                <Plus size={18} />
+                New Order
               </button>
             </div>
           </div>
@@ -346,7 +444,12 @@ function Dashboard() {
                 ) : (
                   <div className="transition-opacity duration-300" style={{ opacity: ordersLoading ? 0.6 : 1 }}>
                     {viewMode === 'table' ? (
-                      <OrdersTable orders={orders} onOrderClick={handleOrderClick} />
+                      <OrdersTable
+                        orders={orders}
+                        onOrderClick={handleOrderClick}
+                        selectedOrders={selectedOrders}
+                        onSelectionChange={setSelectedOrders}
+                      />
                     ) : (
                       <CalendarView
                         orders={orders}
@@ -398,6 +501,42 @@ function Dashboard() {
           isOpen={isScheduledReportsModalOpen}
           onClose={() => setIsScheduledReportsModalOpen(false)}
         />
+
+        {/* Bulk Actions Toolbar */}
+        {viewMode === 'table' && (
+          <BulkActionsToolbar
+            selectedCount={selectedOrders.length}
+            onMarkInstalled={handleBulkMarkInstalled}
+            onReschedule={() => setIsBulkRescheduleModalOpen(true)}
+            onDelete={() => setIsBulkDeleteModalOpen(true)}
+            onExport={() => setIsBulkExportModalOpen(true)}
+            onClearSelection={() => setSelectedOrders([])}
+          />
+        )}
+
+        {/* Bulk Reschedule Modal */}
+        <BulkRescheduleModal
+          isOpen={isBulkRescheduleModalOpen}
+          onClose={() => setIsBulkRescheduleModalOpen(false)}
+          onConfirm={handleBulkReschedule}
+          selectedCount={selectedOrders.length}
+        />
+
+        {/* Bulk Delete Modal */}
+        <BulkDeleteModal
+          isOpen={isBulkDeleteModalOpen}
+          onClose={() => setIsBulkDeleteModalOpen(false)}
+          onConfirm={handleBulkDelete}
+          selectedCount={selectedOrders.length}
+        />
+
+        {/* Bulk Export Modal */}
+        <BulkExportModal
+          isOpen={isBulkExportModalOpen}
+          onClose={() => setIsBulkExportModalOpen(false)}
+          onExport={handleBulkExport}
+          selectedCount={selectedOrders.length}
+        />
       </div>
 
       <style>{`
@@ -413,6 +552,19 @@ function Dashboard() {
         }
         .animate-slideDown {
           animation: slideDown 0.3s ease-out;
+        }
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out;
         }
       `}</style>
     </div>

@@ -39,7 +39,7 @@ function DashboardHeader() {
 
         {/* User Info & Actions */}
         <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-3 px-4 py-2 rounded-lg bg-white/5 border border-white/10">
+          <div className="hidden sm:flex items-center gap-3 h-11 px-4 rounded-lg bg-white/5 border border-white/10">
             <User className="w-5 h-5 text-blue-400" />
             <div className="text-right">
               <p className="text-white text-sm font-medium">{user?.name}</p>
@@ -50,10 +50,16 @@ function DashboardHeader() {
           {/* Notification Settings Button */}
           <button
             onClick={() => navigate('/notification-settings')}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors border border-white/10"
+            className="flex items-center justify-center gap-2 h-11 px-4 text-white rounded-lg transition-all font-medium backdrop-blur-md hover:scale-105 transform duration-200"
+            style={{
+              backgroundColor: 'rgba(0, 15, 33, 0.3)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(0, 200, 255, 0.3)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 0 40px rgba(0, 200, 255, 0.05)'
+            }}
             title="Notification Settings"
           >
-            <Settings className="w-4 h-4" />
+            <Settings size={18} />
           </button>
 
           {/* Notification Bell */}
@@ -62,10 +68,16 @@ function DashboardHeader() {
               setIsNotificationCenterOpen(true)
               loadUnreadCount()
             }}
-            className="relative flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors border border-white/10"
+            className="relative flex items-center justify-center gap-2 h-11 px-4 text-white rounded-lg transition-all font-medium backdrop-blur-md hover:scale-105 transform duration-200"
+            style={{
+              backgroundColor: 'rgba(0, 15, 33, 0.3)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(0, 200, 255, 0.3)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2), inset 0 0 40px rgba(0, 200, 255, 0.05)'
+            }}
             title="Notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell size={18} />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                 {unreadCount > 9 ? '9+' : unreadCount}
@@ -75,9 +87,15 @@ function DashboardHeader() {
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+            className="flex items-center justify-center gap-2 h-11 px-4 text-white rounded-lg transition-all font-medium backdrop-blur-md hover:scale-105 transform duration-200"
+            style={{
+              backgroundColor: 'rgba(220, 38, 38, 0.7)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(239, 68, 68, 0.5)',
+              boxShadow: '0 4px 16px rgba(220, 38, 38, 0.3), inset 0 0 40px rgba(239, 68, 68, 0.1)'
+            }}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut size={18} />
             <span className="hidden sm:inline">Logout</span>
           </button>
         </div>

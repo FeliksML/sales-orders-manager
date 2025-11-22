@@ -74,5 +74,52 @@ export const orderService = {
   sendOrderToEmail: async (orderId) => {
     const response = await apiClient.post(`/api/orders/${orderId}/email`)
     return response.data
+  },
+
+  // Bulk operations
+  bulkMarkInstalled: async (orderIds) => {
+    const response = await apiClient.post('/api/orders/bulk/mark-installed', {
+      order_ids: orderIds
+    })
+    return response.data
+  },
+
+  bulkReschedule: async (orderIds, newDate) => {
+    const response = await apiClient.post('/api/orders/bulk/reschedule', {
+      order_ids: orderIds,
+      new_date: newDate
+    })
+    return response.data
+  },
+
+  bulkDelete: async (orderIds) => {
+    const response = await apiClient.delete('/api/orders/bulk/delete', {
+      data: { order_ids: orderIds }
+    })
+    return response.data
+  },
+
+  bulkExport: async (orderIds, fileFormat = 'excel') => {
+    const orderIdsStr = orderIds.join(',')
+    const response = await apiClient.get('/api/orders/bulk/export', {
+      params: {
+        order_ids: orderIdsStr,
+        file_format: fileFormat
+      },
+      responseType: 'blob'
+    })
+
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    const extension = fileFormat === 'excel' ? 'xlsx' : 'csv'
+    link.setAttribute('download', `orders_bulk_export_${new Date().getTime()}.${extension}`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+
+    return response.data
   }
 }

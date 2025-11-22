@@ -26,6 +26,16 @@ class EmailExportRequest(BaseModel):
     install_status: Optional[str] = None
     recaptcha_token: Optional[str] = None
 
+class BulkMarkInstalledRequest(BaseModel):
+    order_ids: List[int]
+
+class BulkRescheduleRequest(BaseModel):
+    order_ids: List[int]
+    new_date: date
+
+class BulkDeleteRequest(BaseModel):
+    order_ids: List[int]
+
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
     order: OrderCreate,
@@ -691,3 +701,194 @@ async def email_export(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send export: {str(e)}"
         )
+
+@router.post("/bulk/mark-installed", status_code=status.HTTP_200_OK)
+def bulk_mark_installed(
+    request: BulkMarkInstalledRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark multiple orders as installed (set install_date to yesterday or keep if already past)"""
+    if not request.order_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No order IDs provided"
+        )
+
+    # Verify all orders belong to current user
+    orders = db.query(Order).filter(
+        and_(
+            Order.orderid.in_(request.order_ids),
+            Order.userid == current_user.userid
+        )
+    ).all()
+
+    if len(orders) != len(request.order_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Some orders not found or don't belong to you"
+        )
+
+    # Update all orders - set to yesterday if date is today or in future
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    for order in orders:
+        # If order is scheduled for today or in the future, set to yesterday
+        if order.install_date >= today:
+            order.install_date = yesterday
+        # If already in the past, keep the original date
+
+    db.commit()
+
+    return {
+        "message": f"Successfully marked {len(orders)} orders as installed",
+        "updated_count": len(orders)
+    }
+
+@router.post("/bulk/reschedule", status_code=status.HTTP_200_OK)
+def bulk_reschedule(
+    request: BulkRescheduleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Reschedule multiple orders to a new date"""
+    if not request.order_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No order IDs provided"
+        )
+
+    # Verify all orders belong to current user
+    orders = db.query(Order).filter(
+        and_(
+            Order.orderid.in_(request.order_ids),
+            Order.userid == current_user.userid
+        )
+    ).all()
+
+    if len(orders) != len(request.order_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Some orders not found or don't belong to you"
+        )
+
+    # Update all orders to new date
+    for order in orders:
+        order.install_date = request.new_date
+
+    db.commit()
+
+    return {
+        "message": f"Successfully rescheduled {len(orders)} orders to {request.new_date}",
+        "updated_count": len(orders),
+        "new_date": request.new_date
+    }
+
+@router.delete("/bulk/delete", status_code=status.HTTP_200_OK)
+def bulk_delete(
+    request: BulkDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete multiple orders"""
+    if not request.order_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No order IDs provided"
+        )
+
+    # Verify all orders belong to current user
+    orders = db.query(Order).filter(
+        and_(
+            Order.orderid.in_(request.order_ids),
+            Order.userid == current_user.userid
+        )
+    ).all()
+
+    if len(orders) != len(request.order_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Some orders not found or don't belong to you"
+        )
+
+    # Delete all orders
+    deleted_count = len(orders)
+    for order in orders:
+        db.delete(order)
+
+    db.commit()
+
+    return {
+        "message": f"Successfully deleted {deleted_count} orders",
+        "deleted_count": deleted_count
+    }
+
+@router.get("/bulk/export")
+def bulk_export_orders(
+    order_ids: str = Query(..., description="Comma-separated order IDs to export"),
+    file_format: str = Query("excel", description="File format: excel or csv"),
+    columns: Optional[str] = Query(None, description="Comma-separated list of columns to export"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export specific orders by IDs"""
+    # Parse order IDs
+    try:
+        order_id_list = [int(id.strip()) for id in order_ids.split(',') if id.strip()]
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid order IDs format"
+        )
+
+    if not order_id_list:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No order IDs provided"
+        )
+
+    # Get orders
+    orders = db.query(Order).filter(
+        and_(
+            Order.orderid.in_(order_id_list),
+            Order.userid == current_user.userid
+        )
+    ).all()
+
+    if not orders:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No orders found"
+        )
+
+    # Parse column list
+    column_list = None
+    if columns:
+        column_list = [c.strip() for c in columns.split(',') if c.strip()]
+
+    # Generate file based on format
+    if file_format == 'excel':
+        file_data = generate_excel(orders, column_list)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        extension = "xlsx"
+    elif file_format == 'csv':
+        file_data = generate_csv(orders, column_list)
+        media_type = "text/csv"
+        extension = "csv"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File format must be 'excel' or 'csv'"
+        )
+
+    # Create filename with timestamp
+    filename = f"orders_bulk_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{extension}"
+
+    # Return as download
+    return Response(
+        content=file_data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )

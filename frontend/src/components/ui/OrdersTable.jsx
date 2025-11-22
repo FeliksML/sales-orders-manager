@@ -5,8 +5,9 @@ import {
   ChevronDown, CheckCircle, Clock, AlertCircle
 } from 'lucide-react'
 import Card from './Card'
+import CustomCheckbox from './CustomCheckbox'
 
-function OrdersTable({ orders = [], onOrderClick }) {
+function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange }) {
   const [sortField, setSortField] = useState('install_date')
   const [sortDirection, setSortDirection] = useState('desc')
   const [showColumnSettings, setShowColumnSettings] = useState(false)
@@ -30,6 +31,26 @@ function OrdersTable({ orders = [], onOrderClick }) {
 
   const toggleColumn = (column) => {
     setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }))
+  }
+
+  const handleSelectAll = () => {
+    if (selectedOrders.length === orders.length) {
+      // Deselect all
+      onSelectionChange?.([])
+    } else {
+      // Select all
+      onSelectionChange?.(orders.map(order => order.orderid))
+    }
+  }
+
+  const handleSelectOrder = (orderId) => {
+    if (selectedOrders.includes(orderId)) {
+      // Deselect
+      onSelectionChange?.(selectedOrders.filter(id => id !== orderId))
+    } else {
+      // Select
+      onSelectionChange?.([...selectedOrders, orderId])
+    }
   }
 
   const sortedOrders = [...orders].sort((a, b) => {
@@ -124,7 +145,7 @@ function OrdersTable({ orders = [], onOrderClick }) {
   return (
     <Card className="overflow-hidden">
       {/* Header with Column Settings */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10">
+      <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-2">
           <Package className="w-5 h-5 text-blue-400" />
           <span className="text-white font-semibold">Orders ({orders.length})</span>
@@ -175,13 +196,23 @@ function OrdersTable({ orders = [], onOrderClick }) {
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full">
+      <div className="overflow-x-auto rounded-t-lg">
+        <table className="w-full rounded-t-lg">
           <thead>
             <tr className="border-b border-white/10 bg-white/5">
+              {/* Select All Checkbox */}
+              <th className="p-4 first:rounded-tl-lg">
+                <div className="flex flex-col items-center justify-center gap-1">
+                  <span className="text-gray-400 text-xs font-semibold uppercase">All</span>
+                  <CustomCheckbox
+                    checked={orders.length > 0 && selectedOrders.length === orders.length}
+                    onChange={handleSelectAll}
+                  />
+                </div>
+              </th>
               {visibleColumns.spectrum_reference && (
                 <th
-                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors"
+                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors last:rounded-tr-lg"
                   onClick={() => handleSort('spectrum_reference')}
                 >
                   <div className="flex items-center gap-2">
@@ -195,7 +226,7 @@ function OrdersTable({ orders = [], onOrderClick }) {
               )}
               {visibleColumns.account_number && (
                 <th
-                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors"
+                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors last:rounded-tr-lg"
                   onClick={() => handleSort('customer_account_number')}
                 >
                   <div className="flex items-center gap-2">
@@ -209,7 +240,7 @@ function OrdersTable({ orders = [], onOrderClick }) {
               )}
               {visibleColumns.customer_name && (
                 <th
-                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors"
+                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors last:rounded-tr-lg"
                   onClick={() => handleSort('customer_name')}
                 >
                   <div className="flex items-center gap-2">
@@ -223,7 +254,7 @@ function OrdersTable({ orders = [], onOrderClick }) {
               )}
               {visibleColumns.business_name && (
                 <th
-                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors"
+                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors last:rounded-tr-lg"
                   onClick={() => handleSort('business_name')}
                 >
                   <div className="flex items-center gap-2">
@@ -236,7 +267,7 @@ function OrdersTable({ orders = [], onOrderClick }) {
                 </th>
               )}
               {visibleColumns.products && (
-                <th className="text-left p-4 text-gray-400 font-semibold">
+                <th className="text-left p-4 text-gray-400 font-semibold last:rounded-tr-lg">
                   <div className="flex items-center gap-2">
                     <Package className="w-4 h-4" />
                     Products
@@ -245,7 +276,7 @@ function OrdersTable({ orders = [], onOrderClick }) {
               )}
               {visibleColumns.install_date && (
                 <th
-                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors"
+                  className="text-left p-4 text-gray-400 font-semibold cursor-pointer hover:text-white transition-colors last:rounded-tr-lg"
                   onClick={() => handleSort('install_date')}
                 >
                   <div className="flex items-center gap-2">
@@ -262,53 +293,84 @@ function OrdersTable({ orders = [], onOrderClick }) {
           <tbody>
             {sortedOrders.map((order) => {
               const status = getInstallStatus(order.install_date)
+              const isSelected = selectedOrders.includes(order.orderid)
               return (
                 <tr
                   key={order.orderid}
-                  onClick={() => onOrderClick?.(order)}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer group"
+                  className={`border-b border-white/5 hover:bg-white/5 transition-colors group ${
+                    isSelected ? 'bg-blue-500/10' : ''
+                  }`}
                 >
+                  {/* Checkbox */}
+                  <td className="p-4">
+                    <div className="flex items-center justify-center">
+                      <CustomCheckbox
+                        checked={isSelected}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleSelectOrder(order.orderid)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </td>
                   {visibleColumns.spectrum_reference && (
-                    <td className="p-4">
-                      <span className="text-white font-medium group-hover:text-blue-400 transition-colors">
+                    <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
+                      <span
+                        className="text-white font-medium group-hover:text-blue-400 transition-colors block truncate max-w-[150px]"
+                        title={order.spectrum_reference}
+                      >
                         {order.spectrum_reference}
                       </span>
                     </td>
                   )}
                   {visibleColumns.account_number && (
-                    <td className="p-4">
-                      <span className="text-gray-300 font-mono text-sm">
+                    <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
+                      <span
+                        className="text-gray-300 font-mono text-sm block truncate max-w-[120px]"
+                        title={order.customer_account_number}
+                      >
                         {order.customer_account_number}
                       </span>
                     </td>
                   )}
                   {visibleColumns.customer_name && (
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <td className="p-4 cursor-pointer max-w-[200px]" onClick={() => onOrderClick?.(order)}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
                           <User className="w-4 h-4 text-blue-400" />
                         </div>
-                        <span className="text-gray-300">{order.customer_name}</span>
+                        <span
+                          className="text-gray-300 truncate"
+                          title={order.customer_name}
+                        >
+                          {order.customer_name}
+                        </span>
                       </div>
                     </td>
                   )}
                   {visibleColumns.business_name && (
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
+                    <td className="p-4 cursor-pointer max-w-[200px]" onClick={() => onOrderClick?.(order)}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0">
                           <Briefcase className="w-4 h-4 text-purple-400" />
                         </div>
-                        <span className="text-gray-300">{order.business_name}</span>
+                        <span
+                          className="text-gray-300 truncate"
+                          title={order.business_name}
+                        >
+                          {order.business_name}
+                        </span>
                       </div>
                     </td>
                   )}
                   {visibleColumns.products && (
-                    <td className="p-4">
+                    <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
                       {renderProducts(order)}
                     </td>
                   )}
                   {visibleColumns.install_date && (
-                    <td className="p-4">
+                    <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           {status === 'installed' && (
