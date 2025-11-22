@@ -31,8 +31,8 @@ export const useOrders = (filters = {}) => {
     fetchOrders(filters)
   }, [JSON.stringify(filters)])
 
-  const refetch = (filterParams) => {
-    fetchOrders(filterParams || filters)
+  const refetch = async (filterParams) => {
+    await fetchOrders(filterParams || filters)
   }
 
   return { orders, loading, error, refetch }
@@ -68,8 +68,8 @@ export const useOrderStats = () => {
     fetchStats()
   }, [])
 
-  const refetch = () => {
-    fetchStats()
+  const refetch = async () => {
+    await fetchStats()
   }
 
   return { stats, loading, error, refetch }

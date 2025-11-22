@@ -8,3 +8,5 @@ fastapi-mail
 pydantic[email]
 jinja2
 aiofiles
+openpyxl
+apscheduler

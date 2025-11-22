@@ -1,14 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, or_
 from typing import List, Optional
 from datetime import datetime, timedelta, date
+import io
 from .database import get_db
 from .models import Order, User
 from .schemas import OrderCreate, OrderUpdate, OrderResponse, OrderStats
-from .auth import get_current_user
+from .auth import get_current_user, verify_recaptcha
+from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
+from .email_service import send_export_email
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class EmailExportRequest(BaseModel):
+    file_format: str  # 'excel' or 'csv'
+    columns: Optional[str] = None
+    search: Optional[str] = None
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
+    product_types: Optional[str] = None
+    install_status: Optional[str] = None
+    recaptcha_token: Optional[str] = None
 
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
@@ -211,7 +226,9 @@ def update_order(
             detail="Order not found"
         )
 
-    for key, value in order_update.model_dump().items():
+    # Only update fields that are provided (not None)
+    update_data = order_update.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
         setattr(db_order, key, value)
 
     db.commit()
@@ -241,3 +258,392 @@ def delete_order(
     db.delete(db_order)
     db.commit()
     return None
+
+@router.get("/export/columns")
+def get_available_columns(
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of available columns for export"""
+    from .export_utils import COLUMN_LABELS
+    return {
+        "columns": [
+            {"id": col, "label": COLUMN_LABELS.get(col, col)}
+            for col in ALL_COLUMNS
+        ]
+    }
+
+@router.get("/export/excel")
+def export_orders_excel(
+    columns: Optional[str] = Query(None, description="Comma-separated list of columns to export"),
+    search: Optional[str] = Query(None, description="Search by customer name, account number, or spectrum reference"),
+    date_from: Optional[date] = Query(None, description="Filter by install date from"),
+    date_to: Optional[date] = Query(None, description="Filter by install date to"),
+    product_types: Optional[str] = Query(None, description="Comma-separated product types: internet,tv,mobile,voice,wib,sbc"),
+    install_status: Optional[str] = Query(None, description="Filter by install status: installed,pending,today"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export orders to Excel with optional column selection and filters"""
+    # Build query with same filtering logic as get_orders
+    query = db.query(Order).filter(Order.userid == current_user.userid)
+
+    # Apply filters
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Order.customer_name.ilike(search_term),
+                Order.customer_account_number.ilike(search_term),
+                Order.spectrum_reference.ilike(search_term),
+                Order.business_name.ilike(search_term)
+            )
+        )
+
+    if date_from:
+        query = query.filter(Order.install_date >= date_from)
+    if date_to:
+        query = query.filter(Order.install_date <= date_to)
+
+    if product_types:
+        product_list = [p.strip().lower() for p in product_types.split(',')]
+        product_conditions = []
+
+        if 'internet' in product_list:
+            product_conditions.append(Order.has_internet == True)
+        if 'tv' in product_list:
+            product_conditions.append(Order.has_tv == True)
+        if 'mobile' in product_list:
+            product_conditions.append(Order.has_mobile > 0)
+        if 'voice' in product_list:
+            product_conditions.append(Order.has_voice > 0)
+        if 'wib' in product_list:
+            product_conditions.append(Order.has_wib == True)
+        if 'sbc' in product_list:
+            product_conditions.append(Order.has_sbc > 0)
+
+        if product_conditions:
+            query = query.filter(or_(*product_conditions))
+
+    if install_status:
+        today = date.today()
+        status_list = [s.strip().lower() for s in install_status.split(',')]
+        status_conditions = []
+
+        if 'installed' in status_list:
+            status_conditions.append(Order.install_date < today)
+        if 'today' in status_list:
+            status_conditions.append(Order.install_date == today)
+        if 'pending' in status_list:
+            status_conditions.append(Order.install_date > today)
+
+        if status_conditions:
+            query = query.filter(or_(*status_conditions))
+
+    # Get all matching orders
+    orders = query.all()
+
+    # Parse column list
+    column_list = None
+    if columns:
+        column_list = [c.strip() for c in columns.split(',') if c.strip()]
+
+    # Generate Excel
+    excel_data = generate_excel(orders, column_list)
+
+    # Create filename with timestamp
+    filename = f"orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    # Return as download
+    return Response(
+        content=excel_data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+@router.get("/export/csv")
+def export_orders_csv(
+    columns: Optional[str] = Query(None, description="Comma-separated list of columns to export"),
+    search: Optional[str] = Query(None, description="Search by customer name, account number, or spectrum reference"),
+    date_from: Optional[date] = Query(None, description="Filter by install date from"),
+    date_to: Optional[date] = Query(None, description="Filter by install date to"),
+    product_types: Optional[str] = Query(None, description="Comma-separated product types: internet,tv,mobile,voice,wib,sbc"),
+    install_status: Optional[str] = Query(None, description="Filter by install status: installed,pending,today"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export orders to CSV with optional column selection and filters"""
+    # Build query with same filtering logic as get_orders
+    query = db.query(Order).filter(Order.userid == current_user.userid)
+
+    # Apply filters
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Order.customer_name.ilike(search_term),
+                Order.customer_account_number.ilike(search_term),
+                Order.spectrum_reference.ilike(search_term),
+                Order.business_name.ilike(search_term)
+            )
+        )
+
+    if date_from:
+        query = query.filter(Order.install_date >= date_from)
+    if date_to:
+        query = query.filter(Order.install_date <= date_to)
+
+    if product_types:
+        product_list = [p.strip().lower() for p in product_types.split(',')]
+        product_conditions = []
+
+        if 'internet' in product_list:
+            product_conditions.append(Order.has_internet == True)
+        if 'tv' in product_list:
+            product_conditions.append(Order.has_tv == True)
+        if 'mobile' in product_list:
+            product_conditions.append(Order.has_mobile > 0)
+        if 'voice' in product_list:
+            product_conditions.append(Order.has_voice > 0)
+        if 'wib' in product_list:
+            product_conditions.append(Order.has_wib == True)
+        if 'sbc' in product_list:
+            product_conditions.append(Order.has_sbc > 0)
+
+        if product_conditions:
+            query = query.filter(or_(*product_conditions))
+
+    if install_status:
+        today = date.today()
+        status_list = [s.strip().lower() for s in install_status.split(',')]
+        status_conditions = []
+
+        if 'installed' in status_list:
+            status_conditions.append(Order.install_date < today)
+        if 'today' in status_list:
+            status_conditions.append(Order.install_date == today)
+        if 'pending' in status_list:
+            status_conditions.append(Order.install_date > today)
+
+        if status_conditions:
+            query = query.filter(or_(*status_conditions))
+
+    # Get all matching orders
+    orders = query.all()
+
+    # Parse column list
+    column_list = None
+    if columns:
+        column_list = [c.strip() for c in columns.split(',') if c.strip()]
+
+    # Generate CSV
+    csv_data = generate_csv(orders, column_list)
+
+    # Create filename with timestamp
+    filename = f"orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+
+    # Return as download
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+@router.get("/export/stats")
+def export_stats_report(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export statistics report to Excel"""
+    # Get stats (reuse logic from get_order_stats)
+    user_id = current_user.userid
+
+    total_orders = db.query(func.count(Order.orderid)).filter(
+        Order.userid == user_id
+    ).scalar() or 0
+
+    today = date.today()
+    week_ago = today - timedelta(days=7)
+    this_week = db.query(func.count(Order.orderid)).filter(
+        and_(
+            Order.userid == user_id,
+            Order.install_date >= week_ago
+        )
+    ).scalar() or 0
+
+    this_month = db.query(func.count(Order.orderid)).filter(
+        and_(
+            Order.userid == user_id,
+            extract('month', Order.install_date) == today.month,
+            extract('year', Order.install_date) == today.year
+        )
+    ).scalar() or 0
+
+    pending_installs = db.query(func.count(Order.orderid)).filter(
+        and_(
+            Order.userid == user_id,
+            Order.install_date >= today
+        )
+    ).scalar() or 0
+
+    total_internet = db.query(func.count(Order.orderid)).filter(
+        and_(Order.userid == user_id, Order.has_internet == True)
+    ).scalar() or 0
+
+    total_tv = db.query(func.count(Order.orderid)).filter(
+        and_(Order.userid == user_id, Order.has_tv == True)
+    ).scalar() or 0
+
+    total_mobile = db.query(func.sum(Order.has_mobile)).filter(
+        Order.userid == user_id
+    ).scalar() or 0
+
+    total_voice = db.query(func.sum(Order.has_voice)).filter(
+        Order.userid == user_id
+    ).scalar() or 0
+
+    stats = {
+        'total_orders': total_orders,
+        'this_week': this_week,
+        'this_month': this_month,
+        'pending_installs': pending_installs,
+        'total_internet': total_internet,
+        'total_tv': total_tv,
+        'total_mobile': int(total_mobile),
+        'total_voice': int(total_voice)
+    }
+
+    # Get recent orders for the report
+    orders = db.query(Order).filter(Order.userid == user_id).limit(100).all()
+
+    # Generate Excel
+    excel_data = generate_stats_excel(stats, orders)
+
+    # Create filename with timestamp
+    filename = f"statistics_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    # Return as download
+    return Response(
+        content=excel_data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        }
+    )
+
+@router.post("/export/email", status_code=status.HTTP_200_OK)
+async def email_export(
+    request: EmailExportRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Email export file to user with CAPTCHA verification"""
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(request.recaptcha_token):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CAPTCHA verification failed. Please try again."
+        )
+
+    # Validate file format
+    if request.file_format not in ['excel', 'csv']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File format must be 'excel' or 'csv'"
+        )
+
+    try:
+        # Build query with filtering logic
+        query = db.query(Order).filter(Order.userid == current_user.userid)
+
+        # Apply filters
+        if request.search:
+            search_term = f"%{request.search}%"
+            query = query.filter(
+                or_(
+                    Order.customer_name.ilike(search_term),
+                    Order.customer_account_number.ilike(search_term),
+                    Order.spectrum_reference.ilike(search_term),
+                    Order.business_name.ilike(search_term)
+                )
+            )
+
+        if request.date_from:
+            query = query.filter(Order.install_date >= request.date_from)
+        if request.date_to:
+            query = query.filter(Order.install_date <= request.date_to)
+
+        if request.product_types:
+            product_list = [p.strip().lower() for p in request.product_types.split(',')]
+            product_conditions = []
+
+            if 'internet' in product_list:
+                product_conditions.append(Order.has_internet == True)
+            if 'tv' in product_list:
+                product_conditions.append(Order.has_tv == True)
+            if 'mobile' in product_list:
+                product_conditions.append(Order.has_mobile > 0)
+            if 'voice' in product_list:
+                product_conditions.append(Order.has_voice > 0)
+            if 'wib' in product_list:
+                product_conditions.append(Order.has_wib == True)
+            if 'sbc' in product_list:
+                product_conditions.append(Order.has_sbc > 0)
+
+            if product_conditions:
+                query = query.filter(or_(*product_conditions))
+
+        if request.install_status:
+            today = date.today()
+            status_list = [s.strip().lower() for s in request.install_status.split(',')]
+            status_conditions = []
+
+            if 'installed' in status_list:
+                status_conditions.append(Order.install_date < today)
+            if 'today' in status_list:
+                status_conditions.append(Order.install_date == today)
+            if 'pending' in status_list:
+                status_conditions.append(Order.install_date > today)
+
+            if status_conditions:
+                query = query.filter(or_(*status_conditions))
+
+        # Get all matching orders
+        orders = query.all()
+        order_count = len(orders)
+
+        # Parse column list
+        column_list = None
+        if request.columns:
+            column_list = [c.strip() for c in request.columns.split(',') if c.strip()]
+
+        # Generate file based on format
+        if request.file_format == 'excel':
+            file_data = generate_excel(orders, column_list)
+        else:
+            file_data = generate_csv(orders, column_list)
+
+        # Send email
+        await send_export_email(
+            user_email=current_user.email,
+            user_name=current_user.name,
+            file_data=file_data,
+            file_format=request.file_format,
+            order_count=order_count
+        )
+
+        return {
+            "message": f"Export sent successfully to {current_user.email}",
+            "email": current_user.email,
+            "order_count": order_count,
+            "format": request.file_format
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send export: {str(e)}"
+        )

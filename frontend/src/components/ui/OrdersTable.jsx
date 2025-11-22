@@ -37,8 +37,11 @@ function OrdersTable({ orders = [], onOrderClick }) {
     let bVal = b[sortField]
 
     if (sortField === 'install_date') {
-      aVal = new Date(aVal)
-      bVal = new Date(bVal)
+      // Parse dates as LOCAL time for proper sorting
+      const [aYear, aMonth, aDay] = aVal.split('-').map(Number)
+      const [bYear, bMonth, bDay] = bVal.split('-').map(Number)
+      aVal = new Date(aYear, aMonth - 1, aDay)
+      bVal = new Date(bYear, bMonth - 1, bDay)
     }
 
     if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
@@ -47,7 +50,11 @@ function OrdersTable({ orders = [], onOrderClick }) {
   })
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Parse as LOCAL time, not UTC
+    const [year, month, day] = dateString.split('-').map(Number)
+    const localDate = new Date(year, month - 1, day)
+
+    return localDate.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -55,7 +62,9 @@ function OrdersTable({ orders = [], onOrderClick }) {
   }
 
   const getInstallStatus = (dateString) => {
-    const installDate = new Date(dateString + 'T00:00:00')
+    // Parse as LOCAL time, not UTC
+    const [year, month, day] = dateString.split('-').map(Number)
+    const installDate = new Date(year, month - 1, day)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 

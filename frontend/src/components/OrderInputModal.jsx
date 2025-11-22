@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, User, MapPin, Calendar, Package, FileText, CheckCircle, ArrowRight, ArrowLeft, Mail, Phone } from 'lucide-react'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
@@ -10,7 +10,7 @@ const STEPS = {
   NOTES: 3
 }
 
-function OrderInputModal({ isOpen, onClose, onSubmit }) {
+function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
   const [currentStep, setCurrentStep] = useState(STEPS.CUSTOMER)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState({})
@@ -36,6 +36,13 @@ function OrderInputModal({ isOpen, onClose, onSubmit }) {
     has_wib: false,
     notes: ''
   })
+
+  // Update install_date when prefilledDate changes
+  useEffect(() => {
+    if (prefilledDate && isOpen) {
+      setFormData(prev => ({ ...prev, install_date: prefilledDate }))
+    }
+  }, [prefilledDate, isOpen])
 
   const validateStep = (step) => {
     const newErrors = {}

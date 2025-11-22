@@ -73,15 +73,17 @@ async def verify_recaptcha(token: str) -> bool:
         print("❌ No reCAPTCHA token provided")
         return False
 
+    # Check development mode FIRST - bypass CAPTCHA entirely in dev
+    if os.getenv("ENVIRONMENT") == "development":
+        print("⚠️  WARNING: Using development mode - CAPTCHA verification bypassed")
+        return True
+
     secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
     print(f"🔑 Using secret key: {secret_key[:15]}..." if secret_key else "❌ No secret key found in environment")
 
-    # If no secret key is configured, check if it's a test key
+    # If no secret key is configured in production
     if not secret_key:
-        # Google's test key for development
-        if token == "test-token" or os.getenv("ENVIRONMENT") == "development":
-            print("⚠️  WARNING: Using development mode - CAPTCHA verification bypassed")
-            return True
+        print("❌ No RECAPTCHA_SECRET_KEY configured")
         return False
 
     try:

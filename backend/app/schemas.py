@@ -49,8 +49,26 @@ class OrderBase(BaseModel):
 class OrderCreate(OrderBase):
     pass
 
-class OrderUpdate(OrderBase):
-    pass
+class OrderUpdate(BaseModel):
+    spectrum_reference: Optional[str] = None
+    customer_account_number: Optional[str] = None
+    customer_security_code: Optional[str] = None
+    job_number: Optional[str] = None
+    business_name: Optional[str] = None
+    customer_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_address: Optional[str] = None
+    customer_phone: Optional[str] = None
+    install_date: Optional[date] = None
+    install_time: Optional[str] = None
+    has_internet: Optional[bool] = None
+    has_voice: Optional[int] = None
+    has_tv: Optional[bool] = None
+    has_sbc: Optional[int] = None
+    has_mobile: Optional[int] = None
+    mobile_activated: Optional[int] = None
+    has_wib: Optional[bool] = None
+    notes: Optional[str] = None
 
 class OrderResponse(OrderBase):
     orderid: int
