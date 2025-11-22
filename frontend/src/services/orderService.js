@@ -121,5 +121,15 @@ export const orderService = {
     window.URL.revokeObjectURL(url)
 
     return response.data
+  },
+
+  // Delta sync - get only orders updated since last sync
+  getDeltaSync: async (lastSyncTimestamp) => {
+    const response = await apiClient.get('/api/orders/delta', {
+      params: {
+        last_sync: lastSyncTimestamp
+      }
+    })
+    return response.data
   }
 }

@@ -3,6 +3,7 @@ import { orderService } from '../services/orderService'
 
 export const useOrders = (filters = {}) => {
   const [orders, setOrders] = useState([])
+  const [pagination, setPagination] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -17,8 +18,16 @@ export const useOrders = (filters = {}) => {
     try {
       setLoading(true)
       setError(null)
-      const data = await orderService.getOrders(0, 100, filterParams)
-      setOrders(data)
+      const response = await orderService.getOrders(0, 100, filterParams)
+      // Handle paginated response format
+      if (response.data && response.meta) {
+        setOrders(response.data)
+        setPagination(response.meta)
+      } else {
+        // Fallback for non-paginated response (backward compatibility)
+        setOrders(response)
+        setPagination(null)
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch orders')
       console.error('Order fetch error:', err)
@@ -35,7 +44,7 @@ export const useOrders = (filters = {}) => {
     await fetchOrders(filterParams || filters)
   }
 
-  return { orders, loading, error, refetch }
+  return { orders, pagination, loading, error, refetch }
 }
 
 export const useOrderStats = () => {

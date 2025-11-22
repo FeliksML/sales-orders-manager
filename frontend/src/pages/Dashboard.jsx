@@ -1,22 +1,25 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
 import OrdersTable from '../components/ui/OrdersTable'
-import OrderCharts from '../components/ui/OrderCharts'
 import FilterBar from '../components/ui/FilterBar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
-import OrderInputModal from '../components/OrderInputModal'
-import OrderDetailsModal from '../components/OrderDetailsModal'
-import ExportModal from '../components/ExportModal'
-import ScheduledReportsModal from '../components/ScheduledReportsModal'
-import CalendarView from '../components/CalendarView'
 import BulkActionsToolbar from '../components/ui/BulkActionsToolbar'
-import BulkRescheduleModal from '../components/BulkRescheduleModal'
-import BulkDeleteModal from '../components/BulkDeleteModal'
-import BulkExportModal from '../components/BulkExportModal'
+import PullToRefresh from '../components/ui/PullToRefresh'
 import { useOrders, useOrderStats } from '../hooks/useOrders'
 import { orderService } from '../services/orderService'
+
+// Lazy load heavy components for better performance
+const OrderCharts = lazy(() => import('../components/ui/OrderCharts'))
+const OrderInputModal = lazy(() => import('../components/OrderInputModal'))
+const OrderDetailsModal = lazy(() => import('../components/OrderDetailsModal'))
+const ExportModal = lazy(() => import('../components/ExportModal'))
+const ScheduledReportsModal = lazy(() => import('../components/ScheduledReportsModal'))
+const CalendarView = lazy(() => import('../components/CalendarView'))
+const BulkRescheduleModal = lazy(() => import('../components/BulkRescheduleModal'))
+const BulkDeleteModal = lazy(() => import('../components/BulkDeleteModal'))
+const BulkExportModal = lazy(() => import('../components/BulkExportModal'))
 
 function Dashboard() {
   const [filters, setFilters] = useState({})
@@ -204,6 +207,11 @@ function Dashboard() {
     }
   }
 
+  // Pull to refresh handler
+  const handleRefresh = async () => {
+    await Promise.all([refetch(), refetchStats()])
+  }
+
   return (
     <div
       className="min-h-screen p-4 sm:p-8"
@@ -337,17 +345,23 @@ function Dashboard() {
         {!ordersLoading && !statsLoading && (
           <section className="mb-8">
             <h2 className="text-white text-2xl font-bold mb-4">Analytics</h2>
-            <OrderCharts orders={orders} stats={stats} />
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <LoadingSpinner />
+              </div>
+            }>
+              <OrderCharts orders={orders} stats={stats} />
+            </Suspense>
           </section>
         )}
 
         {/* Recent Orders Section */}
         <section>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <h2 className="text-white text-2xl font-bold">Recent Orders</h2>
-            <div className="flex items-center gap-3">
-              {/* View Toggle */}
-              <div className="flex items-center gap-2 rounded-lg p-1 backdrop-blur-md" style={{
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-white text-2xl font-bold">Recent Orders</h2>
+              {/* View Toggle - Desktop */}
+              <div className="hidden md:flex items-center gap-2 rounded-lg p-1 backdrop-blur-md" style={{
                 backgroundColor: 'rgba(0, 15, 33, 0.3)',
                 backdropFilter: 'blur(20px)',
                 border: '1px solid rgba(0, 200, 255, 0.3)',
@@ -386,6 +400,48 @@ function Dashboard() {
                   Calendar
                 </button>
               </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* View Toggle - Mobile (icon only) */}
+              <div className="flex md:hidden items-center gap-1 rounded-lg p-1 backdrop-blur-md" style={{
+                backgroundColor: 'rgba(0, 15, 33, 0.3)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(0, 200, 255, 0.3)',
+                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
+              }}>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`flex items-center justify-center h-9 w-9 rounded-md transition-all ${
+                    viewMode === 'table'
+                      ? 'text-white'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                  style={viewMode === 'table' ? {
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                  } : {}}
+                >
+                  <List size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode('calendar')}
+                  className={`flex items-center justify-center h-9 w-9 rounded-md transition-all ${
+                    viewMode === 'calendar'
+                      ? 'text-white'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                  style={viewMode === 'calendar' ? {
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                  } : {}}
+                >
+                  <CalendarDays size={18} />
+                </button>
+              </div>
 
               <button
                 onClick={handleExportOrders}
@@ -398,7 +454,7 @@ function Dashboard() {
                 }}
               >
                 <Download size={18} />
-                Export
+                <span className="hidden sm:inline">Export</span>
               </button>
               <button
                 onClick={() => {
@@ -414,7 +470,7 @@ function Dashboard() {
                 }}
               >
                 <Plus size={18} />
-                New Order
+                <span className="hidden sm:inline">New Order</span>
               </button>
             </div>
           </div>
@@ -429,78 +485,94 @@ function Dashboard() {
             </div>
           )}
 
-          <div style={{ minHeight: '500px', position: 'relative' }}>
-            {ordersError ? (
-              <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
-                {ordersError}
-              </div>
-            ) : (
-              <>
-                {/* Show loading overlay only on initial load (when no orders exist yet) */}
-                {ordersLoading && orders.length === 0 ? (
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                    <LoadingSpinner />
-                  </div>
-                ) : (
-                  <div className="transition-opacity duration-300" style={{ opacity: ordersLoading ? 0.6 : 1 }}>
-                    {viewMode === 'table' ? (
-                      <OrdersTable
-                        orders={orders}
-                        onOrderClick={handleOrderClick}
-                        selectedOrders={selectedOrders}
-                        onSelectionChange={setSelectedOrders}
-                      />
-                    ) : (
-                      <CalendarView
-                        orders={orders}
-                        onOrderClick={handleOrderClick}
-                        onDateClick={handleCalendarDateClick}
-                        onEventDrop={handleEventDrop}
-                      />
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <PullToRefresh onRefresh={handleRefresh}>
+            <div style={{ minHeight: '500px', position: 'relative' }}>
+              {ordersError ? (
+                <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                  {ordersError}
+                </div>
+              ) : (
+                <>
+                  {/* Show loading overlay only on initial load (when no orders exist yet) */}
+                  {ordersLoading && orders.length === 0 ? (
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                      <LoadingSpinner />
+                    </div>
+                  ) : (
+                    <div className="transition-opacity duration-300" style={{ opacity: ordersLoading ? 0.6 : 1 }}>
+                      {viewMode === 'table' ? (
+                        <OrdersTable
+                          orders={orders}
+                          onOrderClick={handleOrderClick}
+                          selectedOrders={selectedOrders}
+                          onSelectionChange={setSelectedOrders}
+                        />
+                      ) : (
+                        <Suspense fallback={
+                          <div className="flex items-center justify-center p-8">
+                            <LoadingSpinner />
+                          </div>
+                        }>
+                          <CalendarView
+                            orders={orders}
+                            onOrderClick={handleOrderClick}
+                            onDateClick={handleCalendarDateClick}
+                            onEventDrop={handleEventDrop}
+                          />
+                        </Suspense>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </PullToRefresh>
         </section>
 
         {/* Order Input Modal */}
-        <OrderInputModal
-          isOpen={isOrderModalOpen}
-          onClose={() => {
-            setIsOrderModalOpen(false)
-            setPrefilledDate(null)
-          }}
-          onSubmit={handleOrderSubmit}
-          prefilledDate={prefilledDate}
-        />
+        <Suspense fallback={null}>
+          <OrderInputModal
+            isOpen={isOrderModalOpen}
+            onClose={() => {
+              setIsOrderModalOpen(false)
+              setPrefilledDate(null)
+            }}
+            onSubmit={handleOrderSubmit}
+            prefilledDate={prefilledDate}
+          />
+        </Suspense>
 
         {/* Order Details Modal */}
-        <OrderDetailsModal
-          order={selectedOrder}
-          isOpen={isDetailsModalOpen}
-          onClose={() => {
-            setIsDetailsModalOpen(false)
-            setSelectedOrder(null)
-          }}
-          onUpdate={handleOrderUpdate}
-          onDelete={handleOrderDelete}
-        />
+        <Suspense fallback={null}>
+          <OrderDetailsModal
+            order={selectedOrder}
+            isOpen={isDetailsModalOpen}
+            onClose={() => {
+              setIsDetailsModalOpen(false)
+              setSelectedOrder(null)
+            }}
+            onUpdate={handleOrderUpdate}
+            onDelete={handleOrderDelete}
+          />
+        </Suspense>
 
         {/* Export Modal */}
-        <ExportModal
-          isOpen={isExportModalOpen}
-          onClose={() => setIsExportModalOpen(false)}
-          filters={filters}
-          exportType={exportType}
-        />
+        <Suspense fallback={null}>
+          <ExportModal
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            filters={filters}
+            exportType={exportType}
+          />
+        </Suspense>
 
         {/* Scheduled Reports Modal */}
-        <ScheduledReportsModal
-          isOpen={isScheduledReportsModalOpen}
-          onClose={() => setIsScheduledReportsModalOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <ScheduledReportsModal
+            isOpen={isScheduledReportsModalOpen}
+            onClose={() => setIsScheduledReportsModalOpen(false)}
+          />
+        </Suspense>
 
         {/* Bulk Actions Toolbar */}
         {viewMode === 'table' && (
@@ -515,28 +587,34 @@ function Dashboard() {
         )}
 
         {/* Bulk Reschedule Modal */}
-        <BulkRescheduleModal
-          isOpen={isBulkRescheduleModalOpen}
-          onClose={() => setIsBulkRescheduleModalOpen(false)}
-          onConfirm={handleBulkReschedule}
-          selectedCount={selectedOrders.length}
-        />
+        <Suspense fallback={null}>
+          <BulkRescheduleModal
+            isOpen={isBulkRescheduleModalOpen}
+            onClose={() => setIsBulkRescheduleModalOpen(false)}
+            onConfirm={handleBulkReschedule}
+            selectedCount={selectedOrders.length}
+          />
+        </Suspense>
 
         {/* Bulk Delete Modal */}
-        <BulkDeleteModal
-          isOpen={isBulkDeleteModalOpen}
-          onClose={() => setIsBulkDeleteModalOpen(false)}
-          onConfirm={handleBulkDelete}
-          selectedCount={selectedOrders.length}
-        />
+        <Suspense fallback={null}>
+          <BulkDeleteModal
+            isOpen={isBulkDeleteModalOpen}
+            onClose={() => setIsBulkDeleteModalOpen(false)}
+            onConfirm={handleBulkDelete}
+            selectedCount={selectedOrders.length}
+          />
+        </Suspense>
 
         {/* Bulk Export Modal */}
-        <BulkExportModal
-          isOpen={isBulkExportModalOpen}
-          onClose={() => setIsBulkExportModalOpen(false)}
-          onExport={handleBulkExport}
-          selectedCount={selectedOrders.length}
-        />
+        <Suspense fallback={null}>
+          <BulkExportModal
+            isOpen={isBulkExportModalOpen}
+            onClose={() => setIsBulkExportModalOpen(false)}
+            onExport={handleBulkExport}
+            selectedCount={selectedOrders.length}
+          />
+        </Suspense>
       </div>
 
       <style>{`

@@ -1,12 +1,23 @@
 import { useState, useMemo, useCallback } from 'react'
-import { Calendar, momentLocalizer } from 'react-big-calendar'
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
-import moment from 'moment'
+import { format, parse, startOfWeek, getDay } from 'date-fns'
+import enUS from 'date-fns/locale/en-US'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import { Wifi, Tv, Smartphone, Phone, Server, Building } from 'lucide-react'
 
-const localizer = momentLocalizer(moment)
+const locales = {
+  'en-US': enUS,
+}
+
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  locales,
+})
 const DragAndDropCalendar = withDragAndDrop(Calendar)
 
 const CalendarView = ({ orders, onOrderClick, onDateClick, onEventDrop }) => {

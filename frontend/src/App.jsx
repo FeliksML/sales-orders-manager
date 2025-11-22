@@ -1,44 +1,58 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import GoogleMapsLoader from './components/GoogleMapsLoader'
 import ProtectedRoute from './components/ProtectedRoute'
-import Signup from './pages/Signup'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Terms from './pages/Terms'
-import Privacy from './pages/Privacy'
-import VerifyEmail from './pages/VerifyEmail'
-import NotificationSettings from './pages/NotificationSettings'
+import LoadingSpinner from './components/ui/LoadingSpinner'
+import PWAInstallPrompt from './components/PWAInstallPrompt'
+import SyncStatus from './components/SyncStatus'
+
+// Lazy load route components for code splitting
+const Signup = lazy(() => import('./pages/Signup'))
+const Login = lazy(() => import('./pages/Login'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Terms = lazy(() => import('./pages/Terms'))
+const Privacy = lazy(() => import('./pages/Privacy'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 
 function App() {
   return (
     <GoogleMapsLoader>
       <AuthProvider>
         <Router>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/notification-settings"
-              element={
-                <ProtectedRoute>
-                  <NotificationSettings />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+          <Suspense fallback={
+            <div className="flex items-center justify-center min-h-screen">
+              <LoadingSpinner />
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/notification-settings"
+                element={
+                  <ProtectedRoute>
+                    <NotificationSettings />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Suspense>
+          <PWAInstallPrompt />
+          <SyncStatus />
         </Router>
       </AuthProvider>
     </GoogleMapsLoader>

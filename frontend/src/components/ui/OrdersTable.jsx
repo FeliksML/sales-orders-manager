@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Hash, User, Briefcase, Package, Calendar,
   Wifi, Tv, Smartphone, Phone, Radio, Settings2,
@@ -6,8 +6,10 @@ import {
 } from 'lucide-react'
 import Card from './Card'
 import CustomCheckbox from './CustomCheckbox'
+import OrderCard from './OrderCard'
 
 function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange }) {
+  const [isMobile, setIsMobile] = useState(false)
   const [sortField, setSortField] = useState('install_date')
   const [sortDirection, setSortDirection] = useState('desc')
   const [showColumnSettings, setShowColumnSettings] = useState(false)
@@ -52,6 +54,17 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
       onSelectionChange?.([...selectedOrders, orderId])
     }
   }
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768) // md breakpoint
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const sortedOrders = [...orders].sort((a, b) => {
     let aVal = a[sortField]
@@ -142,6 +155,40 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
     )
   }
 
+  // Mobile card view
+  if (isMobile) {
+    return (
+      <div className="space-y-4">
+        {/* Mobile Header */}
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-blue-400" />
+            <span className="text-white font-semibold">Orders ({orders.length})</span>
+          </div>
+          {selectedOrders.length > 0 && (
+            <span className="text-sm text-blue-400">
+              {selectedOrders.length} selected
+            </span>
+          )}
+        </div>
+
+        {/* Card List */}
+        <div className="space-y-3">
+          {sortedOrders.map(order => (
+            <OrderCard
+              key={order.orderid}
+              order={order}
+              onOrderClick={onOrderClick}
+              isSelected={selectedOrders.includes(order.orderid)}
+              onSelectionChange={handleSelectOrder}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Desktop table view
   return (
     <Card className="overflow-hidden">
       {/* Header with Column Settings */}

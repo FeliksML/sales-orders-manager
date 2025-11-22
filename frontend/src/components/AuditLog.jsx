@@ -191,74 +191,83 @@ function AuditLog({ orderId }) {
         {auditLogs.map((log, index) => (
           <div
             key={log.auditid}
-            className={`relative border rounded-lg p-4 ${getActionColor(log.action)}`}
+            className={`relative border rounded-lg p-3 sm:p-4 ${getActionColor(log.action)}`}
           >
-            {/* Timeline connector */}
+            {/* Timeline connector - hidden on mobile */}
             {index !== auditLogs.length - 1 && (
-              <div className="absolute left-8 top-12 bottom-[-12px] w-px bg-white/10" />
+              <div className="hidden sm:block absolute left-8 top-12 bottom-[-12px] w-px bg-white/10" />
             )}
 
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2 sm:gap-3">
               {/* Icon */}
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
+              <div className="flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                 {getActionIcon(log.action)}
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
                 {/* Header */}
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-white capitalize">
-                        {log.action.replace('_', ' ')}
-                      </span>
-                      {log.field_name && (
-                        <span className="text-sm text-white/60">
-                          • {formatFieldName(log.field_name)}
+                <div className="mb-2">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-sm sm:text-base font-medium text-white capitalize">
+                          {log.action.replace('_', ' ')}
                         </span>
-                      )}
+                        {log.field_name && (
+                          <span className="text-xs sm:text-sm text-white/60">
+                            • {formatFieldName(log.field_name)}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-sm text-white/50">
-                      <User className="w-3 h-3" />
-                      <span>{log.user_name}</span>
-                      <span>•</span>
-                      <span>{formatTimestamp(log.timestamp)}</span>
-                    </div>
+
+                    {/* Action buttons - hidden on mobile, shown on hover */}
+                    {(log.action === 'update' || log.action === 'create') && (
+                      <div className="hidden xs:flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => handleViewSnapshot(log)}
+                          className="p-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                          title="View snapshot"
+                        >
+                          <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/60" />
+                        </button>
+                        <button
+                          onClick={() => handleRevertClick(log)}
+                          className="p-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                          title="Revert to this version"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white/60" />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Action buttons */}
-                  {(log.action === 'update' || log.action === 'create') && (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleViewSnapshot(log)}
-                        className="p-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-                        title="View snapshot"
-                      >
-                        <Eye className="w-4 h-4 text-white/60" />
-                      </button>
-                      <button
-                        onClick={() => handleRevertClick(log)}
-                        className="p-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-                        title="Revert to this version"
-                      >
-                        <RotateCcw className="w-4 h-4 text-white/60" />
-                      </button>
+                  {/* User and timestamp - stacked on mobile */}
+                  <div className="flex flex-col xs:flex-row xs:items-center gap-0.5 xs:gap-2 text-xs sm:text-sm text-white/50">
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{log.user_name}</span>
                     </div>
-                  )}
+                    <span className="hidden xs:inline">•</span>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3 flex-shrink-0 xs:hidden" />
+                      <span className="text-xs">{formatTimestamp(log.timestamp)}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Change details */}
+                {/* Change details - single column on mobile */}
                 {log.field_name && log.old_value !== null && log.new_value !== null && (
-                  <div className="mt-2 p-2 rounded bg-black/20 border border-white/5">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-white/40">From:</span>
-                        <span className="ml-2 text-red-300">{formatValue(log.old_value)}</span>
+                  <div className="mt-2 p-2 sm:p-2.5 rounded bg-black/20 border border-white/5">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 text-xs sm:text-sm">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-white/40 font-medium flex-shrink-0">From:</span>
+                        <span className="text-red-300 break-words">{formatValue(log.old_value)}</span>
                       </div>
-                      <div>
-                        <span className="text-white/40">To:</span>
-                        <span className="ml-2 text-green-300">{formatValue(log.new_value)}</span>
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-white/40 font-medium flex-shrink-0">To:</span>
+                        <span className="text-green-300 break-words">{formatValue(log.new_value)}</span>
                       </div>
                     </div>
                   </div>
@@ -266,8 +275,28 @@ function AuditLog({ orderId }) {
 
                 {/* Reason */}
                 {log.change_reason && (
-                  <div className="mt-2 text-sm text-white/50 italic">
+                  <div className="mt-2 text-xs sm:text-sm text-white/50 italic">
                     "{log.change_reason}"
+                  </div>
+                )}
+
+                {/* Mobile action buttons - shown at bottom on mobile */}
+                {(log.action === 'update' || log.action === 'create') && (
+                  <div className="flex xs:hidden gap-2 mt-3 pt-2 border-t border-white/10">
+                    <button
+                      onClick={() => handleViewSnapshot(log)}
+                      className="flex-1 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors flex items-center justify-center gap-1.5 text-xs text-white/70"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>View</span>
+                    </button>
+                    <button
+                      onClick={() => handleRevertClick(log)}
+                      className="flex-1 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors flex items-center justify-center gap-1.5 text-xs text-white/70"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Revert</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -322,15 +351,15 @@ function AuditLog({ orderId }) {
 
       {/* Snapshot Modal */}
       {showSnapshot && snapshotData && selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-white/10 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-blue-400" />
-                  Order Snapshot
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-white/10 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                  <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400 flex-shrink-0" />
+                  <span>Order Snapshot</span>
                 </h3>
-                <p className="text-sm text-white/60 mt-1">
+                <p className="text-xs sm:text-sm text-white/60 mt-1 break-words">
                   State at {formatTimestamp(selectedLog.timestamp)}
                 </p>
               </div>
@@ -340,13 +369,13 @@ function AuditLog({ orderId }) {
                   setSnapshotData(null)
                   setSelectedLog(null)
                 }}
-                className="p-2 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                className="p-2 rounded bg-white/5 hover:bg-white/10 border border-white/10 transition-colors flex-shrink-0"
               >
-                <X className="w-5 h-5 text-white/60" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5 text-white/60" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
               {Object.entries(snapshotData.snapshot || {}).map(([key, value]) => {
                 // Skip system fields
                 if (['orderid', 'userid', 'created_at', 'updated_at', 'created_by'].includes(key)) {
@@ -354,9 +383,9 @@ function AuditLog({ orderId }) {
                 }
 
                 return (
-                  <div key={key} className="p-3 rounded bg-black/20 border border-white/10">
-                    <div className="text-xs text-white/40 mb-1">{formatFieldName(key)}</div>
-                    <div className="text-sm text-white">{formatValue(value)}</div>
+                  <div key={key} className="p-2.5 sm:p-3 rounded bg-black/20 border border-white/10">
+                    <div className="text-xs text-white/40 mb-1 font-medium">{formatFieldName(key)}</div>
+                    <div className="text-xs sm:text-sm text-white break-words">{formatValue(value)}</div>
                   </div>
                 )
               })}

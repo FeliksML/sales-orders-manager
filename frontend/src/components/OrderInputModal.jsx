@@ -146,13 +146,13 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     (formData.has_wib ? 1 : 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        <Card className="relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+        <Card className="relative flex flex-col max-h-full overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+          <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 border-b border-white/10 flex-shrink-0">
             <div>
-              <h2 className="text-2xl font-bold text-white">New Order</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">New Order</h2>
               <p className="text-gray-400 text-sm mt-1">Fill in the order details</p>
             </div>
             <button
@@ -164,7 +164,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
           </div>
 
           {/* Progress Steps */}
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-3 sm:mb-8 flex-shrink-0">
             {stepConfig.map((step, idx) => {
               const Icon = step.icon
               const isActive = currentStep === step.id
@@ -193,7 +193,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                       )}
                     </div>
                     <span
-                      className={`text-xs mt-2 font-medium ${
+                      className={`text-xs mt-2 font-medium hidden sm:block ${
                         isActive ? 'text-white' : 'text-gray-500'
                       }`}
                     >
@@ -213,7 +213,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
           </div>
 
           {/* Form Content */}
-          <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[50vh] px-1">
+          <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-1 min-h-0">
             {/* Step 1: Customer Information */}
             {currentStep === STEPS.CUSTOMER && (
               <div className="space-y-4 animate-fadeIn">
@@ -680,19 +680,20 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
           </form>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
+          <div className="flex items-center justify-between mt-4 sm:mt-6 pt-4 border-t border-white/10 flex-shrink-0">
             <button
               type="button"
               onClick={handlePrev}
               disabled={currentStep === STEPS.CUSTOMER}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 text-sm sm:text-base ${
                 currentStep === STEPS.CUSTOMER
                   ? 'bg-white/5 text-gray-500 cursor-not-allowed'
                   : 'bg-white/10 text-white hover:bg-white/20'
               }`}
             >
               <ArrowLeft className="w-4 h-4" />
-              Previous
+              <span className="hidden sm:inline">Previous</span>
+              <span className="sm:hidden">Back</span>
             </button>
 
             <div className="flex items-center gap-2">
@@ -700,7 +701,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center gap-2"
+                  className="px-4 sm:px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center gap-2 text-sm sm:text-base"
                 >
                   Next
                   <ArrowRight className="w-4 h-4" />
@@ -710,17 +711,19 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 sm:px-6 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Submitting...
+                      <span className="hidden sm:inline">Submitting...</span>
+                      <span className="sm:hidden">...</span>
                     </>
                   ) : (
                     <>
                       <CheckCircle className="w-4 h-4" />
-                      Submit Order
+                      <span className="hidden sm:inline">Submit Order</span>
+                      <span className="sm:hidden">Submit</span>
                     </>
                   )}
                 </button>

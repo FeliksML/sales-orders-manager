@@ -1,6 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Generic, TypeVar
 from datetime import date, datetime
+
+# Generic type for paginated responses
+T = TypeVar('T')
 
 class UserSignup(BaseModel):
     email : str
@@ -89,6 +92,17 @@ class OrderStats(BaseModel):
     total_tv: int
     total_mobile: int
     total_voice: int
+
+# Pagination Schemas
+class PaginationMeta(BaseModel):
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
+
+class PaginatedOrderResponse(BaseModel):
+    data: List[OrderResponse]
+    meta: PaginationMeta
 
 # Audit Trail Schemas
 class AuditLogResponse(BaseModel):

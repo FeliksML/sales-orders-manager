@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, date
 import io
 from .database import get_db
 from .models import Order, User
-from .schemas import OrderCreate, OrderUpdate, OrderResponse, OrderStats
+from .schemas import OrderCreate, OrderUpdate, OrderResponse, OrderStats, PaginatedOrderResponse, PaginationMeta
 from .auth import get_current_user, verify_recaptcha
 from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
 from .email_service import send_export_email
@@ -37,6 +37,11 @@ class BulkRescheduleRequest(BaseModel):
 class BulkDeleteRequest(BaseModel):
     order_ids: List[int]
 
+class DeltaSyncResponse(BaseModel):
+    updated_orders: List[OrderResponse]
+    deleted_order_ids: List[int]
+    sync_timestamp: datetime
+
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def create_order(
     order: OrderCreate,
@@ -64,7 +69,7 @@ def create_order(
 
     return db_order
 
-@router.get("/", response_model=List[OrderResponse])
+@router.get("/", response_model=PaginatedOrderResponse)
 def get_orders(
     skip: int = 0,
     limit: int = 100,
@@ -76,7 +81,7 @@ def get_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all orders for the current user with optional search and filters"""
+    """Get all orders for the current user with optional search and filters, including pagination metadata"""
     # Base query - filter by user
     query = db.query(Order).filter(Order.userid == current_user.userid)
 
@@ -135,16 +140,33 @@ def get_orders(
         if status_conditions:
             query = query.filter(or_(*status_conditions))
 
-    # Apply pagination and return results
-    orders = query.offset(skip).limit(limit).all()
-    return orders
+    # Get total count before pagination
+    total = query.count()
 
-@router.get("/stats", response_model=OrderStats)
+    # Apply pagination
+    orders = query.offset(skip).limit(limit).all()
+
+    # Calculate has_more
+    has_more = (skip + len(orders)) < total
+
+    # Return paginated response with metadata
+    return PaginatedOrderResponse(
+        data=orders,
+        meta=PaginationMeta(
+            total=total,
+            skip=skip,
+            limit=limit,
+            has_more=has_more
+        )
+    )
+
+@router.get("/stats")
 def get_order_stats(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get order statistics for the dashboard"""
+    """Get order statistics for the dashboard with caching"""
     user_id = current_user.userid
 
     # Total orders
@@ -196,6 +218,9 @@ def get_order_stats(
         Order.userid == user_id
     ).scalar() or 0
 
+    # Add Cache-Control header (cache for 5 minutes)
+    response.headers["Cache-Control"] = "private, max-age=300"
+
     return OrderStats(
         total_orders=total_orders,
         this_week=this_week,
@@ -207,13 +232,52 @@ def get_order_stats(
         total_voice=int(total_voice)
     )
 
-@router.get("/{order_id}", response_model=OrderResponse)
-def get_order(
-    order_id: int,
+@router.get("/delta", response_model=DeltaSyncResponse)
+def get_delta_sync(
+    last_sync: datetime = Query(..., description="ISO 8601 datetime of last sync"),
+    response: Response = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get a specific order by ID"""
+    """Get incremental updates since last sync - returns only orders created/updated after last_sync timestamp"""
+    user_id = current_user.userid
+
+    # Get all orders updated or created after last_sync timestamp
+    updated_orders = db.query(Order).filter(
+        and_(
+            Order.userid == user_id,
+            or_(
+                Order.updated_at > last_sync,
+                Order.created_at > last_sync
+            )
+        )
+    ).all()
+
+    # Note: Deleted orders tracking would require a separate deleted_orders table
+    # For now, returning empty list - can be enhanced later
+    deleted_order_ids = []
+
+    # Current server timestamp for client to use in next sync
+    current_timestamp = datetime.utcnow()
+
+    # Don't cache delta sync responses
+    if response:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+
+    return DeltaSyncResponse(
+        updated_orders=updated_orders,
+        deleted_order_ids=deleted_order_ids,
+        sync_timestamp=current_timestamp
+    )
+
+@router.get("/{order_id}", response_model=OrderResponse)
+def get_order(
+    order_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get a specific order by ID with caching"""
     order = db.query(Order).filter(
         and_(
             Order.orderid == order_id,
@@ -226,6 +290,10 @@ def get_order(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found"
         )
+
+    # Add Cache-Control header (cache for 10 minutes)
+    response.headers["Cache-Control"] = "private, max-age=600"
+
     return order
 
 @router.put("/{order_id}", response_model=OrderResponse)

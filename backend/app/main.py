@@ -5,6 +5,7 @@ from .scheduled_reports import router as scheduled_reports_router
 from .notifications import router as notifications_router
 from .audit import router as audit_router
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 from .scheduler import start_scheduler, shutdown_scheduler
 
@@ -34,6 +35,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add GZip compression for responses > 1000 bytes
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 @app.get("/")
 def get_root():
     return {"message": "API is running"}
