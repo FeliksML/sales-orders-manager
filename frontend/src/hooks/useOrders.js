@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { orderService } from '../services/orderService'
 
-export const useOrders = () => {
+export const useOrders = (filters = {}) => {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (filterParams = filters) => {
     // Check if token exists before fetching
     const token = localStorage.getItem('token')
     if (!token) {
@@ -17,7 +17,7 @@ export const useOrders = () => {
     try {
       setLoading(true)
       setError(null)
-      const data = await orderService.getOrders()
+      const data = await orderService.getOrders(0, 100, filterParams)
       setOrders(data)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch orders')
@@ -28,11 +28,11 @@ export const useOrders = () => {
   }
 
   useEffect(() => {
-    fetchOrders()
-  }, [])
+    fetchOrders(filters)
+  }, [JSON.stringify(filters)])
 
-  const refetch = () => {
-    fetchOrders()
+  const refetch = (filterParams) => {
+    fetchOrders(filterParams || filters)
   }
 
   return { orders, loading, error, refetch }

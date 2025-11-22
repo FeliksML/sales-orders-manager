@@ -4,6 +4,7 @@ import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
 import OrdersTable from '../components/ui/OrdersTable'
 import OrderCharts from '../components/ui/OrderCharts'
+import FilterBar from '../components/ui/FilterBar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import OrderInputModal from '../components/OrderInputModal'
 import OrderDetailsModal from '../components/OrderDetailsModal'
@@ -11,12 +12,21 @@ import { useOrders, useOrderStats } from '../hooks/useOrders'
 import { orderService } from '../services/orderService'
 
 function Dashboard() {
-  const { orders, loading: ordersLoading, error: ordersError, refetch } = useOrders()
+  const [filters, setFilters] = useState({})
+  const { orders, loading: ordersLoading, error: ordersError, refetch } = useOrders(filters)
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useOrderStats()
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters)
+  }
+
+  const handleClearFilters = () => {
+    setFilters({})
+  }
 
   const handleOrderSubmit = async (orderData) => {
     try {
@@ -199,6 +209,14 @@ function Dashboard() {
             >
               + New Order
             </button>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="mb-4">
+            <FilterBar
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+            />
           </div>
 
           {ordersLoading ? (

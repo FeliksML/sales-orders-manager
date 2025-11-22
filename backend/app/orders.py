@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract
-from typing import List
+from sqlalchemy import func, and_, extract, or_
+from typing import List, Optional
 from datetime import datetime, timedelta, date
 from .database import get_db
 from .models import Order, User
@@ -30,13 +30,75 @@ def create_order(
 def get_orders(
     skip: int = 0,
     limit: int = 100,
+    search: Optional[str] = Query(None, description="Search by customer name, account number, or spectrum reference"),
+    date_from: Optional[date] = Query(None, description="Filter by install date from"),
+    date_to: Optional[date] = Query(None, description="Filter by install date to"),
+    product_types: Optional[str] = Query(None, description="Comma-separated product types: internet,tv,mobile,voice,wib,sbc"),
+    install_status: Optional[str] = Query(None, description="Filter by install status: installed,pending,today"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all orders for the current user"""
-    orders = db.query(Order).filter(
-        Order.userid == current_user.userid
-    ).offset(skip).limit(limit).all()
+    """Get all orders for the current user with optional search and filters"""
+    # Base query - filter by user
+    query = db.query(Order).filter(Order.userid == current_user.userid)
+
+    # Search filter - search across customer name, account number, and spectrum reference
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Order.customer_name.ilike(search_term),
+                Order.customer_account_number.ilike(search_term),
+                Order.spectrum_reference.ilike(search_term),
+                Order.business_name.ilike(search_term)
+            )
+        )
+
+    # Date range filter
+    if date_from:
+        query = query.filter(Order.install_date >= date_from)
+    if date_to:
+        query = query.filter(Order.install_date <= date_to)
+
+    # Product type filter
+    if product_types:
+        product_list = [p.strip().lower() for p in product_types.split(',')]
+        product_conditions = []
+
+        if 'internet' in product_list:
+            product_conditions.append(Order.has_internet == True)
+        if 'tv' in product_list:
+            product_conditions.append(Order.has_tv == True)
+        if 'mobile' in product_list:
+            product_conditions.append(Order.has_mobile > 0)
+        if 'voice' in product_list:
+            product_conditions.append(Order.has_voice > 0)
+        if 'wib' in product_list:
+            product_conditions.append(Order.has_wib == True)
+        if 'sbc' in product_list:
+            product_conditions.append(Order.has_sbc > 0)
+
+        if product_conditions:
+            query = query.filter(or_(*product_conditions))
+
+    # Install status filter
+    if install_status:
+        today = date.today()
+        status_list = [s.strip().lower() for s in install_status.split(',')]
+        status_conditions = []
+
+        if 'installed' in status_list:
+            status_conditions.append(Order.install_date < today)
+        if 'today' in status_list:
+            status_conditions.append(Order.install_date == today)
+        if 'pending' in status_list:
+            status_conditions.append(Order.install_date > today)
+
+        if status_conditions:
+            query = query.filter(or_(*status_conditions))
+
+    # Apply pagination and return results
+    orders = query.offset(skip).limit(limit).all()
     return orders
 
 @router.get("/stats", response_model=OrderStats)
