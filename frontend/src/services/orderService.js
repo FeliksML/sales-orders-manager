@@ -68,5 +68,11 @@ export const orderService = {
   getStats: async () => {
     const response = await apiClient.get('/api/orders/stats')
     return response.data
+  },
+
+  // Send order details to email
+  sendOrderToEmail: async (orderId) => {
+    const response = await apiClient.post(`/api/orders/${orderId}/email`)
+    return response.data
   }
 }

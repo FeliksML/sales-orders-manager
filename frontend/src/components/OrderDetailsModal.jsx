@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import {
   X, Edit2, Save, Calendar, User, MapPin, Phone, Briefcase, Package,
   CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
-  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy
+  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send
 } from 'lucide-react'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
+import { orderService } from '../services/orderService'
 
 function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -13,6 +14,8 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [showReschedule, setShowReschedule] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [copiedField, setCopiedField] = useState(null)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [emailMessage, setEmailMessage] = useState(null)
   const [errors, setErrors] = useState({})
   const [formData, setFormData] = useState({})
 
@@ -154,6 +157,37 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     }
   }
 
+  const handleSendToEmail = async () => {
+    setSendingEmail(true)
+    setEmailMessage(null)
+
+    try {
+      const response = await orderService.sendOrderToEmail(order.orderid)
+      setEmailMessage({
+        type: 'success',
+        text: `Order details sent successfully to ${response.email}`
+      })
+
+      // Clear message after 5 seconds
+      setTimeout(() => {
+        setEmailMessage(null)
+      }, 5000)
+    } catch (error) {
+      console.error('Failed to send order email:', error)
+      setEmailMessage({
+        type: 'error',
+        text: error.response?.data?.detail || 'Failed to send email. Please try again.'
+      })
+
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        setEmailMessage(null)
+      }, 5000)
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   const formatPhoneNumber = (phone) => {
     // Return empty string if phone is undefined, null, or empty
     if (!phone) return ''
@@ -272,6 +306,24 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
               </button>
             </div>
           </div>
+
+          {/* Email Status Message */}
+          {emailMessage && (
+            <div className={`mb-4 p-3 rounded-lg border ${
+              emailMessage.type === 'success'
+                ? 'bg-green-500/10 border-green-500/30 text-green-300'
+                : 'bg-red-500/10 border-red-500/30 text-red-300'
+            }`}>
+              <div className="flex items-center gap-2">
+                {emailMessage.type === 'success' ? (
+                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                )}
+                <p className="text-sm font-medium">{emailMessage.text}</p>
+              </div>
+            </div>
+          )}
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-1 custom-scrollbar">
@@ -626,13 +678,33 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
 
           {/* Footer */}
           <div className="flex-shrink-0 flex items-center justify-between mt-6 pt-4 border-t border-white/10">
-            <button
-              onClick={handleDeleteClick}
-              disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-medium transition-colors border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Delete Order
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDeleteClick}
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-medium transition-colors border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Delete Order
+              </button>
+              <button
+                onClick={handleSendToEmail}
+                disabled={sendingEmail || isSubmitting}
+                className="px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 font-medium transition-colors border border-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                title="Send order details to your email"
+              >
+                {sendingEmail ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send to My Email
+                  </>
+                )}
+              </button>
+            </div>
             {(isEditing || showReschedule) && (
               <button
                 onClick={handleSave}

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Terms from './pages/Terms'
 import Privacy from './pages/Privacy'
 import VerifyEmail from './pages/VerifyEmail'
+import NotificationSettings from './pages/NotificationSettings'
 
 function App() {
   return (
@@ -26,6 +27,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notification-settings"
+              element={
+                <ProtectedRoute>
+                  <NotificationSettings />
                 </ProtectedRoute>
               }
             />

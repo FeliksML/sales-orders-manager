@@ -1,5 +1,6 @@
 from .database import Base
 from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary, DateTime
+from datetime import datetime
 
 class User(Base):
     __tablename__ = 'users'
@@ -12,6 +13,12 @@ class User(Base):
     email_verified = Column(Boolean, default=False, nullable=False)
     verification_token = Column(String(255), nullable=True)
     verification_token_expiry = Column(DateTime, nullable=True)
+
+    # Notification preferences
+    phone_number = Column(String(20), nullable=True)
+    email_notifications = Column(Boolean, default=True, nullable=False)
+    sms_notifications = Column(Boolean, default=False, nullable=False)
+    browser_notifications = Column(Boolean, default=True, nullable=False)
 
 class Order(Base):
     __tablename__ = 'orders'
@@ -47,3 +54,25 @@ class Order(Base):
     
     # Additional notes
     notes = Column(Text)
+
+class Notification(Base):
+    __tablename__ = 'notifications'
+
+    notificationid = Column(Integer, primary_key=True)
+    userid = Column(Integer, ForeignKey('users.userid'), nullable=False)
+    orderid = Column(Integer, ForeignKey('orders.orderid'), nullable=True)
+
+    # Notification details
+    notification_type = Column(String(50), nullable=False)  # 'install_reminder', 'today_install', etc.
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+
+    # Delivery channels
+    sent_via_email = Column(Boolean, default=False)
+    sent_via_sms = Column(Boolean, default=False)
+    sent_via_browser = Column(Boolean, default=False)
+
+    # Status
+    is_read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    read_at = Column(DateTime, nullable=True)

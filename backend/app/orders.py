@@ -11,6 +11,7 @@ from .schemas import OrderCreate, OrderUpdate, OrderResponse, OrderStats
 from .auth import get_current_user, verify_recaptcha
 from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
 from .email_service import send_export_email
+from .notification_service import send_order_details_email
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -258,6 +259,49 @@ def delete_order(
     db.delete(db_order)
     db.commit()
     return None
+
+@router.post("/{order_id}/email", status_code=status.HTTP_200_OK)
+async def send_order_email(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Send order details to user's email"""
+    # Get the order
+    order = db.query(Order).filter(
+        and_(
+            Order.orderid == order_id,
+            Order.userid == current_user.userid
+        )
+    ).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    try:
+        # Send email
+        success = await send_order_details_email(current_user, order)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send email"
+            )
+
+        return {
+            "message": f"Order details sent successfully to {current_user.email}",
+            "email": current_user.email,
+            "order_id": order_id
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send order email: {str(e)}"
+        )
 
 @router.get("/export/columns")
 def get_available_columns(

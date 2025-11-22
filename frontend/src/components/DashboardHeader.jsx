@@ -1,10 +1,15 @@
+import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, User, Settings } from 'lucide-react'
+import { LogOut, User, Settings, Bell } from 'lucide-react'
+import { useNotifications } from '../hooks/useNotifications'
+import NotificationCenter from './NotificationCenter'
 
 function DashboardHeader() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { unreadCount, loadUnreadCount } = useNotifications()
+  const [isNotificationCenterOpen, setIsNotificationCenterOpen] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -42,6 +47,32 @@ function DashboardHeader() {
             </div>
           </div>
 
+          {/* Notification Settings Button */}
+          <button
+            onClick={() => navigate('/notification-settings')}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors border border-white/10"
+            title="Notification Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+
+          {/* Notification Bell */}
+          <button
+            onClick={() => {
+              setIsNotificationCenterOpen(true)
+              loadUnreadCount()
+            }}
+            className="relative flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors border border-white/10"
+            title="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
@@ -51,6 +82,15 @@ function DashboardHeader() {
           </button>
         </div>
       </div>
+
+      {/* Notification Center */}
+      <NotificationCenter
+        isOpen={isNotificationCenterOpen}
+        onClose={() => {
+          setIsNotificationCenterOpen(false)
+          loadUnreadCount()
+        }}
+      />
     </header>
   )
 }

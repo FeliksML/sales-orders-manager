@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from typing import Optional
 import logging
+import asyncio
 from .database import SessionLocal
-from .models import User, Order
+from .models import User, Order, Notification
 from .export_utils import generate_stats_excel
 from .email_service import send_scheduled_report_email
+from .notification_service import send_install_reminder, send_today_install_notification
 from sqlalchemy import func, and_, extract
 
 # Configure logging
@@ -175,11 +177,160 @@ def get_user_scheduled_reports(user_id: int) -> list:
             })
     return reports
 
+def check_installation_reminders():
+    """Check and send 24-hour installation reminders"""
+    logger.info("=" * 50)
+    logger.info("Running installation reminder check")
+    logger.info(f"Current time: {datetime.now()}")
+
+    db = SessionLocal()
+    try:
+        # Get installations scheduled for tomorrow
+        tomorrow = date.today() + timedelta(days=1)
+        logger.info(f"Checking for installations on: {tomorrow}")
+
+        # Get all orders scheduled for tomorrow
+        orders = db.query(Order).filter(Order.install_date == tomorrow).all()
+
+        logger.info(f"Found {len(orders)} total installations scheduled for tomorrow")
+
+        reminders_sent = 0
+        for order in orders:
+            # Get user
+            user = db.query(User).filter(User.userid == order.userid).first()
+            if not user:
+                logger.warning(f"User not found for order {order.orderid}")
+                continue
+
+            logger.info(f"Processing order {order.orderid} for user {user.email}")
+
+            # Check if reminder was already sent today
+            existing_notification = db.query(func.count(Notification.notificationid)).filter(
+                and_(
+                    Notification.userid == user.userid,
+                    Notification.orderid == order.orderid,
+                    Notification.notification_type == 'install_reminder_24h',
+                    func.date(Notification.created_at) == date.today()
+                )
+            ).scalar()
+
+            if existing_notification > 0:
+                logger.info(f"Reminder already sent today for order {order.orderid}")
+                continue
+
+            # Check if user wants notifications
+            if user.email_notifications or user.sms_notifications or user.browser_notifications:
+                logger.info(f"Sending reminder to {user.email} for order {order.orderid}")
+                asyncio.run(send_install_reminder(db, user, order, hours_before=24))
+                reminders_sent += 1
+            else:
+                logger.info(f"User {user.email} has all notifications disabled")
+
+        logger.info(f"Sent {reminders_sent} new reminders")
+        logger.info("=" * 50)
+
+    except Exception as e:
+        logger.error(f"Failed to send installation reminders: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
+def check_today_installations():
+    """Check and send notifications for today's installations"""
+    logger.info("=" * 50)
+    logger.info("Running today's installation check")
+    logger.info(f"Current time: {datetime.now()}")
+
+    db = SessionLocal()
+    try:
+        # Get installations scheduled for today
+        today = date.today()
+        logger.info(f"Checking for installations on: {today}")
+
+        # Get all orders scheduled for today
+        orders = db.query(Order).filter(Order.install_date == today).all()
+
+        logger.info(f"Found {len(orders)} total installations scheduled for today")
+
+        notifications_sent = 0
+        for order in orders:
+            # Get user
+            user = db.query(User).filter(User.userid == order.userid).first()
+            if not user:
+                logger.warning(f"User not found for order {order.orderid}")
+                continue
+
+            logger.info(f"Processing order {order.orderid} for user {user.email}")
+
+            # Check if notification was already sent today
+            existing_notification = db.query(func.count(Notification.notificationid)).filter(
+                and_(
+                    Notification.userid == user.userid,
+                    Notification.orderid == order.orderid,
+                    Notification.notification_type == 'today_install',
+                    func.date(Notification.created_at) == date.today()
+                )
+            ).scalar()
+
+            if existing_notification > 0:
+                logger.info(f"Today notification already sent for order {order.orderid}")
+                continue
+
+            # Check if user wants notifications
+            if user.email_notifications or user.sms_notifications or user.browser_notifications:
+                logger.info(f"Sending today notification to {user.email} for order {order.orderid}")
+                asyncio.run(send_today_install_notification(db, user, order))
+                notifications_sent += 1
+            else:
+                logger.info(f"User {user.email} has all notifications disabled")
+
+        logger.info(f"Sent {notifications_sent} new today notifications")
+        logger.info("=" * 50)
+
+    except Exception as e:
+        logger.error(f"Failed to send today installation notifications: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """Start the scheduler"""
     if not scheduler.running:
+        logger.info("=" * 70)
+        logger.info("STARTING NOTIFICATION SCHEDULER")
+        logger.info("=" * 70)
+
+        # Add installation reminder job (runs every hour to continuously check)
+        scheduler.add_job(
+            check_installation_reminders,
+            trigger=CronTrigger(hour='*', minute=0),  # Every hour
+            id='installation_reminders',
+            replace_existing=True
+        )
+        logger.info("✓ Added installation reminder job (runs every hour)")
+
+        # Add today's installation notification job (runs every 2 hours)
+        scheduler.add_job(
+            check_today_installations,
+            trigger=CronTrigger(hour='*/2', minute=0),  # Every 2 hours
+            id='today_installations',
+            replace_existing=True
+        )
+        logger.info("✓ Added today installation notification job (runs every 2 hours)")
+
         scheduler.start()
-        logger.info("Scheduler started")
+        logger.info("✓ Scheduler started successfully")
+        logger.info("=" * 70)
+
+        # Run checks immediately on startup
+        logger.info("Running initial notification checks on startup...")
+        try:
+            check_installation_reminders()
+            check_today_installations()
+        except Exception as e:
+            logger.error(f"Failed to run initial checks: {str(e)}")
+    else:
+        logger.warning("Scheduler already running")
 
 def shutdown_scheduler():
     """Shutdown the scheduler"""
