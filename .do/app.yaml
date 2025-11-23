@@ -54,7 +54,7 @@ services:
 
     # Use Dockerfile for build
     dockerfile_path: backend/Dockerfile
-    source_dir: backend
+    # source_dir removed - build context is repo root
 
     # Instance configuration
     instance_count: 2
