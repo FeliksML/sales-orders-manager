@@ -584,13 +584,13 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
       <div className="flex items-stretch gap-0 shadow-md">
         {/* Search input - Integrated left side */}
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600 z-10 pointer-events-none" size={20} />
           <input
             type="text"
             value={searchInput}
             onChange={handleSearchChange}
             placeholder="Search by customer name, account number, or spectrum reference..."
-            className="w-full h-full pl-12 pr-12 py-3.5 text-sm border-2 border-r-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            className="w-full h-full pl-12 pr-12 py-3.5 text-sm border-2 border-r-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all relative"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.98)',
               backdropFilter: 'blur(10px)',
