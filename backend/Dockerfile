@@ -40,6 +40,9 @@ COPY --from=dependencies /usr/local/bin /usr/local/bin
 # Copy application code - copy everything from build context
 COPY --chown=appuser:appuser . /app/
 
+# Set PYTHONPATH so Python can find the app module
+ENV PYTHONPATH=/app
+
 # Switch to non-root user
 USER appuser
 
