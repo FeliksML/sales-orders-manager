@@ -13,19 +13,34 @@ from contextlib import asynccontextmanager
 from .scheduler import start_scheduler, shutdown_scheduler
 from .models import ErrorLog
 from .database import SessionLocal
+from .config import validate_environment
+from .security_headers import SecurityHeadersMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import traceback
 from jose import jwt
 from .auth import SECRET_KEY, ALGORITHM
 
+# Validate environment variables at module load time (before app starts)
+validate_environment()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    print("🚀 Starting application scheduler...")
     start_scheduler()
     yield
     # Shutdown
+    print("🛑 Shutting down application scheduler...")
     shutdown_scheduler()
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Error logging middleware
 @app.middleware("http")
@@ -99,6 +114,10 @@ app.include_router(scheduled_reports_router, prefix="/api/scheduled-reports", ta
 app.include_router(notifications_router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(audit_router, prefix="/api/audit", tags=["audit"])
 app.include_router(admin_router)
+
+# Add security headers middleware (first, so it applies to all responses)
+app.add_middleware(SecurityHeadersMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -120,3 +139,41 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 @app.get("/")
 def get_root():
     return {"message": "API is running"}
+
+@app.get("/health")
+def health_check():
+    """
+    Health check endpoint for load balancers and monitoring.
+    Returns 200 if the application is running.
+    """
+    return {
+        "status": "healthy",
+        "service": "sales-order-manager-api"
+    }
+
+@app.get("/readiness")
+def readiness_check():
+    """
+    Readiness check endpoint that verifies the application can handle requests.
+    Checks database connectivity.
+    """
+    try:
+        # Test database connection
+        with SessionLocal() as db:
+            db.execute("SELECT 1")
+
+        return {
+            "status": "ready",
+            "database": "connected",
+            "service": "sales-order-manager-api"
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not ready",
+                "database": "disconnected",
+                "error": str(e),
+                "service": "sales-order-manager-api"
+            }
+        )

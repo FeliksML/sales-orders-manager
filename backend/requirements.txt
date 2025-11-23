@@ -1,5 +1,5 @@
 fastapi
-uvicorn
+uvicorn[standard]
 psycopg2-binary
 python-dotenv
 sqlalchemy
@@ -11,3 +11,8 @@ aiofiles
 openpyxl
 apscheduler
 twilio
+python-jose[cryptography]
+httpx
+slowapi
+gunicorn
+sentry-sdk[fastapi]

@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: sales-order-db
+    environment:
+      POSTGRES_USER: salesorder
+      POSTGRES_PASSWORD: salesorder_dev_password
+      POSTGRES_DB: spectrum_orders
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salesorder -d spectrum_orders"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sales-order-network
+
+  # Backend API (Development mode)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development  # Use development stage
+    container_name: sales-order-backend
+    environment:
+      - DATABASE_URL=postgresql://salesorder:salesorder_dev_password@database:5432/spectrum_orders
+      - SECRET_KEY=development-secret-key-change-in-production-abcdef123456
+      - FRONTEND_URL=http://localhost:5173
+      - ENVIRONMENT=development
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM:-noreply@salesorder.com}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_SERVER=${MAIL_SERVER:-smtp.gmail.com}
+      - MAIL_STARTTLS=True
+      - MAIL_SSL_TLS=False
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app  # Mount for hot-reload
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sales-order-network
+
+  # Frontend (Development mode)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development  # Use development stage
+    container_name: sales-order-frontend
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src  # Mount for hot-reload
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+    depends_on:
+      - backend
+    networks:
+      - sales-order-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  sales-order-network:
+    driver: bridge

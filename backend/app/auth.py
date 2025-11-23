@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Path, HTTPException, Depends
+from fastapi import APIRouter, Path, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from .schemas import UserSignup, UserLogin, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
 from .models import User
 from .database import SessionLocal, get_db
 from .email_config import send_verification_email, send_password_reset_email
+from .config import get_secret_key
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import bcrypt
 import secrets
 from datetime import datetime, timedelta
@@ -14,11 +17,14 @@ import os
 import httpx
 
 # JWT Configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
+SECRET_KEY = get_secret_key()  # No fallback - will fail if not set
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days (TODO: reduce to 60 and implement refresh tokens)
 
 security = HTTPBearer()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -133,7 +139,8 @@ def check_email(email: str):
         return {"exists": existing_user is not None}
 
 @router.post("/signup")
-async def signup(user_data: UserSignup):
+@limiter.limit("5/hour")  # Strict limit for signup to prevent abuse
+async def signup(request: Request, user_data: UserSignup):
     # Verify reCAPTCHA
     if not await verify_recaptcha(user_data.recaptcha_token):
         return JSONResponse(
@@ -234,7 +241,8 @@ def verify_email(token: str):
         )
 
 @router.post("/login")
-async def login(user_data: UserLogin):
+@limiter.limit("10/15minutes")  # Prevent brute force attacks
+async def login(request: Request, user_data: UserLogin):
     # Verify reCAPTCHA
     if not await verify_recaptcha(user_data.recaptcha_token):
         return JSONResponse(
@@ -279,17 +287,18 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 @router.post("/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest):
+@limiter.limit("3/hour")  # Strict limit for password reset requests
+async def forgot_password(request: Request, reset_request: ForgotPasswordRequest):
     """Send password reset email to user"""
     # Verify reCAPTCHA
-    if not await verify_recaptcha(request.recaptcha_token):
+    if not await verify_recaptcha(reset_request.recaptcha_token):
         return JSONResponse(
             status_code=400,
             content={"error": "CAPTCHA verification failed. Please try again."}
         )
 
     with SessionLocal() as db:
-        user = db.query(User).filter(User.email == request.email).first()
+        user = db.query(User).filter(User.email == reset_request.email).first()
 
         # Always return success to prevent email enumeration attacks
         # but only send email if user exists
@@ -325,24 +334,25 @@ async def forgot_password(request: ForgotPasswordRequest):
     }
 
 @router.post("/reset-password")
-async def reset_password(request: ResetPasswordRequest):
+@limiter.limit("5/hour")  # Limit password reset attempts
+async def reset_password(request: Request, reset_request: ResetPasswordRequest):
     """Reset user password with token"""
     # Verify reCAPTCHA
-    if not await verify_recaptcha(request.recaptcha_token):
+    if not await verify_recaptcha(reset_request.recaptcha_token):
         return JSONResponse(
             status_code=400,
             content={"error": "CAPTCHA verification failed. Please try again."}
         )
 
     # Validate password length
-    if len(request.new_password) < 8:
+    if len(reset_request.new_password) < 8:
         return JSONResponse(
             status_code=400,
             content={"error": "Password must be at least 8 characters long."}
         )
 
     with SessionLocal() as db:
-        user = db.query(User).filter(User.reset_token == request.token).first()
+        user = db.query(User).filter(User.reset_token == reset_request.token).first()
 
         if not user:
             print(f"❌ Password reset failed: Invalid token")
@@ -360,7 +370,7 @@ async def reset_password(request: ResetPasswordRequest):
             )
 
         # Hash new password
-        password_bytes = request.new_password.encode('utf-8')
+        password_bytes = reset_request.new_password.encode('utf-8')
         hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
 
         # Update password and clear reset token

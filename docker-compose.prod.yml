@@ -1,0 +1,83 @@
+version: '3.8'
+
+# Production Docker Compose configuration
+# This is a reference configuration. In production, you would typically use:
+# - Managed database service (AWS RDS, Azure Database, etc.)
+# - Container orchestration (Kubernetes, ECS, etc.)
+# - Secrets management (AWS Secrets Manager, Azure Key Vault, etc.)
+
+services:
+  # Backend API (Production mode)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production  # Use production stage
+    container_name: sales-order-backend-prod
+    environment:
+      # IMPORTANT: In production, use a secrets manager, not environment variables
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ENVIRONMENT=production
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM=${MAIL_FROM}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_SERVER=${MAIL_SERVER}
+      - MAIL_STARTTLS=${MAIL_STARTTLS:-True}
+      - MAIL_SSL_TLS=${MAIL_SSL_TLS:-False}
+      - SENTRY_DSN=${SENTRY_DSN}  # Optional: Sentry error tracking
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sales-order-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Frontend (Production mode with Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production  # Use production stage
+    container_name: sales-order-frontend-prod
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      - backend
+    networks:
+      - sales-order-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+networks:
+  sales-order-network:
+    driver: bridge
