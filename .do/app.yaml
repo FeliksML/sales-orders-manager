@@ -8,6 +8,36 @@ region: sfo
 ingress:
   rules:
     - component:
+        name: backend
+      match:
+        path:
+          prefix: /api
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /auth
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /health
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /readiness
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /docs
+    - component:
+        name: backend
+      match:
+        path:
+          prefix: /redoc
+    - component:
         name: frontend
       match:
         path:
@@ -24,6 +54,7 @@ services:
 
     # Use Dockerfile for build
     dockerfile_path: backend/Dockerfile
+    source_dir: backend
 
     # Instance configuration
     instance_count: 2
@@ -48,11 +79,11 @@ services:
         scope: RUN_TIME
         type: SECRET
 
-      # Critical - MUST be set in DigitalOcean UI
+      # Critical - Production secret key
       - key: SECRET_KEY
         scope: RUN_TIME
         type: SECRET
-        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+        value: "SyRtO8XWcmHycEvVbz343bQJd96yy10JSneaeZftVH-gIgzoTzhO4iDw7BpeKhN9OVOaa5pLWTeCxxeKf0FFZA"
 
       - key: ENVIRONMENT
         scope: RUN_TIME
@@ -63,22 +94,22 @@ services:
         scope: RUN_TIME
         value: "${APP_URL}"
 
-      # ReCAPTCHA - SET IN DIGITALOCEAN UI
+      # ReCAPTCHA secret key
       - key: RECAPTCHA_SECRET_KEY
         scope: RUN_TIME
         type: SECRET
-        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+        value: "6LcqgxQsAAAAAPW1VDkdosH8WUc6krZWsZW8sVHs"
 
-      # Email configuration - SET IN DIGITALOCEAN UI
+      # Email configuration
       - key: MAIL_USERNAME
         scope: RUN_TIME
         type: SECRET
-        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+        value: "salesmanagerverif@gmail.com"
 
       - key: MAIL_PASSWORD
         scope: RUN_TIME
         type: SECRET
-        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+        value: "oral omab uklw ufhn"
 
       - key: MAIL_FROM
         scope: RUN_TIME
@@ -100,15 +131,6 @@ services:
         scope: RUN_TIME
         value: "False"
 
-    # Routes
-    routes:
-      - path: /api
-      - path: /auth
-      - path: /health
-      - path: /readiness
-      - path: /docs
-      - path: /redoc
-
 # Frontend Static Site
 static_sites:
   - name: frontend
@@ -119,9 +141,8 @@ static_sites:
       deploy_on_push: true
 
     # Build configuration
-    source_dir: frontend
-    output_dir: dist
-    build_command: npm install && npm run build
+    output_dir: frontend/dist
+    build_command: cd shared && npm install && cd ../frontend && npm install && npm run build
 
     # Environment variables for build
     envs:
@@ -129,19 +150,10 @@ static_sites:
         scope: BUILD_TIME
         value: "${backend.PUBLIC_URL}"
 
-    # Routes - catch all other paths
-    routes:
-      - path: /
-
 # Database
 databases:
   - name: production-db
-    engine: PG
-    version: "15"
-    production: true
-    cluster_name: sales-order-db
-    db_name: sales_orders
-    db_user: salesorder
+    cluster_name: db-postgresql-sfo3-98348
 
 # Optional: Redis for caching/sessions (uncomment if needed)
 # databases:
