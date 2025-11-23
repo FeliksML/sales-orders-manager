@@ -83,7 +83,7 @@ function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
       <div className="flex items-center gap-2 mb-2">
         <Calendar size={16} className="text-blue-400" />
         <span className="text-white/90 text-sm font-medium">
-          {format(installDate, 'MMM dd, yyyy')} at {order.install_time}
+          {format(new Date(order.install_date), 'MMM dd, yyyy')} at {order.install_time}
         </span>
       </div>
 

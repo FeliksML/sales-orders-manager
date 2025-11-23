@@ -31,9 +31,21 @@ function DashboardHeader() {
               WebkitTextStroke: '0.5px rgba(255, 255, 255, 0.3)',
               textShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
               filter: 'drop-shadow(0 0 10px rgba(0, 200, 255, 0.4))',
+              position: 'relative',
+              paddingRight: '36px'
             }}
           >
             Sales Order Manager
+            <span style={{
+              position: 'absolute',
+              right: '0',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '24px',
+              height: '24px',
+              background: 'linear-gradient(135deg, #2563eb 0%, #059669 100%)',
+              clipPath: 'polygon(0% 0%, 100% 50%, 0% 100%)'
+            }}></span>
           </h1>
         </Link>
 

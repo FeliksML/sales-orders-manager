@@ -363,8 +363,7 @@ class OfflineService {
     try {
       // Get all unsynced items from queue
       const queuedItems = await db.syncQueue
-        .where('synced')
-        .equals(false)
+        .filter(item => item.synced === false)
         .toArray()
 
       console.log(`Syncing ${queuedItems.length} queued operations...`)
@@ -449,14 +448,26 @@ class OfflineService {
 
   // Get sync queue status
   async getSyncQueueStatus() {
-    const queuedItems = await db.syncQueue.where('synced').equals(false).toArray()
-    const lastSync = await getLastSyncTime()
+    try {
+      const queuedItems = await db.syncQueue
+        .filter(item => item.synced === false)
+        .toArray()
+      const lastSync = await getLastSyncTime()
 
-    return {
-      queuedItems: queuedItems.length,
-      lastSync,
-      isOnline: this.isOnline,
-      syncInProgress: this.syncInProgress
+      return {
+        queuedItems: queuedItems.length,
+        lastSync,
+        isOnline: this.isOnline,
+        syncInProgress: this.syncInProgress
+      }
+    } catch (error) {
+      console.error('Error getting sync queue status:', error)
+      return {
+        queuedItems: 0,
+        lastSync: null,
+        isOnline: this.isOnline,
+        syncInProgress: this.syncInProgress
+      }
     }
   }
 

@@ -28,7 +28,7 @@ export const markAsSynced = async (table, id) => {
 
 // Helper function to get unsynced records
 export const getUnsyncedRecords = async (table) => {
-  return await db[table].where('synced').equals(false).toArray()
+  return await db[table].filter(record => record.synced === false).toArray()
 }
 
 // Clear all data (for logout)

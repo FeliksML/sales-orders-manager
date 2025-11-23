@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Hash, User, Briefcase, Package, Calendar,
   Wifi, Tv, Smartphone, Phone, Radio, Settings2,
@@ -21,6 +22,9 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
     products: true,
     install_date: true
   })
+  const columnSettingsRef = useRef(null)
+  const columnButtonRef = useRef(null)
+  const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0, width: 0 })
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -65,6 +69,28 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Close column settings when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        columnSettingsRef.current &&
+        !columnSettingsRef.current.contains(event.target) &&
+        columnButtonRef.current &&
+        !columnButtonRef.current.contains(event.target)
+      ) {
+        setShowColumnSettings(false)
+      }
+    }
+
+    if (showColumnSettings) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showColumnSettings])
 
   const sortedOrders = [...orders].sort((a, b) => {
     let aVal = a[sortField]
@@ -200,7 +226,18 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
 
         <div className="relative">
           <button
-            onClick={() => setShowColumnSettings(!showColumnSettings)}
+            ref={columnButtonRef}
+            onClick={() => {
+              if (!showColumnSettings && columnButtonRef.current) {
+                const rect = columnButtonRef.current.getBoundingClientRect()
+                setButtonPosition({
+                  top: rect.bottom,
+                  left: rect.left,
+                  width: rect.width
+                })
+              }
+              setShowColumnSettings(!showColumnSettings)
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white transition-colors text-sm"
           >
             <Settings2 className="w-4 h-4" />
@@ -208,10 +245,20 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
             <ChevronDown className={`w-4 h-4 transition-transform ${showColumnSettings ? 'rotate-180' : ''}`} />
           </button>
 
-          {showColumnSettings && (
-            <div className="absolute right-0 mt-2 w-56 bg-gray-900 border border-white/20 rounded-lg shadow-xl z-10">
-              <div className="p-2">
-                <p className="text-xs text-gray-500 font-semibold uppercase px-2 py-1 mb-1">Visible Columns</p>
+          {showColumnSettings && createPortal(
+            <div
+              ref={columnSettingsRef}
+              className="w-56 bg-gray-900 border border-white/20 rounded-lg shadow-2xl z-[9999]"
+              style={{
+                position: 'fixed',
+                top: `${buttonPosition.top + 8}px`,
+                left: `${buttonPosition.left + buttonPosition.width - 224}px`
+              }}
+            >
+              <p className="text-xs text-gray-500 font-semibold uppercase px-4 py-2 border-b border-white/10 bg-gray-900 rounded-t-lg">
+                Visible Columns
+              </p>
+              <div className="p-2 max-h-80 overflow-y-auto">
                 {[
                   { key: 'spectrum_reference', label: 'Spectrum Reference', icon: Hash },
                   { key: 'account_number', label: 'Account Number', icon: Hash },
@@ -237,7 +284,8 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                   </button>
                 ))}
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
       </div>
