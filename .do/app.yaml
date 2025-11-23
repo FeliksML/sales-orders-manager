@@ -1,0 +1,159 @@
+# DigitalOcean App Platform Configuration
+# This file defines your complete application infrastructure
+
+name: sales-order-manager
+region: sfo
+
+# Ingress configuration - handles routing
+ingress:
+  rules:
+    - component:
+        name: frontend
+      match:
+        path:
+          prefix: /
+
+# Backend API Service
+services:
+  - name: backend
+    # Source configuration
+    github:
+      repo: FeliksML/sales-orders-manager
+      branch: main
+      deploy_on_push: true
+
+    # Use Dockerfile for build
+    dockerfile_path: backend/Dockerfile
+
+    # Instance configuration
+    instance_count: 2
+    instance_size_slug: professional-xs  # 1GB RAM, 1 vCPU - $12/month per instance
+
+    # HTTP configuration
+    http_port: 8000
+
+    # Health check
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+
+    # Environment variables
+    envs:
+      # Will be set to database connection string automatically
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+
+      # Critical - MUST be set in DigitalOcean UI
+      - key: SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: "production"
+
+      # Will be set after frontend deploys
+      - key: FRONTEND_URL
+        scope: RUN_TIME
+        value: "${APP_URL}"
+
+      # ReCAPTCHA - SET IN DIGITALOCEAN UI
+      - key: RECAPTCHA_SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+
+      # Email configuration - SET IN DIGITALOCEAN UI
+      - key: MAIL_USERNAME
+        scope: RUN_TIME
+        type: SECRET
+        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+
+      - key: MAIL_PASSWORD
+        scope: RUN_TIME
+        type: SECRET
+        value: "CHANGE_THIS_IN_DIGITALOCEAN_UI"
+
+      - key: MAIL_FROM
+        scope: RUN_TIME
+        value: "noreply@salesorder.com"
+
+      - key: MAIL_PORT
+        scope: RUN_TIME
+        value: "587"
+
+      - key: MAIL_SERVER
+        scope: RUN_TIME
+        value: "smtp.gmail.com"
+
+      - key: MAIL_STARTTLS
+        scope: RUN_TIME
+        value: "True"
+
+      - key: MAIL_SSL_TLS
+        scope: RUN_TIME
+        value: "False"
+
+    # Routes
+    routes:
+      - path: /api
+      - path: /auth
+      - path: /health
+      - path: /readiness
+      - path: /docs
+      - path: /redoc
+
+# Frontend Static Site
+static_sites:
+  - name: frontend
+    # Source configuration
+    github:
+      repo: FeliksML/sales-orders-manager
+      branch: main
+      deploy_on_push: true
+
+    # Build configuration
+    source_dir: frontend
+    output_dir: dist
+    build_command: npm install && npm run build
+
+    # Environment variables for build
+    envs:
+      - key: VITE_API_URL
+        scope: BUILD_TIME
+        value: "${backend.PUBLIC_URL}"
+
+    # Routes - catch all other paths
+    routes:
+      - path: /
+
+# Database
+databases:
+  - name: production-db
+    engine: PG
+    version: "15"
+    production: true
+    cluster_name: sales-order-db
+    db_name: sales_orders
+    db_user: salesorder
+
+# Optional: Redis for caching/sessions (uncomment if needed)
+# databases:
+#   - name: redis
+#     engine: REDIS
+#     production: true
+
+# Features
+features:
+  - buildpack-stack=ubuntu-22
+
+# Alerts (optional - configure in UI)
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
