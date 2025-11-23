@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Path, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from .schemas import UserSignup, UserLogin, UserResponse
+from .schemas import UserSignup, UserLogin, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
 from .models import User
 from .database import SessionLocal, get_db
-from .email_config import send_verification_email
+from .email_config import send_verification_email, send_password_reset_email
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 import bcrypt
@@ -66,6 +66,17 @@ async def get_current_user(
 
     print(f"✅ User authenticated: {user.email}")
     return user
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency to require admin privileges"""
+    if not current_user.is_admin:
+        print(f"❌ Access denied: {current_user.email} is not an admin")
+        raise HTTPException(
+            status_code=403,
+            detail="Admin privileges required"
+        )
+    print(f"✅ Admin access granted: {current_user.email}")
+    return current_user
 
 async def verify_recaptcha(token: str) -> bool:
     """Verify reCAPTCHA token with Google"""
@@ -255,7 +266,8 @@ async def login(user_data: UserLogin):
                     "name": user.name,
                     "salesid": str(user.salesid),
                     "userid": user.userid,
-                    "email_verified": user.email_verified
+                    "email_verified": user.email_verified,
+                    "is_admin": user.is_admin
                 }
             }
         else:
@@ -265,3 +277,100 @@ async def login(user_data: UserLogin):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current user information"""
     return current_user
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Send password reset email to user"""
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(request.recaptcha_token):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "CAPTCHA verification failed. Please try again."}
+        )
+
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == request.email).first()
+
+        # Always return success to prevent email enumeration attacks
+        # but only send email if user exists
+        if user:
+            # Generate reset token
+            reset_token = secrets.token_urlsafe(32)
+            reset_token_expiry = datetime.utcnow() + timedelta(hours=1)  # Token valid for 1 hour
+
+            # Save token to database
+            user.reset_token = reset_token
+            user.reset_token_expiry = reset_token_expiry
+            db.commit()
+
+            # Construct reset link
+            frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+            reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+
+            # Send reset email
+            try:
+                await send_password_reset_email(
+                    email=user.email,
+                    name=user.name,
+                    reset_link=reset_link
+                )
+                print(f"✓ Password reset email sent to {user.email}")
+            except Exception as e:
+                print(f"✗ Failed to send password reset email: {str(e)}")
+                print(f"Reset link: {reset_link}")
+
+    return {
+        "message": "If an account with that email exists, a password reset link has been sent.",
+        "success": True
+    }
+
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset user password with token"""
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(request.recaptcha_token):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "CAPTCHA verification failed. Please try again."}
+        )
+
+    # Validate password length
+    if len(request.new_password) < 8:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Password must be at least 8 characters long."}
+        )
+
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.reset_token == request.token).first()
+
+        if not user:
+            print(f"❌ Password reset failed: Invalid token")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Invalid or expired reset token."}
+            )
+
+        # Check if token has expired
+        if user.reset_token_expiry < datetime.utcnow():
+            print(f"❌ Password reset failed: Token expired for {user.email}")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "Reset token has expired. Please request a new password reset."}
+            )
+
+        # Hash new password
+        password_bytes = request.new_password.encode('utf-8')
+        hashed_password = bcrypt.hashpw(password_bytes, bcrypt.gensalt())
+
+        # Update password and clear reset token
+        user.password = hashed_password
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.commit()
+
+        print(f"✅ Password reset successfully for {user.email}")
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "Password reset successfully! You can now log in with your new password."}
+        )

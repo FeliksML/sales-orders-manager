@@ -23,9 +23,19 @@ class UserResponse(BaseModel):
     salesid: int
     name: str
     email_verified: bool
+    is_admin: bool = False
 
     class Config:
         from_attributes = True
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+    recaptcha_token: Optional[str] = None
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+    recaptcha_token: Optional[str] = None
 
 # Order Schemas
 class OrderBase(BaseModel):
@@ -140,3 +150,77 @@ class UserActivitySummary(BaseModel):
     bulk_operations: int
     reverts: int
     period_days: int
+
+# Error Log Schemas
+class ErrorLogResponse(BaseModel):
+    errorid: int
+    error_type: str
+    error_message: str
+    stack_trace: Optional[str] = None
+    endpoint: Optional[str] = None
+    method: Optional[str] = None
+    status_code: Optional[int] = None
+    user_id: Optional[int] = None
+    user_email: Optional[str] = None
+    ip_address: Optional[str] = None
+    request_data: Optional[Dict[str, Any]] = None
+    user_agent: Optional[str] = None
+    is_resolved: bool = False
+    resolved_at: Optional[datetime] = None
+    resolved_by: Optional[int] = None
+    resolution_notes: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class ErrorLogCreate(BaseModel):
+    error_type: str
+    error_message: str
+    stack_trace: Optional[str] = None
+    endpoint: Optional[str] = None
+    method: Optional[str] = None
+    status_code: Optional[int] = None
+    user_agent: Optional[str] = None
+    component_name: Optional[str] = None  # For frontend errors
+
+class ResolveErrorRequest(BaseModel):
+    resolution_notes: Optional[str] = None
+
+# Admin Schemas
+class AdminUserResponse(UserResponse):
+    phone_number: Optional[str] = None
+    email_notifications: bool = True
+    sms_notifications: bool = False
+    browser_notifications: bool = True
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+    total_orders: int = 0
+    pending_orders: int = 0
+
+class SystemAnalytics(BaseModel):
+    total_users: int
+    verified_users: int
+    unverified_users: int
+    admin_users: int
+    total_orders: int
+    orders_this_week: int
+    orders_this_month: int
+    pending_installs: int
+    total_internet: int
+    total_tv: int
+    total_mobile: int
+    total_voice: int
+    total_wib: int
+    total_sbc: int
+    total_errors: int
+    unresolved_errors: int
+    recent_errors: List[ErrorLogResponse] = []
+
+class PaginatedErrorLogResponse(BaseModel):
+    data: List[ErrorLogResponse]
+    meta: PaginationMeta
+
+class PaginatedUserResponse(BaseModel):
+    data: List[AdminUserResponse]
+    meta: PaginationMeta

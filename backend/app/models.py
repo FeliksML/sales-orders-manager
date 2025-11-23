@@ -14,11 +14,18 @@ class User(Base):
     verification_token = Column(String(255), nullable=True)
     verification_token_expiry = Column(DateTime, nullable=True)
 
+    # Password reset fields
+    reset_token = Column(String(255), nullable=True)
+    reset_token_expiry = Column(DateTime, nullable=True)
+
     # Notification preferences
     phone_number = Column(String(20), nullable=True)
     email_notifications = Column(Boolean, default=True, nullable=False)
     sms_notifications = Column(Boolean, default=False, nullable=False)
     browser_notifications = Column(Boolean, default=True, nullable=False)
+
+    # Admin role
+    is_admin = Column(Boolean, default=False, nullable=False)
 
 class Order(Base):
     __tablename__ = 'orders'
@@ -111,4 +118,37 @@ class AuditLog(Base):
     ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
 
     # When
+    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+class ErrorLog(Base):
+    __tablename__ = 'error_logs'
+
+    errorid = Column(Integer, primary_key=True)
+
+    # Error details
+    error_type = Column(String(100), nullable=False)  # 'api_error', 'frontend_error', 'validation_error', etc.
+    error_message = Column(Text, nullable=False)
+    stack_trace = Column(Text, nullable=True)
+
+    # Context
+    endpoint = Column(String(255), nullable=True)  # API endpoint where error occurred
+    method = Column(String(10), nullable=True)  # HTTP method (GET, POST, etc.)
+    status_code = Column(Integer, nullable=True)  # HTTP status code
+
+    # User context
+    user_id = Column(Integer, ForeignKey('users.userid'), nullable=True)  # null if not authenticated
+    user_email = Column(String(255), nullable=True)  # Denormalized for historical accuracy
+    ip_address = Column(String(45), nullable=True)  # IPv4 or IPv6
+
+    # Request details
+    request_data = Column(JSON, nullable=True)  # Request payload (sanitized)
+    user_agent = Column(String(500), nullable=True)  # Browser/client info
+
+    # Resolution
+    is_resolved = Column(Boolean, default=False, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(Integer, ForeignKey('users.userid'), nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+
+    # Timestamps
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

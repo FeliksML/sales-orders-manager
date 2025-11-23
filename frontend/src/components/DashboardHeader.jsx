@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown } from 'lucide-react'
+import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
 import NotificationCenter from './NotificationCenter'
 
@@ -164,6 +164,20 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
                         <Settings size={16} />
                         <span className="text-sm">Settings</span>
                       </button>
+
+                      {/* Admin Panel - Only show for admin users */}
+                      {user?.is_admin && (
+                        <button
+                          onClick={() => {
+                            navigate('/admin')
+                            setIsUserMenuOpen(false)
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors"
+                        >
+                          <Shield size={16} />
+                          <span className="text-sm">Admin Panel</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {
