@@ -37,9 +37,8 @@ FROM base as production
 COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=dependencies /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY --chown=appuser:appuser ./app /app/app
-COPY --chown=appuser:appuser gunicorn.conf.py /app/
+# Copy application code - copy everything from build context
+COPY --chown=appuser:appuser . /app/
 
 # Switch to non-root user
 USER appuser
