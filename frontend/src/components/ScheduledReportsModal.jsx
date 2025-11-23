@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Calendar, Mail, Trash2, Plus, Send } from 'lucide-react'
 import ReCAPTCHA from 'react-google-recaptcha'
 import apiClient from '../services/api'
+import { formatErrorMessage } from '../utils/errorHandler'
 import Toast from './Toast'
 
 function ScheduledReportsModal({ isOpen, onClose }) {
@@ -101,7 +102,7 @@ function ScheduledReportsModal({ isOpen, onClose }) {
       }
     } catch (error) {
       console.error('Failed to send report:', error)
-      const errorMsg = error.response?.data?.detail || 'Failed to send report. Please try again.'
+      const errorMsg = formatErrorMessage(error, 'Failed to send report. Please try again.')
       setToast({
         message: errorMsg,
         type: 'error'

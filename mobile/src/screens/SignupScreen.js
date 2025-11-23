@@ -1,132 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Animated } from 'react-native'
+import React, { useState } from 'react'
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
 import { Text, TextInput, Button, HelperText } from 'react-native-paper'
 import LinearGradient from 'react-native-linear-gradient'
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Circle } from 'react-native-svg'
 import { validateEmail, validatePassword } from '@sales-order-manager/shared'
 
-const AnimatedSvg = Animated.createAnimatedComponent(Svg)
-
-// Magic Ring Component with rotating SVG circle border
-const MagicRing = ({ children, isFocused, spin }) => {
-  return (
-    <View style={magicRingStyles.container}>
-      {/* Rotating SVG gradient border - only visible when focused */}
-      {isFocused && (
-        <AnimatedSvg
-          width="100%"
-          height="100%"
-          viewBox="0 0 100 100"
-          style={[
-            magicRingStyles.svgContainer,
-            { transform: [{ rotate: spin }] },
-          ]}
-        >
-          <Defs>
-            <SvgLinearGradient id="borderGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="transparent" stopOpacity="0" />
-              <Stop offset="25%" stopColor="#00c8ff" stopOpacity="0.8" />
-              <Stop offset="50%" stopColor="#00e5ff" stopOpacity="1" />
-              <Stop offset="75%" stopColor="#00c8ff" stopOpacity="0.8" />
-              <Stop offset="100%" stopColor="transparent" stopOpacity="0" />
-            </SvgLinearGradient>
-          </Defs>
-
-          {/* Stroke circle with gradient */}
-          <Circle
-            cx="50"
-            cy="50"
-            r="48"
-            fill="none"
-            stroke="url(#borderGradient)"
-            strokeWidth="4"
-          />
-        </AnimatedSvg>
-      )}
-
-      {/* Inner background to create border effect */}
-      <View style={magicRingStyles.innerBackground} />
-
-      {/* Content */}
-      <View style={magicRingStyles.content}>
-        {children}
-      </View>
-    </View>
-  )
-}
-
-const magicRingStyles = StyleSheet.create({
-  container: {
-    position: 'relative',
-    borderRadius: 12,
-  },
-  svgContainer: {
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    right: -2,
-    bottom: -2,
-    borderRadius: 12,
-    zIndex: 1,
-    overflow: 'hidden',
-  },
-  innerBackground: {
-    position: 'absolute',
-    top: 2,
-    left: 2,
-    right: 2,
-    bottom: 2,
-    backgroundColor: '#0a1628',
-    borderRadius: 10,
-    zIndex: 2,
-  },
-  content: {
-    position: 'relative',
-    zIndex: 3,
-  },
-})
-
-const LoginScreen = ({ navigation }) => {
+const SignupScreen = ({ navigation }) => {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
-  const [emailFocused, setEmailFocused] = useState(false)
-  const [passwordFocused, setPasswordFocused] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // Rotation animation for magic ring effect
-  const rotateAnim = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    // Start continuous rotation animation
-    const rotateAnimation = Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 4000,
-        useNativeDriver: true,
-      })
-    )
-    rotateAnimation.start()
-
-    return () => rotateAnimation.stop()
-  }, [])
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  })
-
-  const handleLogin = async () => {
+  const handleSignup = async () => {
     // Validate inputs
     const emailValidation = validateEmail(email)
     const passwordValidation = validatePassword(password)
 
-    if (!emailValidation.valid || !passwordValidation.valid) {
-      setErrors({
-        email: emailValidation.error,
-        password: passwordValidation.error,
-      })
+    const newErrors = {}
+
+    if (!name.trim()) {
+      newErrors.name = 'Name is required'
+    }
+
+    if (!emailValidation.valid) {
+      newErrors.email = emailValidation.error
+    }
+
+    if (!passwordValidation.valid) {
+      newErrors.password = passwordValidation.error
+    }
+
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
       return
     }
 
@@ -134,14 +46,14 @@ const LoginScreen = ({ navigation }) => {
       setLoading(true)
       setErrors({})
 
-      // TODO: Implement actual login API call
-      // const response = await authService.login(email, password)
+      // TODO: Implement actual signup API call
+      // const response = await authService.signup(name, email, password)
       // await AsyncStorage.setItem('auth_token', response.token)
 
       // For now, just navigate to main app
       navigation.replace('Main')
     } catch (error) {
-      setErrors({ general: error.message || 'Login failed' })
+      setErrors({ general: error.message || 'Signup failed' })
     } finally {
       setLoading(false)
     }
@@ -178,41 +90,60 @@ const LoginScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          {/* Login Card with Glassmorphism */}
+          {/* Signup Card with Glassmorphism */}
           <View style={styles.cardContainer}>
             <View style={styles.card}>
               <Text variant="headlineLarge" style={styles.title}>
-                Login
+                Sign Up
               </Text>
+
+              <View style={styles.inputContainer}>
+                <Text variant="bodyMedium" style={styles.label}>
+                  Full Name
+                </Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    mode="outlined"
+                    autoCapitalize="words"
+                    error={!!errors.name}
+                    style={styles.input}
+                    outlineColor="rgba(0, 200, 255, 0.3)"
+                    activeOutlineColor="#00c8ff"
+                    textColor="#e5e7eb"
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#6b7280"
+                    autoFocus
+                  />
+                </View>
+                {!!errors.name && (
+                  <HelperText type="error" visible={!!errors.name} style={styles.helperText}>
+                    {errors.name}
+                  </HelperText>
+                )}
+              </View>
 
               <View style={styles.inputContainer}>
                 <Text variant="bodyMedium" style={styles.label}>
                   Email Address
                 </Text>
-                <MagicRing isFocused={emailFocused} spin={spin}>
-                  <View style={[
-                    styles.inputWrapper,
-                    emailFocused && styles.inputWrapperFocused
-                  ]}>
-                    <TextInput
-                      value={email}
-                      onChangeText={setEmail}
-                      onFocus={() => setEmailFocused(true)}
-                      onBlur={() => setEmailFocused(false)}
-                      mode="outlined"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      error={!!errors.email}
-                      style={styles.input}
-                      outlineColor="rgba(0, 200, 255, 0.3)"
-                      activeOutlineColor="#00c8ff"
-                      textColor="#e5e7eb"
-                      placeholder="Enter your email"
-                      placeholderTextColor="#6b7280"
-                      autoFocus
-                    />
-                  </View>
-                </MagicRing>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    mode="outlined"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    error={!!errors.email}
+                    style={styles.input}
+                    outlineColor="rgba(0, 200, 255, 0.3)"
+                    activeOutlineColor="#00c8ff"
+                    textColor="#e5e7eb"
+                    placeholder="Enter your email"
+                    placeholderTextColor="#6b7280"
+                  />
+                </View>
                 {!!errors.email && (
                   <HelperText type="error" visible={!!errors.email} style={styles.helperText}>
                     {errors.email}
@@ -224,38 +155,64 @@ const LoginScreen = ({ navigation }) => {
                 <Text variant="bodyMedium" style={styles.label}>
                   Password
                 </Text>
-                <MagicRing isFocused={passwordFocused} spin={spin}>
-                  <View style={[
-                    styles.inputWrapper,
-                    passwordFocused && styles.inputWrapperFocused
-                  ]}>
-                    <TextInput
-                      value={password}
-                      onChangeText={setPassword}
-                      onFocus={() => setPasswordFocused(true)}
-                      onBlur={() => setPasswordFocused(false)}
-                      mode="outlined"
-                      secureTextEntry={!showPassword}
-                      error={!!errors.password}
-                      style={styles.input}
-                      outlineColor="rgba(0, 200, 255, 0.3)"
-                      activeOutlineColor="#00c8ff"
-                      textColor="#e5e7eb"
-                      placeholder="Enter your password"
-                      placeholderTextColor="#6b7280"
-                      right={
-                        <TextInput.Icon
-                          icon={showPassword ? 'eye-off' : 'eye'}
-                          onPress={() => setShowPassword(!showPassword)}
-                          color="#9ca3af"
-                        />
-                      }
-                    />
-                  </View>
-                </MagicRing>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={password}
+                    onChangeText={setPassword}
+                    mode="outlined"
+                    secureTextEntry={!showPassword}
+                    error={!!errors.password}
+                    style={styles.input}
+                    outlineColor="rgba(0, 200, 255, 0.3)"
+                    activeOutlineColor="#00c8ff"
+                    textColor="#e5e7eb"
+                    placeholder="Enter your password"
+                    placeholderTextColor="#6b7280"
+                    right={
+                      <TextInput.Icon
+                        icon={showPassword ? 'eye-off' : 'eye'}
+                        onPress={() => setShowPassword(!showPassword)}
+                        color="#9ca3af"
+                      />
+                    }
+                  />
+                </View>
                 {!!errors.password && (
                   <HelperText type="error" visible={!!errors.password} style={styles.helperText}>
                     {errors.password}
+                  </HelperText>
+                )}
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Text variant="bodyMedium" style={styles.label}>
+                  Confirm Password
+                </Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    mode="outlined"
+                    secureTextEntry={!showConfirmPassword}
+                    error={!!errors.confirmPassword}
+                    style={styles.input}
+                    outlineColor="rgba(0, 200, 255, 0.3)"
+                    activeOutlineColor="#00c8ff"
+                    textColor="#e5e7eb"
+                    placeholder="Confirm your password"
+                    placeholderTextColor="#6b7280"
+                    right={
+                      <TextInput.Icon
+                        icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                        onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                        color="#9ca3af"
+                      />
+                    }
+                  />
+                </View>
+                {!!errors.confirmPassword && (
+                  <HelperText type="error" visible={!!errors.confirmPassword} style={styles.helperText}>
+                    {errors.confirmPassword}
                   </HelperText>
                 )}
               </View>
@@ -274,7 +231,7 @@ const LoginScreen = ({ navigation }) => {
               >
                 <Button
                   mode="contained"
-                  onPress={handleLogin}
+                  onPress={handleSignup}
                   loading={loading}
                   disabled={loading}
                   style={styles.button}
@@ -282,17 +239,17 @@ const LoginScreen = ({ navigation }) => {
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.buttonLabel}
                 >
-                  {loading ? 'Logging in...' : 'Login'}
+                  {loading ? 'Creating account...' : 'Sign Up'}
                 </Button>
               </LinearGradient>
 
-              <Text variant="bodyMedium" style={styles.signupText}>
-                Don't have an account?{' '}
+              <Text variant="bodyMedium" style={styles.loginText}>
+                Already have an account?{' '}
                 <Text
-                  style={styles.signupLink}
-                  onPress={() => navigation.navigate('Signup')}
+                  style={styles.loginLink}
+                  onPress={() => navigation.navigate('Auth')}
                 >
-                  Sign up
+                  Login
                 </Text>
               </Text>
             </View>
@@ -392,13 +349,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'visible',
   },
-  inputWrapperFocused: {
-    shadowColor: '#00c8ff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    elevation: 8,
-  },
   input: {
     backgroundColor: '#0a1628',
     borderRadius: 10,
@@ -424,17 +374,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  signupText: {
+  loginText: {
     color: '#d1d5db',
     textAlign: 'center',
     marginTop: 24,
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  signupLink: {
+  loginLink: {
     color: '#60a5fa',
     textDecorationLine: 'underline',
   },
 })
 
-export default LoginScreen
+export default SignupScreen

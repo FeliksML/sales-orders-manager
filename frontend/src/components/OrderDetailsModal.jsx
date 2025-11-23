@@ -8,6 +8,7 @@ import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 import AuditLog from './AuditLog'
 import { orderService } from '../services/orderService'
+import { formatErrorMessage } from '../utils/errorHandler'
 
 function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -177,7 +178,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
       console.error('Failed to send order email:', error)
       setEmailMessage({
         type: 'error',
-        text: error.response?.data?.detail || 'Failed to send email. Please try again.'
+        text: formatErrorMessage(error, 'Failed to send email. Please try again.')
       })
 
       // Clear error message after 5 seconds
@@ -230,112 +231,218 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
         <Card className="relative flex flex-col max-h-full overflow-hidden">
           {/* Header */}
           <div className="mb-4 sm:mb-6 pb-4 border-b border-white/10 flex-shrink-0">
-            {/* Title and Close Button Row */}
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg sm:text-2xl font-bold text-white">Order Details</h2>
-                <p className="text-gray-400 text-xs sm:text-sm mt-1">Order #{order.orderid}</p>
+            {/* Mobile: Stacked Layout */}
+            <div className="md:hidden">
+              {/* Title and Close Button Row */}
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg sm:text-2xl font-bold text-white">Order Details</h2>
+                  <p className="text-gray-400 text-xs sm:text-sm mt-1">Order #{order.orderid}</p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex-shrink-0"
+                  title="Close"
+                >
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
               </div>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex-shrink-0"
-                title="Close"
-              >
-                <X className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-            </div>
 
-            {/* Status Badges */}
-            <div className="flex items-center gap-2 flex-wrap mb-3">
-              {isInstalled && (
-                <span className="px-2 sm:px-3 py-1 rounded-full bg-green-500/20 border border-green-500 text-green-300 text-xs sm:text-sm font-medium flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline">Installed</span>
-                  <span className="xs:hidden">✓</span>
-                </span>
-              )}
-              {isToday && (
-                <span className="px-2 sm:px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500 text-blue-300 text-xs sm:text-sm font-medium flex items-center gap-1">
-                  <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline">Today</span>
-                  <span className="xs:hidden">⏰</span>
-                </span>
-              )}
-              {isPending && (
-                <span className="px-2 sm:px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500 text-yellow-300 text-xs sm:text-sm font-medium flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline">Pending</span>
-                  <span className="xs:hidden">⚠</span>
-                </span>
-              )}
-            </div>
+              {/* Status Badges */}
+              <div className="flex items-center gap-2 flex-wrap mb-3">
+                {isInstalled && (
+                  <span className="px-3 py-1 rounded-full bg-green-500/20 border border-green-500 text-green-300 text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Installed</span>
+                  </span>
+                )}
+                {isToday && (
+                  <span className="px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500 text-blue-300 text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                    <Clock className="w-4 h-4" />
+                    <span>Today</span>
+                  </span>
+                )}
+                {isPending && (
+                  <span className="px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500 text-yellow-300 text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Pending Install</span>
+                  </span>
+                )}
+              </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-              {!isEditing && !showReschedule && (
-                <>
-                  {isPending && (
-                    <button
-                      onClick={() => setShowReschedule(true)}
-                      className="px-2 sm:px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 transition-colors text-yellow-300 hover:text-yellow-200 text-xs font-medium flex items-center gap-1"
-                      title="Reschedule installation"
-                    >
-                      <CalendarClock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span className="hidden xs:inline">Reschedule</span>
-                    </button>
-                  )}
-                  {(isPending || isToday) && (
-                    <button
-                      onClick={handleMarkAsInstalled}
-                      disabled={isSubmitting}
-                      className="px-2 sm:px-3 py-1.5 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 transition-colors text-green-300 hover:text-green-200 text-xs font-medium flex items-center gap-1 disabled:opacity-50"
-                      title="Mark as installed"
-                    >
-                      <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                      <span className="hidden xs:inline">Mark Done</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="px-2 sm:px-3 py-1.5 rounded-lg hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300 border border-blue-500/30 flex items-center gap-1 text-xs font-medium"
-                    title="Edit order"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    <span className="hidden xs:inline">Edit</span>
-                  </button>
-                </>
-              )}
-              {(isEditing || showReschedule) && (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsEditing(false)
-                      setShowReschedule(false)
-                      setErrors({})
-                    }}
-                    className="px-2 sm:px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white text-xs font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={isSubmitting}
-                    className="px-2 sm:px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span className="hidden xs:inline">Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-3.5 h-3.5" />
-                        <span className="hidden xs:inline">Save</span>
-                      </>
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
+                {!isEditing && !showReschedule && (
+                  <>
+                    {isPending && (
+                      <button
+                        onClick={() => setShowReschedule(true)}
+                        className="px-3 sm:px-4 py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 transition-all hover:scale-105 text-yellow-300 hover:text-yellow-200 text-sm font-medium flex items-center gap-2 shadow-sm"
+                        title="Reschedule installation"
+                      >
+                        <CalendarClock className="w-4 h-4" />
+                        <span>Reschedule</span>
+                      </button>
                     )}
-                  </button>
-                </>
-              )}
+                    {(isPending || isToday) && (
+                      <button
+                        onClick={handleMarkAsInstalled}
+                        disabled={isSubmitting}
+                        className="px-3 sm:px-4 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 transition-all hover:scale-105 text-green-300 hover:text-green-200 text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100 shadow-sm"
+                        title="Mark as installed"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Mark Done</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="px-3 sm:px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-all hover:scale-105 text-blue-400 hover:text-blue-300 border border-blue-500/30 flex items-center gap-2 text-sm font-medium shadow-sm"
+                      title="Edit order"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span>Edit</span>
+                    </button>
+                  </>
+                )}
+                {(isEditing || showReschedule) && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsEditing(false)
+                        setShowReschedule(false)
+                        setErrors({})
+                      }}
+                      className="px-3 sm:px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white text-sm font-medium border border-white/10"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSubmitting}
+                      className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Desktop: Horizontal Layout */}
+            <div className="hidden md:flex items-center justify-between gap-4">
+              {/* Left: Title with Inline Status Badge */}
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0">
+                  <h2 className="text-2xl font-bold text-white">Order Details</h2>
+                  <p className="text-gray-400 text-sm mt-0.5">Order #{order.orderid}</p>
+                </div>
+
+                {/* Inline Status Badge */}
+                {isInstalled && (
+                  <span className="px-3 py-1.5 rounded-full bg-green-500/20 border border-green-500 text-green-300 text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Installed</span>
+                  </span>
+                )}
+                {isToday && (
+                  <span className="px-3 py-1.5 rounded-full bg-blue-500/20 border border-blue-500 text-blue-300 text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                    <Clock className="w-4 h-4" />
+                    <span>Today</span>
+                  </span>
+                )}
+                {isPending && (
+                  <span className="px-3 py-1.5 rounded-full bg-yellow-500/20 border border-yellow-500 text-yellow-300 text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Pending Install</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Right: Action Buttons + Close */}
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {!isEditing && !showReschedule && (
+                  <>
+                    {isPending && (
+                      <button
+                        onClick={() => setShowReschedule(true)}
+                        className="px-4 py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 transition-all hover:scale-105 text-yellow-300 hover:text-yellow-200 text-sm font-medium flex items-center gap-2 shadow-sm"
+                        title="Reschedule installation"
+                      >
+                        <CalendarClock className="w-4 h-4" />
+                        <span>Reschedule</span>
+                      </button>
+                    )}
+                    {(isPending || isToday) && (
+                      <button
+                        onClick={handleMarkAsInstalled}
+                        disabled={isSubmitting}
+                        className="px-4 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 border border-green-500/50 transition-all hover:scale-105 text-green-300 hover:text-green-200 text-sm font-medium flex items-center gap-2 disabled:opacity-50 disabled:hover:scale-100 shadow-sm"
+                        title="Mark as installed"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Mark Done</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 transition-all hover:scale-105 text-blue-400 hover:text-blue-300 border border-blue-500/30 flex items-center gap-2 text-sm font-medium shadow-sm"
+                      title="Edit order"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      <span>Edit</span>
+                    </button>
+                  </>
+                )}
+                {(isEditing || showReschedule) && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsEditing(false)
+                        setShowReschedule(false)
+                        setErrors({})
+                      }}
+                      className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white text-sm font-medium border border-white/10"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={isSubmitting}
+                      className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-50 shadow-lg hover:shadow-xl hover:scale-105 disabled:hover:scale-100"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          <span>Save</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex-shrink-0"
+                  title="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -714,35 +821,35 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
           </div>
 
           {/* Footer */}
-          <div className="flex-shrink-0 flex flex-col xs:flex-row items-stretch xs:items-center gap-2 xs:gap-3 mt-6 pt-4 border-t border-white/10">
-            <button
-              onClick={handleDeleteClick}
-              disabled={isSubmitting}
-              className="px-3 sm:px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs sm:text-sm font-medium transition-colors border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
-            >
-              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span className="hidden xs:inline">Delete Order</span>
-              <span className="xs:hidden">Delete</span>
-            </button>
+          <div className="flex-shrink-0 flex flex-col xs:flex-row items-stretch xs:items-center xs:justify-end gap-2 xs:gap-3 mt-6 pt-4 border-t border-white/10">
+            {/* Email Button - Primary Action */}
             <button
               onClick={handleSendToEmail}
               disabled={sendingEmail || isSubmitting}
-              className="px-3 sm:px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 text-xs sm:text-sm font-medium transition-colors border border-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+              className="xs:w-auto px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white text-sm font-medium transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               title="Send order details to your email"
             >
               {sendingEmail ? (
                 <>
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                  <span className="hidden xs:inline">Sending...</span>
-                  <span className="xs:hidden">...</span>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Sending...</span>
                 </>
               ) : (
                 <>
-                  <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="hidden xs:inline">Send to My Email</span>
-                  <span className="xs:hidden">Email</span>
+                  <Send className="w-4 h-4" />
+                  <span>Send to My Email</span>
                 </>
               )}
+            </button>
+
+            {/* Delete Button - Secondary/Destructive Action */}
+            <button
+              onClick={handleDeleteClick}
+              disabled={isSubmitting}
+              className="xs:w-auto px-4 sm:px-6 py-2 sm:py-2.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-gray-300 hover:text-red-400 text-sm font-medium transition-colors border border-white/10 hover:border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Delete Order</span>
             </button>
           </div>
         </Card>

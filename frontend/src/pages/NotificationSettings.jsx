@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import notificationService from '../services/notificationService';
+import { formatErrorMessage } from '../utils/errorHandler';
 
 const NotificationSettings = () => {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ const NotificationSettings = () => {
       console.error('Failed to save preferences:', error);
       setMessage({
         type: 'error',
-        text: error.response?.data?.detail || 'Failed to save preferences'
+        text: formatErrorMessage(error, 'Failed to save preferences')
       });
     } finally {
       setSaving(false);
@@ -117,7 +118,7 @@ const NotificationSettings = () => {
       console.error('Failed to send test reminders:', error);
       setMessage({
         type: 'error',
-        text: error.response?.data?.detail || 'Failed to send test reminders'
+        text: formatErrorMessage(error, 'Failed to send test reminders')
       });
     } finally {
       setSendingTest(false);

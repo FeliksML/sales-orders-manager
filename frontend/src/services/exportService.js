@@ -50,16 +50,21 @@ export const exportService = {
   emailExport: async (format, filters = {}, columns = null, recaptchaToken) => {
     const params = buildExportParams(filters, columns)
 
-    const response = await apiClient.post('/api/orders/export/email', {
+    // Build request body, only including non-null values
+    const requestBody = {
       file_format: format,
-      columns: params.columns || null,
-      search: params.search || null,
-      date_from: params.date_from || null,
-      date_to: params.date_to || null,
-      product_types: params.product_types || null,
-      install_status: params.install_status || null,
       recaptcha_token: recaptchaToken
-    })
+    }
+
+    // Only add optional fields if they have values
+    if (params.columns) requestBody.columns = params.columns
+    if (params.search) requestBody.search = params.search
+    if (params.date_from) requestBody.date_from = params.date_from
+    if (params.date_to) requestBody.date_to = params.date_to
+    if (params.product_types) requestBody.product_types = params.product_types
+    if (params.install_status) requestBody.install_status = params.install_status
+
+    const response = await apiClient.post('/api/orders/export/email', requestBody)
 
     return response.data
   }

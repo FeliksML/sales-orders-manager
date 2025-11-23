@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
@@ -24,6 +24,8 @@ const BulkExportModal = lazy(() => import('../components/BulkExportModal'))
 function Dashboard() {
   const [filters, setFilters] = useState({})
   const { orders, loading: ordersLoading, error: ordersError, refetch } = useOrders(filters)
+  // Fetch all orders (unfiltered) for analytics
+  const { orders: allOrders, refetch: refetchAllOrders } = useOrders({})
   const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useOrderStats()
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -57,6 +59,7 @@ function Dashboard() {
 
       // Refetch orders and stats
       refetch()
+      refetchAllOrders()
       refetchStats()
 
       // Hide success message after 3 seconds
@@ -80,6 +83,7 @@ function Dashboard() {
 
       // Refetch orders and stats
       refetch()
+      refetchAllOrders()
       refetchStats()
 
       // Update selected order with new data
@@ -107,6 +111,7 @@ function Dashboard() {
 
       // Refetch orders and stats
       refetch()
+      refetchAllOrders()
       refetchStats()
 
       setIsDetailsModalOpen(false)
@@ -150,7 +155,7 @@ function Dashboard() {
       await orderService.updateOrder(orderId, { install_date: formattedDate })
 
       // Refetch orders and stats to update both calendar and table views
-      await Promise.all([refetch(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
 
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -163,7 +168,7 @@ function Dashboard() {
   const handleBulkMarkInstalled = async () => {
     try {
       await orderService.bulkMarkInstalled(selectedOrders)
-      await Promise.all([refetch(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
       setSelectedOrders([])
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -175,7 +180,7 @@ function Dashboard() {
   const handleBulkReschedule = async (newDate) => {
     try {
       await orderService.bulkReschedule(selectedOrders, newDate)
-      await Promise.all([refetch(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
       setSelectedOrders([])
       setIsBulkRescheduleModalOpen(false)
       setSubmitSuccess(true)
@@ -188,7 +193,7 @@ function Dashboard() {
   const handleBulkDelete = async () => {
     try {
       await orderService.bulkDelete(selectedOrders)
-      await Promise.all([refetch(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
       setSelectedOrders([])
       setIsBulkDeleteModalOpen(false)
       setSubmitSuccess(true)
@@ -209,7 +214,7 @@ function Dashboard() {
 
   // Pull to refresh handler
   const handleRefresh = async () => {
-    await Promise.all([refetch(), refetchStats()])
+    await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
   }
 
   return (
@@ -227,7 +232,10 @@ function Dashboard() {
       }}
     >
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader />
+        <DashboardHeader
+          onReportsClick={() => setIsScheduledReportsModalOpen(true)}
+          onExportClick={handleExportStats}
+        />
 
         {/* Success Message */}
         {submitSuccess && (
@@ -241,37 +249,7 @@ function Dashboard() {
 
         {/* Statistics Section */}
         <section className="mb-8">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <h2 className="text-white text-2xl font-bold">Overview</h2>
-            <div className="flex items-center gap-2 w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(25%-0.75rem)]">
-              <button
-                onClick={() => setIsScheduledReportsModalOpen(true)}
-                className="flex items-center justify-center gap-2 h-11 px-5 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200 flex-1 text-sm"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(234, 88, 12, 0.7), rgba(220, 38, 38, 0.7))',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(251, 146, 60, 0.4)',
-                  boxShadow: '0 4px 16px rgba(234, 88, 12, 0.3), inset 0 0 40px rgba(251, 146, 60, 0.1)'
-                }}
-              >
-                <Clock size={16} />
-                <span className="whitespace-nowrap">Reports</span>
-              </button>
-              <button
-                onClick={handleExportStats}
-                className="flex items-center justify-center gap-2 h-11 px-5 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200 flex-1 text-sm"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.7), rgba(16, 185, 129, 0.7))',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(34, 197, 94, 0.4)',
-                  boxShadow: '0 4px 16px rgba(22, 163, 74, 0.3), inset 0 0 40px rgba(34, 197, 94, 0.1)'
-                }}
-              >
-                <FileBarChart size={16} />
-                <span className="whitespace-nowrap">Export</span>
-              </button>
-            </div>
-          </div>
+          <h2 className="text-white text-2xl font-bold mb-4">Overview</h2>
           <div style={{ minHeight: '120px' }}>
             {statsLoading ? (
               <div className="flex items-center justify-center" style={{ height: '120px' }}>
@@ -313,165 +291,158 @@ function Dashboard() {
         </section>
 
         {/* Product Statistics */}
-        {stats && (
-          <section className="mb-8">
-            <h2 className="text-white text-2xl font-bold mb-4">Products</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Internet"
-                value={stats.total_internet}
-                icon={Wifi}
-              />
-              <StatCard
-                title="TV"
-                value={stats.total_tv}
-                icon={Tv}
-              />
-              <StatCard
-                title="Mobile"
-                value={stats.total_mobile}
-                icon={Smartphone}
-              />
-              <StatCard
-                title="Voice Lines"
-                value={stats.total_voice}
-                icon={Phone}
-              />
-            </div>
-          </section>
-        )}
-
-        {/* Charts Section */}
-        {!ordersLoading && !statsLoading && (
-          <section className="mb-8">
-            <h2 className="text-white text-2xl font-bold mb-4">Analytics</h2>
-            <Suspense fallback={
-              <div className="flex items-center justify-center p-8">
+        <section className="mb-8">
+          <h2 className="text-white text-2xl font-bold mb-4">Products</h2>
+          <div style={{ minHeight: '120px' }}>
+            {statsLoading ? (
+              <div className="flex items-center justify-center" style={{ height: '120px' }}>
                 <LoadingSpinner />
               </div>
-            }>
-              <OrderCharts orders={orders} stats={stats} />
-            </Suspense>
-          </section>
-        )}
+            ) : statsError ? (
+              <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                {statsError}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity duration-300">
+                <StatCard
+                  title="Internet"
+                  value={stats?.total_internet || 0}
+                  icon={Wifi}
+                />
+                <StatCard
+                  title="TV"
+                  value={stats?.total_tv || 0}
+                  icon={Tv}
+                />
+                <StatCard
+                  title="Mobile"
+                  value={stats?.total_mobile || 0}
+                  icon={Smartphone}
+                />
+                <StatCard
+                  title="Voice Lines"
+                  value={stats?.total_voice || 0}
+                  icon={Phone}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Charts Section */}
+        <section className="mb-8">
+          <h2 className="text-white text-2xl font-bold mb-4">Analytics</h2>
+          <div style={{ minHeight: '300px' }}>
+            {statsLoading ? (
+              <div className="flex items-center justify-center" style={{ height: '300px' }}>
+                <LoadingSpinner />
+              </div>
+            ) : statsError ? (
+              <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                {statsError}
+              </div>
+            ) : (
+              <Suspense fallback={
+                <div className="flex items-center justify-center p-8">
+                  <LoadingSpinner />
+                </div>
+              }>
+                <OrderCharts orders={allOrders} stats={stats} />
+              </Suspense>
+            )}
+          </div>
+        </section>
 
         {/* Recent Orders Section */}
         <section>
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-white text-2xl font-bold">Recent Orders</h2>
-              {/* View Toggle - Desktop */}
-              <div className="hidden md:flex items-center gap-2 rounded-lg p-1 backdrop-blur-md" style={{
-                backgroundColor: 'rgba(0, 15, 33, 0.3)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(0, 200, 255, 0.3)',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
-              }}>
-                <button
-                  onClick={() => setViewMode('table')}
-                  className={`flex items-center justify-center gap-2 h-9 px-4 rounded-md transition-all font-medium ${
-                    viewMode === 'table'
-                      ? 'text-white'
-                      : 'text-white/70 hover:text-white'
-                  }`}
-                  style={viewMode === 'table' ? {
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-                  } : {}}
-                >
-                  <List size={18} />
-                  Table
-                </button>
-                <button
-                  onClick={() => setViewMode('calendar')}
-                  className={`flex items-center justify-center gap-2 h-9 px-4 rounded-md transition-all font-medium ${
-                    viewMode === 'calendar'
-                      ? 'text-white'
-                      : 'text-white/70 hover:text-white'
-                  }`}
-                  style={viewMode === 'calendar' ? {
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-                  } : {}}
-                >
-                  <CalendarDays size={18} />
-                  Calendar
-                </button>
-              </div>
-            </div>
+            {/* Single-row header with title, actions, and view toggles */}
+            <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+              {/* Left: Title */}
+              <h2 className="text-white text-2xl font-bold flex-shrink-0">Recent Orders</h2>
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* View Toggle - Mobile (icon only) */}
-              <div className="flex md:hidden items-center gap-1 rounded-lg p-1 backdrop-blur-md" style={{
-                backgroundColor: 'rgba(0, 15, 33, 0.3)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(0, 200, 255, 0.3)',
-                boxShadow: '0 4px 16px rgba(0, 0, 0, 0.2)'
-              }}>
+              {/* Right: Actions + View Toggles */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Export button - Subtle toolbar style */}
                 <button
-                  onClick={() => setViewMode('table')}
-                  className={`flex items-center justify-center h-9 w-9 rounded-md transition-all ${
-                    viewMode === 'table'
-                      ? 'text-white'
-                      : 'text-white/70 hover:text-white'
-                  }`}
-                  style={viewMode === 'table' ? {
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-                  } : {}}
+                  onClick={handleExportOrders}
+                  className="flex items-center justify-center gap-2 h-10 px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+                  style={{
+                    backgroundColor: 'rgba(0, 15, 33, 0.3)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(0, 200, 255, 0.3)',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                  }}
+                  title="Export Orders"
                 >
-                  <List size={18} />
+                  <Download size={16} />
+                  <span className="hidden sm:inline text-sm">Export</span>
                 </button>
-                <button
-                  onClick={() => setViewMode('calendar')}
-                  className={`flex items-center justify-center h-9 w-9 rounded-md transition-all ${
-                    viewMode === 'calendar'
-                      ? 'text-white'
-                      : 'text-white/70 hover:text-white'
-                  }`}
-                  style={viewMode === 'calendar' ? {
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
-                    backdropFilter: 'blur(10px)',
-                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-                  } : {}}
-                >
-                  <CalendarDays size={18} />
-                </button>
-              </div>
 
-              <button
-                onClick={handleExportOrders}
-                className="flex items-center justify-center gap-2 h-11 px-4 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.7), rgba(99, 102, 241, 0.7))',
+                {/* New Order button - Primary action (prominent) */}
+                <button
+                  onClick={() => {
+                    setPrefilledDate(null)
+                    setIsOrderModalOpen(true)
+                  }}
+                  className="flex items-center justify-center gap-2 h-10 px-4 text-white font-medium rounded-lg transition-all hover:scale-105 transform duration-200"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(59, 130, 246, 0.7))',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                    boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3)'
+                  }}
+                >
+                  <Plus size={16} />
+                  <span className="hidden sm:inline text-sm">New Order</span>
+                </button>
+
+                {/* View Toggle */}
+                <div className="flex items-center gap-1 rounded-lg p-1 backdrop-blur-md" style={{
+                  backgroundColor: 'rgba(0, 15, 33, 0.3)',
                   backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(168, 85, 247, 0.4)',
-                  boxShadow: '0 4px 16px rgba(147, 51, 234, 0.3), inset 0 0 40px rgba(168, 85, 247, 0.1)'
-                }}
-              >
-                <Download size={18} />
-                <span className="hidden sm:inline">Export</span>
-              </button>
-              <button
-                onClick={() => {
-                  setPrefilledDate(null)
-                  setIsOrderModalOpen(true)
-                }}
-                className="flex items-center justify-center gap-2 h-11 px-4 text-white font-medium rounded-lg transition-all backdrop-blur-md hover:scale-105 transform duration-200"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(59, 130, 246, 0.7))',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
-                  boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3), inset 0 0 40px rgba(59, 130, 246, 0.1)'
-                }}
-              >
-                <Plus size={18} />
-                <span className="hidden sm:inline">New Order</span>
-              </button>
+                  border: '1px solid rgba(0, 200, 255, 0.3)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                }}>
+                  {/* Table view */}
+                  <button
+                    onClick={() => setViewMode('table')}
+                    className={`flex items-center justify-center gap-1.5 h-8 px-3 rounded-md transition-all text-sm font-medium ${
+                      viewMode === 'table'
+                        ? 'text-white'
+                        : 'text-white/70 hover:text-white'
+                    }`}
+                    style={viewMode === 'table' ? {
+                      background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                    } : {}}
+                    title="Table View"
+                  >
+                    <List size={16} />
+                    <span className="hidden md:inline">Table</span>
+                  </button>
+
+                  {/* Calendar view */}
+                  <button
+                    onClick={() => setViewMode('calendar')}
+                    className={`flex items-center justify-center gap-1.5 h-8 px-3 rounded-md transition-all text-sm font-medium ${
+                      viewMode === 'calendar'
+                        ? 'text-white'
+                        : 'text-white/70 hover:text-white'
+                    }`}
+                    style={viewMode === 'calendar' ? {
+                      background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
+                    } : {}}
+                    title="Calendar View"
+                  >
+                    <CalendarDays size={16} />
+                    <span className="hidden md:inline">Calendar</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -481,6 +452,8 @@ function Dashboard() {
               <FilterBar
                 onFilterChange={handleFilterChange}
                 onClearFilters={handleClearFilters}
+                totalResults={stats?.total_orders || 0}
+                filteredResults={orders?.length || 0}
               />
             </div>
           )}

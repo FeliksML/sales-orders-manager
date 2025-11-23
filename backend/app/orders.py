@@ -19,13 +19,13 @@ router = APIRouter()
 
 class EmailExportRequest(BaseModel):
     file_format: str  # 'excel' or 'csv'
+    recaptcha_token: str  # Required for verification
     columns: Optional[str] = None
     search: Optional[str] = None
     date_from: Optional[date] = None
     date_to: Optional[date] = None
     product_types: Optional[str] = None
     install_status: Optional[str] = None
-    recaptcha_token: Optional[str] = None
 
 class BulkMarkInstalledRequest(BaseModel):
     order_ids: List[int]
@@ -270,154 +270,6 @@ def get_delta_sync(
         sync_timestamp=current_timestamp
     )
 
-@router.get("/{order_id}", response_model=OrderResponse)
-def get_order(
-    order_id: int,
-    response: Response,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get a specific order by ID with caching"""
-    order = db.query(Order).filter(
-        and_(
-            Order.orderid == order_id,
-            Order.userid == current_user.userid
-        )
-    ).first()
-
-    if not order:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
-        )
-
-    # Add Cache-Control header (cache for 10 minutes)
-    response.headers["Cache-Control"] = "private, max-age=600"
-
-    return order
-
-@router.put("/{order_id}", response_model=OrderResponse)
-def update_order(
-    order_id: int,
-    order_update: OrderUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Update an existing order"""
-    db_order = db.query(Order).filter(
-        and_(
-            Order.orderid == order_id,
-            Order.userid == current_user.userid
-        )
-    ).first()
-
-    if not db_order:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
-        )
-
-    # Capture old values before updating
-    update_data = order_update.model_dump(exclude_unset=True)
-    old_values = {}
-    new_values = {}
-
-    for key, value in update_data.items():
-        old_values[key] = getattr(db_order, key)
-        new_values[key] = value
-        setattr(db_order, key, value)
-
-    db.commit()
-    db.refresh(db_order)
-
-    # Log the update to audit trail
-    audit_service.log_order_update(
-        db=db,
-        order=db_order,
-        old_values=old_values,
-        new_values=new_values,
-        user=current_user,
-        ip_address=None,
-        reason="Order updated"
-    )
-
-    return db_order
-
-@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_order(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Delete an order"""
-    db_order = db.query(Order).filter(
-        and_(
-            Order.orderid == order_id,
-            Order.userid == current_user.userid
-        )
-    ).first()
-
-    if not db_order:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
-        )
-
-    # Log deletion before actually deleting
-    audit_service.log_order_deletion(
-        db=db,
-        order=db_order,
-        user=current_user,
-        ip_address=None,
-        reason="Order deleted"
-    )
-
-    db.delete(db_order)
-    db.commit()
-    return None
-
-@router.post("/{order_id}/email", status_code=status.HTTP_200_OK)
-async def send_order_email(
-    order_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Send order details to user's email"""
-    # Get the order
-    order = db.query(Order).filter(
-        and_(
-            Order.orderid == order_id,
-            Order.userid == current_user.userid
-        )
-    ).first()
-
-    if not order:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found"
-        )
-
-    try:
-        # Send email
-        success = await send_order_details_email(current_user, order)
-
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to send email"
-            )
-
-        return {
-            "message": f"Order details sent successfully to {current_user.email}",
-            "email": current_user.email,
-            "order_id": order_id
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send order email: {str(e)}"
-        )
 
 @router.get("/export/columns")
 def get_available_columns(
@@ -701,6 +553,8 @@ async def email_export(
     current_user: User = Depends(get_current_user)
 ):
     """Email export file to user with CAPTCHA verification"""
+    print(f"📧 Email export request received: {request.model_dump()}")
+
     # Verify reCAPTCHA
     if not await verify_recaptcha(request.recaptcha_token):
         raise HTTPException(
@@ -1034,3 +888,151 @@ def bulk_export_orders(
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+@router.get("/{order_id}", response_model=OrderResponse)
+def get_order(
+    order_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get a specific order by ID with caching"""
+    order = db.query(Order).filter(
+        and_(
+            Order.orderid == order_id,
+            Order.userid == current_user.userid
+        )
+    ).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    # Add Cache-Control header (cache for 10 minutes)
+    response.headers["Cache-Control"] = "private, max-age=600"
+
+    return order
+
+@router.put("/{order_id}", response_model=OrderResponse)
+def update_order(
+    order_id: int,
+    order_update: OrderUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update an existing order"""
+    db_order = db.query(Order).filter(
+        and_(
+            Order.orderid == order_id,
+            Order.userid == current_user.userid
+        )
+    ).first()
+
+    if not db_order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    # Capture old values before updating
+    update_data = order_update.model_dump(exclude_unset=True)
+    old_values = {}
+    new_values = {}
+
+    for key, value in update_data.items():
+        old_values[key] = getattr(db_order, key)
+        new_values[key] = value
+        setattr(db_order, key, value)
+
+    db.commit()
+    db.refresh(db_order)
+
+    # Log the update to audit trail
+    audit_service.log_order_update(
+        db=db,
+        order=db_order,
+        old_values=old_values,
+        new_values=new_values,
+        user=current_user,
+        ip_address=None,
+        reason="Order updated"
+    )
+
+    return db_order
+
+@router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete an order"""
+    db_order = db.query(Order).filter(
+        and_(
+            Order.orderid == order_id,
+            Order.userid == current_user.userid
+        )
+    ).first()
+
+    if not db_order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    # Log deletion before actually deleting
+    audit_service.log_order_deletion(
+        db=db,
+        order=db_order,
+        user=current_user,
+        ip_address=None,
+        reason="Order deleted"
+    )
+
+    db.delete(db_order)
+    db.commit()
+    return None
+
+@router.post("/{order_id}/email", status_code=status.HTTP_200_OK)
+async def send_order_email(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Send order details to user's email"""
+    # Get the order
+    order = db.query(Order).filter(
+        and_(
+            Order.orderid == order_id,
+            Order.userid == current_user.userid
+        )
+    ).first()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Order not found"
+        )
+
+    try:
+        # Send email
+        success = await send_order_details_email(current_user, order)
+
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send email"
+            )
+
+        return {
+            "message": f"Order details sent successfully to {current_user.email}",
+            "email": current_user.email,
+            "order_id": order_id
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send order email: {str(e)}"
+        )

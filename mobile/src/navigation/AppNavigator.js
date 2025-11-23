@@ -6,6 +6,7 @@ import { Icon } from 'react-native-paper'
 
 // Screens
 import LoginScreen from '../screens/LoginScreen'
+import SignupScreen from '../screens/SignupScreen'
 import OrdersScreen from '../screens/OrdersScreen'
 import ProfileScreen from '../screens/ProfileScreen'
 
@@ -71,6 +72,7 @@ const AppNavigator = () => {
         }}
       >
         <Stack.Screen name="Auth" component={LoginScreen} />
+        <Stack.Screen name="Signup" component={SignupScreen} />
         <Stack.Screen name="Main" component={MainTabNavigator} />
       </Stack.Navigator>
     </NavigationContainer>

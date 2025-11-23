@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from .auth import router as auth_router
 from .orders import router as orders_router
 from .scheduled_reports import router as scheduled_reports_router
@@ -18,6 +20,22 @@ async def lifespan(app: FastAPI):
     shutdown_scheduler()
 
 app = FastAPI(lifespan=lifespan)
+
+# Add custom validation error handler for debugging
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    print("=" * 80)
+    print("❌ VALIDATION ERROR:")
+    print(f"Path: {request.url.path}")
+    print(f"Method: {request.method}")
+    print(f"Errors: {exc.errors()}")
+    print(f"Body: {exc.body}")
+    print("=" * 80)
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": exc.errors()},
+    )
+
 app.include_router(auth_router, prefix="/auth")
 app.include_router(orders_router, prefix="/api/orders", tags=["orders"])
 app.include_router(scheduled_reports_router, prefix="/api/scheduled-reports", tags=["scheduled-reports"])

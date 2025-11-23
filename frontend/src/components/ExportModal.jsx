@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Download, FileSpreadsheet, FileText, ChevronDown, ChevronUp, Mail, Send } from 'lucide-react'
 import ReCAPTCHA from 'react-google-recaptcha'
 import { exportService } from '../services/exportService'
+import { formatErrorMessage } from '../utils/errorHandler'
 import Toast from './Toast'
 
 function ExportModal({ isOpen, onClose, filters, exportType = 'orders' }) {
@@ -123,7 +124,7 @@ function ExportModal({ isOpen, onClose, filters, exportType = 'orders' }) {
       setTimeout(() => onClose(), 1500)
     } catch (error) {
       console.error('Failed to send export email:', error)
-      const errorMsg = error.response?.data?.detail || 'Failed to send export. Please try again.'
+      const errorMsg = formatErrorMessage(error, 'Failed to send export. Please try again.')
       setToast({
         message: errorMsg,
         type: 'error'

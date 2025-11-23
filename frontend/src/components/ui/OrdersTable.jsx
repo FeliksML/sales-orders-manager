@@ -70,7 +70,7 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Close column settings when clicking outside
+  // Close column settings when clicking outside, update position on scroll
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (
@@ -83,12 +83,27 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
       }
     }
 
+    const updatePosition = () => {
+      if (columnButtonRef.current) {
+        const rect = columnButtonRef.current.getBoundingClientRect()
+        setButtonPosition({
+          top: rect.bottom,
+          left: rect.left,
+          width: rect.width
+        })
+      }
+    }
+
     if (showColumnSettings) {
       document.addEventListener('mousedown', handleClickOutside)
+      window.addEventListener('scroll', updatePosition, true)
+      window.addEventListener('resize', updatePosition)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
     }
   }, [showColumnSettings])
 

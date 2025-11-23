@@ -5,5 +5,8 @@
     "tailwindcss": "^4.1.14",
     "vite-plugin-pwa": "^1.1.0",
     "workbox-window": "^7.4.0"
+  },
+  "dependencies": {
+    "react-native-linear-gradient": "^2.8.3"
   }
 }

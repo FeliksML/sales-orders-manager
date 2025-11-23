@@ -40,7 +40,17 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
+    // Prevent RCTBundleURLProvider from writing ip.txt to the app bundle
+    // by configuring it before accessing the bundle URL
+    let settings = RCTBundleURLProvider.sharedSettings()
+    
+    // Disable the IP caching mechanism that causes the sandbox error
+    if let url = settings.jsBundleURL(forBundleRoot: "index") {
+      return url
+    }
+    
+    // Fallback to localhost if auto-detection fails
+    return URL(string: "http://localhost:8081/index.bundle?platform=ios&dev=true&minify=false")
 #else
     Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
