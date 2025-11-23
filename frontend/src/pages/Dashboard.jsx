@@ -362,7 +362,7 @@ function Dashboard() {
               <h2 className="text-white text-2xl font-bold flex-shrink-0">Recent Orders</h2>
 
               {/* Right: Actions + View Toggles */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap ml-auto">
                 {/* Export button - Subtle toolbar style */}
                 <button
                   onClick={handleExportOrders}
@@ -376,7 +376,8 @@ function Dashboard() {
                   title="Export Orders"
                 >
                   <Download size={16} />
-                  <span className="hidden sm:inline text-sm">Export</span>
+                  {/* Leftmost: Shows text only when all buttons can fit with text (560px+) */}
+                  <span className="hidden min-[560px]:inline text-sm">Export</span>
                 </button>
 
                 {/* New Order button - Primary action (prominent) */}
@@ -394,7 +395,8 @@ function Dashboard() {
                   }}
                 >
                   <Plus size={16} />
-                  <span className="hidden sm:inline text-sm">New Order</span>
+                  {/* Shows text when New Order + Table/Calendar can fit with text (440px+) */}
+                  <span className="hidden min-[440px]:inline text-sm">New Order</span>
                 </button>
 
                 {/* View Toggle */}
@@ -420,7 +422,8 @@ function Dashboard() {
                     title="Table View"
                   >
                     <List size={16} />
-                    <span className="hidden md:inline">Table</span>
+                    {/* Rightmost: Shows text when at least Table/Calendar can fit with text (340px+) */}
+                    <span className="hidden min-[340px]:inline">Table</span>
                   </button>
 
                   {/* Calendar view */}
@@ -439,7 +442,8 @@ function Dashboard() {
                     title="Calendar View"
                   >
                     <CalendarDays size={16} />
-                    <span className="hidden md:inline">Calendar</span>
+                    {/* Rightmost: Shows text when at least Table/Calendar can fit with text (340px+) */}
+                    <span className="hidden min-[340px]:inline">Calendar</span>
                   </button>
                 </div>
               </div>

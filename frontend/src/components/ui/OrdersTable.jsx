@@ -206,11 +206,25 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
             <Package className="w-5 h-5 text-blue-400" />
             <span className="text-white font-semibold">Orders ({orders.length})</span>
           </div>
-          {selectedOrders.length > 0 && (
-            <span className="text-sm text-blue-400">
-              {selectedOrders.length} selected
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {selectedOrders.length > 0 && (
+              <span className="text-sm text-blue-400">
+                {selectedOrders.length} selected
+              </span>
+            )}
+            {/* Select All Button */}
+            <button
+              onClick={handleSelectAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 rounded-lg transition-colors text-xs font-semibold"
+              title={orders.length > 0 && selectedOrders.length === orders.length ? "Deselect all" : "Select all"}
+            >
+              <CustomCheckbox
+                checked={orders.length > 0 && selectedOrders.length === orders.length}
+                onChange={handleSelectAll}
+              />
+              <span>ALL</span>
+            </button>
+          </div>
         </div>
 
         {/* Card List */}

@@ -51,7 +51,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
         </Link>
 
         {/* Right: Actions + Account Controls */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap ml-auto">
           {/* Primary Actions: Reports & Export */}
           <button
             onClick={onReportsClick}
@@ -65,7 +65,8 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Reports"
           >
             <Clock size={16} />
-            <span className="hidden sm:inline text-sm">Reports</span>
+            {/* Leftmost: Shows text only when all buttons can fit with text (620px+) */}
+            <span className="hidden min-[620px]:inline text-sm">Reports</span>
           </button>
 
           <button
@@ -80,7 +81,8 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Export"
           >
             <FileBarChart size={16} />
-            <span className="hidden sm:inline text-sm">Export</span>
+            {/* Shows text when Export + User can fit with text (500px+) */}
+            <span className="hidden min-[500px]:inline text-sm">Export</span>
           </button>
 
           {/* Secondary Controls: Notifications, Settings, User */}
@@ -121,7 +123,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
                 }}
               >
                 <User size={18} className="text-blue-400" />
-                <span className="hidden md:inline text-sm font-medium">{user?.name}</span>
+                <span className="hidden min-[380px]:inline text-sm font-medium">{user?.name}</span>
                 <ChevronDown size={16} className={`transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
