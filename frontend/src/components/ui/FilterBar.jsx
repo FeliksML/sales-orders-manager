@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Search, Filter, X, Save, ChevronDown, Calendar,
   Wifi, Tv, Smartphone, Phone, Radio, Server, CheckCircle, Clock, AlertCircle, Package
@@ -33,11 +33,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     }
   })
 
-  // Separate state for search input to prevent scroll jumps during typing
+  // Separate state for search input with debouncing
   const [searchInput, setSearchInput] = useState('')
-
-  // Save scroll position before filter updates to prevent scroll jumps
-  const scrollPositionRef = useRef(0)
 
   // Detect mobile screen size
   useEffect(() => {
@@ -62,7 +59,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     }
   }, [])
 
-  // Debounce search input to prevent scroll jumps and excessive re-renders
+  // Debounce search input to prevent excessive re-renders
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters(prev => ({ ...prev, search: searchInput }))
@@ -73,21 +70,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
 
   // Notify parent when filters change
   useEffect(() => {
-    // Save scroll position before triggering parent re-render
-    scrollPositionRef.current = window.scrollY
     onFilterChange(filters)
   }, [filters, onFilterChange])
-
-  // Restore scroll position after re-render to prevent scroll jumps
-  useLayoutEffect(() => {
-    if (scrollPositionRef.current !== null) {
-      window.scrollTo({
-        top: scrollPositionRef.current,
-        left: 0,
-        behavior: 'instant' // Use instant to override smooth scrolling
-      })
-    }
-  }, [filters])
 
   const handleSearchChange = (e) => {
     setSearchInput(e.target.value)
@@ -318,6 +302,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
             Filter Presets
           </label>
           <button
+            type="button"
             onClick={() => setShowPresets(!showPresets)}
             className="flex items-center gap-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 font-semibold rounded-lg transition-colors shadow-sm"
           >
@@ -344,6 +329,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   }}
                 />
                 <button
+                  type="button"
                   onClick={savePreset}
                   disabled={!presetName.trim()}
                   className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-semibold transition-colors shadow-sm"
@@ -363,12 +349,14 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                     className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200 shadow-sm"
                   >
                     <button
+                      type="button"
                       onClick={() => loadPreset(preset)}
                       className="flex-1 text-left text-sm font-semibold text-gray-900 hover:text-indigo-700 transition-colors"
                     >
                       {preset.name}
                     </button>
                     <button
+                      type="button"
                       onClick={() => deletePreset(preset.id)}
                       className="ml-2 p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
                     >
@@ -412,6 +400,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               />
               {searchInput && (
                 <button
+                  type="button"
                   onClick={() => setSearchInput('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
                 >
@@ -422,6 +411,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
 
             {/* Filter button */}
             <button
+              type="button"
               onClick={() => setShowFilters(true)}
               className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all shadow-md ${
                 activeCount > 0
@@ -438,8 +428,9 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
             </button>
           </div>
 
-          {/* Results counter and Active filter badges - Always rendered to prevent layout shift */}
-          <div className={`space-y-2 transition-opacity duration-200 ${activeCount === 0 ? 'opacity-0 pointer-events-none h-0 overflow-hidden' : 'opacity-100'}`}>
+          {/* Results counter and Active filter badges */}
+          {activeCount > 0 && (
+            <div className="space-y-2 animate-fadeIn">
             {/* Results counter */}
             <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
               <div className="flex items-center gap-2">
@@ -462,6 +453,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   <Search size={14} />
                   <span className="max-w-[100px] truncate font-semibold">{filters.search}</span>
                   <button
+                    type="button"
                     onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
                     className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
                   >
@@ -474,6 +466,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   <Calendar size={14} />
                   <span className="font-semibold">Date</span>
                   <button
+                    type="button"
                     onClick={() => setFilters(prev => ({ ...prev, dateFrom: '', dateTo: '' }))}
                     className="hover:bg-purple-200 rounded-full p-0.5 transition-colors"
                   >
@@ -485,6 +478,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-100 text-green-800 rounded-lg text-xs font-medium border border-green-200 shadow-sm">
                   <span className="font-semibold">Products</span>
                   <button
+                    type="button"
                     onClick={() => setFilters(prev => ({
                       ...prev,
                       productTypes: Object.fromEntries(Object.keys(prev.productTypes).map(k => [k, false]))
@@ -499,6 +493,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-100 text-yellow-800 rounded-lg text-xs font-medium border border-yellow-200 shadow-sm">
                   <span className="font-semibold">Status</span>
                   <button
+                    type="button"
                     onClick={() => setFilters(prev => ({
                       ...prev,
                       installStatus: Object.fromEntries(Object.keys(prev.installStatus).map(k => [k, false]))
@@ -510,7 +505,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 </div>
               )}
             </div>
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom Sheet Overlay */}
@@ -541,6 +537,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   <div className="flex items-center gap-2">
                     {activeCount > 0 && (
                       <button
+                        type="button"
                         onClick={clearAllFilters}
                         className="text-sm text-red-600 font-semibold px-3 py-1.5 hover:bg-red-50 rounded-lg transition-colors"
                       >
@@ -548,6 +545,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                       </button>
                     )}
                     <button
+                      type="button"
                       onClick={() => setShowFilters(false)}
                       className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                     >
@@ -565,6 +563,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               {/* Bottom sheet footer */}
               <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3">
                 <button
+                  type="button"
                   onClick={() => setShowFilters(false)}
                   className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"
                 >
@@ -602,6 +601,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
           />
           {searchInput && (
             <button
+              type="button"
               onClick={() => setSearchInput('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
               title="Clear search"
@@ -613,6 +613,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
 
         {/* Filter toggle button - Integrated right side */}
         <button
+          type="button"
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-5 py-3.5 transition-all text-sm font-semibold border-2 ${
             showFilters || activeCount > 0
@@ -643,6 +644,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
         {/* Clear filters button - Only show when filters are active */}
         {activeCount > 0 && (
           <button
+            type="button"
             onClick={clearAllFilters}
             className="flex items-center gap-2 px-4 py-3.5 ml-3 text-sm text-red-600 font-semibold border-2 border-red-400 rounded-xl hover:bg-red-50 hover:border-red-500 transition-all shadow-md animate-fadeIn"
             style={{
@@ -663,8 +665,9 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
         </Card>
       )}
 
-      {/* Results counter and Active filter badges - Always rendered to prevent layout shift */}
-      <div className={`space-y-3 transition-opacity duration-200 ${activeCount === 0 ? 'opacity-0 pointer-events-none h-0 overflow-hidden' : 'opacity-100'}`}>
+      {/* Results counter and Active filter badges */}
+      {activeCount > 0 && (
+        <div className="space-y-3 animate-fadeIn">
         {/* Results counter */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
           <div className="flex items-center gap-2">
@@ -688,6 +691,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               <span className="font-semibold">Search:</span>
               <span className="max-w-[200px] truncate">{filters.search}</span>
               <button
+                type="button"
                 onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
                 className="ml-1 p-1 hover:bg-blue-200 rounded-full transition-colors"
                 title="Remove filter"
@@ -704,6 +708,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 {filters.dateFrom || '...'} to {filters.dateTo || '...'}
               </span>
               <button
+                type="button"
                 onClick={() => setFilters(prev => ({ ...prev, dateFrom: '', dateTo: '' }))}
                 className="ml-1 p-1 hover:bg-purple-200 rounded-full transition-colors"
                 title="Remove filter"
@@ -717,6 +722,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               <div key={product} className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-800 rounded-lg text-sm font-medium shadow-sm border border-green-200 animate-fadeIn">
                 <span className="capitalize font-semibold">{product}</span>
                 <button
+                  type="button"
                   onClick={() => handleProductToggle(product)}
                   className="ml-1 p-1 hover:bg-green-200 rounded-full transition-colors"
                   title="Remove filter"
@@ -731,6 +737,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               <div key={status} className="flex items-center gap-2 px-3 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium shadow-sm border border-yellow-200 animate-fadeIn">
                 <span className="capitalize font-semibold">{status}</span>
                 <button
+                  type="button"
                   onClick={() => handleStatusToggle(status)}
                   className="ml-1 p-1 hover:bg-yellow-200 rounded-full transition-colors"
                   title="Remove filter"
@@ -741,7 +748,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
             ) : null
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

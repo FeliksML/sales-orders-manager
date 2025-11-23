@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
@@ -43,13 +43,13 @@ function Dashboard() {
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
 
-  const handleFilterChange = (newFilters) => {
+  const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters)
-  }
+  }, [])
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setFilters({})
-  }
+  }, [])
 
   const handleOrderSubmit = async (orderData) => {
     try {

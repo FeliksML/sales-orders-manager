@@ -28,9 +28,9 @@
   scrollbar-color: #1e40af rgba(30, 64, 175, 0.1);
 }
 
-/* Smooth scrolling */
+/* Auto scrolling - prevents unwanted smooth scroll during filter changes */
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 
 /* Notification Center Slide-in Animation */
