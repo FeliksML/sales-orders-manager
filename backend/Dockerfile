@@ -30,7 +30,29 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Stage 3: Production image
+# Stage 3: Development image (for docker-compose)
+FROM dependencies as development
+
+WORKDIR /app
+
+# Install additional development dependencies
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    black \
+    flake8 \
+    mypy
+
+# Don't switch to non-root user in development for flexibility
+# Development files will be mounted as volumes
+
+EXPOSE 8000
+
+# Run with uvicorn for hot-reload in development
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# Stage 4: Production image (MUST be last - App Platform builds last stage)
 FROM base as production
 
 # Copy installed dependencies from dependencies stage
@@ -56,25 +78,3 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Run with gunicorn for production
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "app.main:app"]
-
-# Stage 4: Development image (optional, for docker-compose)
-FROM dependencies as development
-
-WORKDIR /app
-
-# Install additional development dependencies
-RUN pip install --no-cache-dir \
-    pytest \
-    pytest-asyncio \
-    pytest-cov \
-    black \
-    flake8 \
-    mypy
-
-# Don't switch to non-root user in development for flexibility
-# Development files will be mounted as volumes
-
-EXPOSE 8000
-
-# Run with uvicorn for hot-reload in development
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
