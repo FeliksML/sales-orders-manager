@@ -24,8 +24,8 @@ WORKDIR /app
 # Stage 2: Dependencies installation
 FROM base as dependencies
 
-# Copy requirements file from backend directory (build context is repo root)
-COPY backend/requirements.txt .
+# Copy requirements file (build context is backend/ due to dockerfile_path)
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -37,9 +37,9 @@ FROM base as production
 COPY --from=dependencies /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=dependencies /usr/local/bin /usr/local/bin
 
-# Copy application code from backend directory (build context is repo root)
-COPY --chown=appuser:appuser backend/app /app/app
-COPY --chown=appuser:appuser backend/gunicorn.conf.py /app/
+# Copy application code (build context is backend/ due to dockerfile_path)
+COPY --chown=appuser:appuser app /app/app
+COPY --chown=appuser:appuser gunicorn.conf.py /app/
 
 # Set PYTHONPATH so Python can find the app module
 ENV PYTHONPATH=/app
