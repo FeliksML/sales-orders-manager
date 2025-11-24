@@ -99,7 +99,7 @@ services:
       - key: RECAPTCHA_SECRET_KEY
         scope: RUN_TIME
         type: SECRET
-        value: "6LcqgxQsAAAAAPW1VDkdosH8WUc6krZWsZW8sVHs"
+        value: "6LdZWRYsAAAAAOVccmuN5WX3I-myMZK4CFnL_atQ"
 
       # Email configuration
       - key: MAIL_USERNAME
@@ -150,6 +150,10 @@ static_sites:
       - key: VITE_API_URL
         scope: BUILD_TIME
         value: "${backend.PUBLIC_URL}"
+
+      - key: VITE_RECAPTCHA_SITE_KEY
+        scope: BUILD_TIME
+        value: "6LdZWRYsAAAAABAcanNt3bLxGWo-bW0rZZr67O3q"
 
 # Database connection is set directly in DATABASE_URL env var above
 # databases:
