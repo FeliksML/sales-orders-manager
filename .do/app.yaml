@@ -132,6 +132,42 @@ services:
         scope: RUN_TIME
         value: "False"
 
+# Database Initialization Job (run manually from console or CLI)
+jobs:
+  - name: db-init
+    # Source configuration
+    github:
+      repo: FeliksML/sales-orders-manager
+      branch: main
+      deploy_on_push: false  # Don't run automatically
+
+    # Use same Dockerfile as backend
+    dockerfile_path: backend/Dockerfile
+    source_dir: backend
+
+    # Instance size
+    instance_size_slug: professional-xs
+    instance_count: 1
+
+    # The command to run
+    run_command: python init_database.py
+
+    # Environment variables (same as backend)
+    envs:
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+        value: "postgresql://doadmin:AVNS_UWagqbikulP2lN6_0Jw@db-postgresql-sfo3-98348-do-user-18370984-0.i.db.ondigitalocean.com:25060/defaultdb?sslmode=require"
+
+      - key: SECRET_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: "SyRtO8XWcmHycEvVbz343bQJd96yy10JSneaeZftVH-gIgzoTzhO4iDw7BpeKhN9OVOaa5pLWTeCxxeKf0FFZA"
+
+      - key: ENVIRONMENT
+        scope: RUN_TIME
+        value: "production"
+
 # Frontend Static Site
 static_sites:
   - name: frontend
