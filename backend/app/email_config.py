@@ -5,9 +5,14 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from pydantic import EmailStr
 from typing import List
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
@@ -21,6 +26,15 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=True
 )
 
+# Log email configuration (without sensitive data)
+logger.info(f"📧 Email configuration loaded:")
+logger.info(f"   MAIL_SERVER: {os.getenv('MAIL_SERVER', 'smtp.gmail.com')}")
+logger.info(f"   MAIL_PORT: {os.getenv('MAIL_PORT', '587')}")
+logger.info(f"   MAIL_FROM: {os.getenv('MAIL_FROM', 'noreply@salesorder.com')}")
+logger.info(f"   MAIL_USERNAME: {'***' + os.getenv('MAIL_USERNAME', '')[-10:] if os.getenv('MAIL_USERNAME') else 'NOT SET'}")
+logger.info(f"   MAIL_STARTTLS: {os.getenv('MAIL_STARTTLS', 'True')}")
+logger.info(f"   MAIL_SSL_TLS: {os.getenv('MAIL_SSL_TLS', 'False')}")
+
 fast_mail = FastMail(conf)
 
 
@@ -33,6 +47,7 @@ async def send_verification_email(email: EmailStr, name: str, verification_link:
         name: User's name
         verification_link: The verification URL with token
     """
+    logger.info(f"📧 Starting verification email to {email}")
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -121,7 +136,13 @@ async def send_verification_email(email: EmailStr, name: str, verification_link:
         subtype=MessageType.html
     )
 
-    await fast_mail.send_message(message)
+    logger.info(f"📤 Sending verification email to {email}")
+    try:
+        await fast_mail.send_message(message)
+        logger.info(f"✅ Successfully sent verification email to {email}")
+    except Exception as e:
+        logger.error(f"❌ Failed to send verification email to {email}: {str(e)}")
+        raise
 
 
 async def send_password_reset_email(email: EmailStr, name: str, reset_link: str):
@@ -133,6 +154,7 @@ async def send_password_reset_email(email: EmailStr, name: str, reset_link: str)
         name: User's name
         reset_link: The password reset URL with token
     """
+    logger.info(f"📧 Starting password reset email to {email}")
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -226,4 +248,10 @@ async def send_password_reset_email(email: EmailStr, name: str, reset_link: str)
         subtype=MessageType.html
     )
 
-    await fast_mail.send_message(message)
+    logger.info(f"📤 Sending password reset email to {email}")
+    try:
+        await fast_mail.send_message(message)
+        logger.info(f"✅ Successfully sent password reset email to {email}")
+    except Exception as e:
+        logger.error(f"❌ Failed to send password reset email to {email}: {str(e)}")
+        raise

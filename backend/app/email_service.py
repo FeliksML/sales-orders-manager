@@ -4,7 +4,12 @@ import base64
 import asyncio
 import tempfile
 import os
+import logging
 from .email_config import conf
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 async def send_scheduled_report_email(
     user_email: str,
@@ -14,6 +19,7 @@ async def send_scheduled_report_email(
     excel_data: bytes
 ):
     """Send scheduled report email with Excel attachment"""
+    logger.info(f"📧 Starting scheduled report email to {user_email} (type: {schedule_type})")
 
     # Create HTML body
     html_body = f"""
@@ -165,7 +171,13 @@ async def send_scheduled_report_email(
 
         # Send email
         fm = FastMail(conf)
-        await fm.send_message(message)
+        logger.info(f"📤 Sending scheduled report email to {user_email}")
+        try:
+            await fm.send_message(message)
+            logger.info(f"✅ Successfully sent scheduled report email to {user_email}")
+        except Exception as e:
+            logger.error(f"❌ Failed to send scheduled report email to {user_email}: {str(e)}")
+            raise
 
     finally:
         # Clean up temp file after a delay to ensure email is sent
@@ -175,8 +187,7 @@ async def send_scheduled_report_email(
                 time.sleep(1)  # Give email time to send
                 os.unlink(temp_file)
             except Exception as e:
-                # If cleanup fails, it's not critical
-                pass
+                logger.warning(f"⚠️ Failed to cleanup temp file {temp_file}: {str(e)}")
 
 async def send_export_email(
     user_email: str,
@@ -186,6 +197,7 @@ async def send_export_email(
     order_count: int
 ):
     """Send export file via email"""
+    logger.info(f"📧 Starting export email to {user_email} (format: {file_format}, count: {order_count})")
 
     # Determine file extension and media type
     if file_format == 'excel':
@@ -295,7 +307,13 @@ async def send_export_email(
 
         # Send email
         fm = FastMail(conf)
-        await fm.send_message(message)
+        logger.info(f"📤 Sending export email to {user_email}")
+        try:
+            await fm.send_message(message)
+            logger.info(f"✅ Successfully sent export email to {user_email}")
+        except Exception as e:
+            logger.error(f"❌ Failed to send export email to {user_email}: {str(e)}")
+            raise
 
     finally:
         # Clean up temp file
@@ -305,4 +323,4 @@ async def send_export_email(
                 time.sleep(1)
                 os.unlink(temp_file)
             except Exception as e:
-                pass
+                logger.warning(f"⚠️ Failed to cleanup temp file {temp_file}: {str(e)}")
