@@ -1,12 +1,38 @@
 version: '3.8'
 
-# Production Docker Compose configuration
-# This is a reference configuration. In production, you would typically use:
-# - Managed database service (AWS RDS, Azure Database, etc.)
-# - Container orchestration (Kubernetes, ECS, etc.)
-# - Secrets management (AWS Secrets Manager, Azure Key Vault, etc.)
+# Production Docker Compose configuration for VM deployment
+# Includes PostgreSQL database for self-hosted deployment
 
 services:
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: sales-order-database-prod
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-sales_order_db}
+      - POSTGRES_USER=${POSTGRES_USER:-sales_order_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sales_order_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sales-order-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
   # Backend API (Production mode)
   backend:
     build:
@@ -14,21 +40,13 @@ services:
       dockerfile: Dockerfile
       target: production  # Use production stage
     container_name: sales-order-backend-prod
+    env_file:
+      - ./backend/.env
     environment:
-      # IMPORTANT: In production, use a secrets manager, not environment variables
       - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY}
       - FRONTEND_URL=${FRONTEND_URL}
       - ENVIRONMENT=production
-      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY}
-      - MAIL_USERNAME=${MAIL_USERNAME}
-      - MAIL_PASSWORD=${MAIL_PASSWORD}
-      - MAIL_FROM=${MAIL_FROM}
-      - MAIL_PORT=${MAIL_PORT:-587}
-      - MAIL_SERVER=${MAIL_SERVER}
-      - MAIL_STARTTLS=${MAIL_STARTTLS:-True}
-      - MAIL_SSL_TLS=${MAIL_SSL_TLS:-False}
-      - SENTRY_DSN=${SENTRY_DSN}  # Optional: Sentry error tracking
     ports:
       - "8000:8000"
     restart: unless-stopped
@@ -38,6 +56,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      database:
+        condition: service_healthy
     networks:
       - sales-order-network
     deploy:
@@ -55,9 +76,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production  # Use production stage
+      args:
+        - VITE_API_URL=${API_URL}
+        - VITE_RECAPTCHA_SITE_KEY=${VITE_RECAPTCHA_SITE_KEY}
+        - VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
     container_name: sales-order-frontend-prod
+    env_file:
+      - ./frontend/.env
     ports:
-      - "80:80"
+      - "3000:80"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
@@ -77,6 +104,10 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
+
+volumes:
+  postgres_data_prod:
+    driver: local
 
 networks:
   sales-order-network:

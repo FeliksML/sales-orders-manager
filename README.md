@@ -30,9 +30,9 @@ A full-stack web application that allows Spectrum sales representatives to manag
 - PyMuPDF / pdfplumber (PDF parsing)
 
 **Deployment:**
-- Frontend: *TBD (Vercel/Netlify)*
-- Backend: *TBD (Render/Railway)*
-- Database: *TBD (Supabase/Railway)*
+- Docker Compose with PostgreSQL
+- DigitalOcean VM / Any Ubuntu server
+- Nginx reverse proxy with SSL/TLS
 
 ## 📦 Project Structure
 
@@ -49,13 +49,36 @@ sales-order-manager/
 └── README.md
 ```
 
-## 🚦 Getting Started
+## 🚀 Deployment Options
+
+### Option 1: Production VM Deployment (Recommended)
+
+Deploy to a DigitalOcean VM or any Ubuntu server with just 3 commands:
+
+```bash
+sudo ./setup_vm.sh      # Install Docker, Nginx, SSL tools
+./configure_env.sh      # Configure environment variables
+sudo ./deploy.sh your-domain.com  # Deploy with HTTPS
+```
+
+**See [VM_DEPLOYMENT.md](VM_DEPLOYMENT.md) for complete deployment guide.**
+
+**Requirements:**
+- Ubuntu 22.04 or 24.04 server
+- 2GB RAM, 2 vCPUs, 50GB disk (minimum)
+- Domain name (optional, but required for HTTPS)
+
+### Option 2: Development Setup
+
+For local development and testing:
+
+## 🚦 Getting Started (Local Development)
 
 ### Prerequisites
 
 - Node.js 18+ and npm
 - Python 3.11+
-- PostgreSQL 14+
+- PostgreSQL 14+ OR Docker
 
 ### Installation
 
@@ -88,24 +111,38 @@ cd frontend
 npm install
 ```
 
-**4. Database Setup**
+**4. Run with Docker Compose (Easiest)**
 
 ```bash
-# Instructions coming soon
+# Start all services (database, backend, frontend)
+docker-compose up -d
+
+# Initialize database
+docker-compose exec backend python init_database.py
+
+# View logs
+docker-compose logs -f
 ```
 
-**5. Run the application**
+Access the application:
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+
+**OR Run Manually**
 
 Backend:
 ```bash
 cd backend
-uvicorn app.main:app --reload
+# Set up .env file first (see backend/.env.example)
+uvicorn app.main:app --reload --port 8000
 ```
 
 Frontend:
 ```bash
 cd frontend
-npm start
+# Set up .env file first (see frontend/.env.example)
+npm run dev
 ```
 
 ## 📊 Database Schema
@@ -135,17 +172,23 @@ npm start
 - has_wib
 - notes
 
-## 🗺️ Roadmap
+## 🗺️ Development Status
 
 - [x] Project setup and planning
 - [x] Database schema design
-- [ ] Backend API development
-- [ ] User authentication system
-- [ ] Frontend UI components
-- [ ] Manual order entry form
-- [ ] PDF parsing integration
-- [ ] Dashboard analytics
-- [ ] Deployment
+- [x] Backend API development
+- [x] User authentication system
+- [x] Frontend UI components
+- [x] Manual order entry form
+- [x] Dashboard analytics with filtering
+- [x] Email notifications (password reset, order updates)
+- [x] Admin panel and user management
+- [x] Audit logging and error tracking
+- [x] Docker deployment setup
+- [x] VM deployment automation
+- [ ] PDF parsing integration (planned)
+- [ ] SMS notifications via Twilio (optional)
+- [ ] Mobile app (React Native) (in progress)
 
 ## 📸 Screenshots
 
