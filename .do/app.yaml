@@ -52,8 +52,8 @@ services:
       branch: main
       deploy_on_push: true
 
-    # Use Dockerfile for build - path relative to source_dir
-    dockerfile_path: Dockerfile
+    # Use Dockerfile for build - path relative to repo root
+    dockerfile_path: backend/Dockerfile
     source_dir: backend
 
     # Instance configuration
