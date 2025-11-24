@@ -9,7 +9,8 @@ bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
 backlog = 2048
 
 # Worker processes
-workers = multiprocessing.cpu_count() * 2 + 1  # Recommended formula
+# Fixed to 2 workers for 1GB RAM instances (cpu_count() returns host CPUs in containers)
+workers = 2
 worker_class = "uvicorn.workers.UvicornWorker"  # ASGI worker for FastAPI
 worker_connections = 1000
 max_requests = 10000  # Restart worker after this many requests (prevents memory leaks)
