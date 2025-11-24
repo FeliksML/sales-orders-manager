@@ -53,7 +53,7 @@ services:
       deploy_on_push: true
 
     # Use Dockerfile for build
-    dockerfile_path: Dockerfile
+    dockerfile_path: backend/Dockerfile
     source_dir: backend
 
     # Instance configuration
