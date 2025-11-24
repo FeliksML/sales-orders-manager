@@ -181,6 +181,14 @@ static_sites:
     output_dir: frontend/dist
     build_command: cd shared && npm install && cd ../frontend && npm install && npm run build
 
+    # SPA routing - serve index.html for all routes
+    routes:
+      - path: /
+        preserve_path_prefix: false
+
+    # Catch-all for 404s to support client-side routing
+    error_document: index.html
+
     # Environment variables for build
     envs:
       - key: VITE_API_URL
