@@ -31,12 +31,12 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Starting application scheduler...")
-    start_scheduler()
+    print("🚀 Application starting (scheduler disabled for debugging)...")
+    # start_scheduler()  # Temporarily disabled for debugging
     yield
     # Shutdown
-    print("🛑 Shutting down application scheduler...")
-    shutdown_scheduler()
+    print("🛑 Application shutting down...")
+    # shutdown_scheduler()  # Temporarily disabled for debugging
 
 app = FastAPI(lifespan=lifespan)
 app.state.limiter = limiter
