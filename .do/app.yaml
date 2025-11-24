@@ -74,10 +74,10 @@ services:
 
     # Environment variables
     envs:
-      # Will be set to database connection string automatically
+      # Database connection string from attached database
       - key: DATABASE_URL
         scope: RUN_TIME
-        type: SECRET
+        value: "${production-db.DATABASE_URL}"
 
       # Critical - Production secret key
       - key: SECRET_KEY
