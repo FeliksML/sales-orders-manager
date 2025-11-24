@@ -77,7 +77,8 @@ services:
       # Database connection string from attached database
       - key: DATABASE_URL
         scope: RUN_TIME
-        value: "${db.DATABASE_URL}"
+        type: SECRET
+        value: "postgresql://doadmin:AVNS_UWagqbikulP2lN6_0Jw@db-postgresql-sfo3-98348-do-user-18370984-0.i.db.ondigitalocean.com:25060/defaultdb?sslmode=require"
 
       # Critical - Production secret key
       - key: SECRET_KEY
