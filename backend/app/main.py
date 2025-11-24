@@ -1,7 +1,14 @@
+print("DEBUG: Starting main.py import...", flush=True)
+
 from fastapi import FastAPI, Request, status
+print("DEBUG: FastAPI imported", flush=True)
+
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+print("DEBUG: FastAPI exceptions imported", flush=True)
+
 from .auth import router as auth_router
+print("DEBUG: Auth router imported", flush=True)
 from .orders import router as orders_router
 from .scheduled_reports import router as scheduled_reports_router
 from .notifications import router as notifications_router
