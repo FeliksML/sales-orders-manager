@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react"
 import ReCAPTCHA from "react-google-recaptcha"
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 function ResetPassword() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -67,7 +69,7 @@ function ResetPassword() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://localhost:8000/auth/reset-password", {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

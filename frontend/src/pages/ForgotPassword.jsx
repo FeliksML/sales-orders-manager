@@ -3,6 +3,8 @@ import { Link } from "react-router-dom"
 import { Loader2, ArrowLeft } from "lucide-react"
 import ReCAPTCHA from "react-google-recaptcha"
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 function ForgotPassword() {
   const rippleRef = useRef(null)
   const recaptchaRef = useRef(null)
@@ -38,7 +40,7 @@ function ForgotPassword() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://localhost:8000/auth/forgot-password", {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
