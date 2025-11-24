@@ -90,10 +90,10 @@ services:
         scope: RUN_TIME
         value: "production"
 
-      # Will be set after frontend deploys
+      # Frontend URL for password reset links
       - key: FRONTEND_URL
         scope: RUN_TIME
-        value: "${APP_URL}"
+        value: "https://sales-order-manager-henzz.ondigitalocean.app"
 
       # ReCAPTCHA secret key
       - key: RECAPTCHA_SECRET_KEY
