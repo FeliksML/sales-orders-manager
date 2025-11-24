@@ -62,6 +62,7 @@ COPY --from=dependencies /usr/local/bin /usr/local/bin
 # Copy application code (build context is backend/ due to dockerfile_path)
 COPY --chown=appuser:appuser app /app/app
 COPY --chown=appuser:appuser gunicorn.conf.py /app/
+COPY --chown=appuser:appuser init_database.py /app/
 
 # Set PYTHONPATH so Python can find the app module
 ENV PYTHONPATH=/app
