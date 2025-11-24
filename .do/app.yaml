@@ -53,8 +53,8 @@ services:
       deploy_on_push: true
 
     # Use Dockerfile for build
-    dockerfile_path: backend/Dockerfile
-    # source_dir removed - build context is repo root
+    dockerfile_path: Dockerfile
+    source_dir: backend
 
     # Instance configuration
     instance_count: 2
@@ -151,12 +151,12 @@ static_sites:
         scope: BUILD_TIME
         value: "${backend.PUBLIC_URL}"
 
-# Database
-databases:
-  - name: db
-    engine: PG
-    cluster_name: db-postgresql-sfo3-98348
-    production: true
+# Database connection is set directly in DATABASE_URL env var above
+# databases:
+#   - name: db
+#     engine: PG
+#     cluster_name: db-postgresql-sfo3-98348
+#     production: true
 
 # Optional: Redis for caching/sessions (uncomment if needed)
 # databases:
