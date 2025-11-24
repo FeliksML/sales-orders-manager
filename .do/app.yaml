@@ -77,7 +77,7 @@ services:
       # Database connection string from attached database
       - key: DATABASE_URL
         scope: RUN_TIME
-        value: "${production-db.DATABASE_URL}"
+        value: "${db.DATABASE_URL}"
 
       # Critical - Production secret key
       - key: SECRET_KEY
@@ -152,7 +152,7 @@ static_sites:
 
 # Database
 databases:
-  - name: production-db
+  - name: db
     cluster_name: db-postgresql-sfo3-98348
 
 # Optional: Redis for caching/sessions (uncomment if needed)
