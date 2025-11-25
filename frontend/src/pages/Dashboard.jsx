@@ -61,7 +61,17 @@ function Dashboard() {
       setSubmitSuccess(true)
 
       // Refetch orders and stats - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      console.log('📊 Starting data refresh after order creation...')
+      try {
+        const [ordersResult, allOrdersResult, statsResult] = await Promise.all([
+          refetch().then(r => { console.log('✅ refetch() completed'); return r }),
+          refetchAllOrders().then(r => { console.log('✅ refetchAllOrders() completed'); return r }),
+          refetchStats().then(r => { console.log('✅ refetchStats() completed'); return r })
+        ])
+        console.log('📊 All refetches completed')
+      } catch (refetchError) {
+        console.error('❌ Refetch error:', refetchError)
+      }
       
       // Force chart re-render
       setChartsKey(k => k + 1)
