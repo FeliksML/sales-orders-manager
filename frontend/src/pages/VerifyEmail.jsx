@@ -30,7 +30,8 @@ function VerifyEmail() {
     const verifyEmail = async () => {
       try {
         console.log("🔍 Starting email verification...");
-        const response = await fetch(`http://127.0.0.1:8000/auth/verify-email/${token}`);
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_BASE_URL}/auth/verify-email/${token}`);
         console.log("📡 Response status:", response.status, response.statusText);
 
         const data = await response.json();
