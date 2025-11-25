@@ -8,6 +8,13 @@ WORKDIR /app
 # Copy shared package first (from parent directory context)
 COPY shared /shared
 
+# Install shared package dependencies
+WORKDIR /shared
+RUN npm install
+
+# Switch back to app directory
+WORKDIR /app
+
 # Copy package files and update shared reference
 COPY frontend/package*.json ./
 
