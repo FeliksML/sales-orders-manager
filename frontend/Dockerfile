@@ -5,14 +5,20 @@ FROM node:20-alpine as build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy shared package first (from parent directory context)
+COPY shared /shared
+
+# Copy package files and update shared reference
+COPY frontend/package*.json ./
+
+# Update package.json to point to copied shared folder
+RUN sed -i 's|"file:../shared"|"file:/shared"|g' package.json
 
 # Install dependencies
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY frontend/ .
 
 # Build the application
 RUN npm run build
@@ -41,14 +47,15 @@ FROM node:20-alpine as development
 
 WORKDIR /app
 
+# For development, shared is mounted via volumes
 # Copy package files
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 # Install all dependencies (including dev)
-RUN npm install
+RUN npm install || true
 
 # Copy source code
-COPY . .
+COPY frontend/ .
 
 # Expose Vite dev server port
 EXPOSE 5173

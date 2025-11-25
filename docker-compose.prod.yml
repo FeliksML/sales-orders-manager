@@ -73,8 +73,8 @@ services:
   # Frontend (Production mode with Nginx)
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       target: production  # Use production stage
       args:
         - VITE_API_URL=${API_URL}

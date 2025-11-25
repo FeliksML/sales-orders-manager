@@ -60,8 +60,8 @@ services:
   # Frontend (Development mode)
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       target: development  # Use development stage
     container_name: sales-order-frontend
     environment:
