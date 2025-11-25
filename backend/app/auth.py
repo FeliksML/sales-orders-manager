@@ -141,24 +141,41 @@ def check_email(email: str):
 @router.post("/signup")
 @limiter.limit("5/hour")  # Strict limit for signup to prevent abuse
 async def signup(request: Request, user_data: UserSignup):
+    print("\n" + "="*60)
+    print("📝 SIGNUP REQUEST RECEIVED")
+    print("="*60)
+    print(f"   Email: {user_data.email}")
+    print(f"   Name: {user_data.name}")
+    print(f"   Sales ID: {user_data.salesid}")
+    print(f"   reCAPTCHA token: {user_data.recaptcha_token[:20]}..." if user_data.recaptcha_token else "   reCAPTCHA token: MISSING")
+    
     # Verify reCAPTCHA
+    print("\n🔐 Step 1: Verifying reCAPTCHA...")
     if not await verify_recaptcha(user_data.recaptcha_token):
+        print("❌ reCAPTCHA verification FAILED")
         return JSONResponse(
             status_code=400,
             content={"error": "CAPTCHA verification failed. Please try again."}
         )
+    print("✅ reCAPTCHA verification PASSED")
 
     # Check for duplicate email and sales ID
+    print("\n🔍 Step 2: Checking for duplicates...")
     with SessionLocal() as db:
         existing_email = db.query(User).filter(User.email == user_data.email).first()
         if existing_email:
+            print(f"❌ Email {user_data.email} already exists")
             return {"error": "This email is already registered. Please use a different email or login."}
+        print(f"✅ Email {user_data.email} is available")
 
         existing_salesid = db.query(User).filter(User.salesid == user_data.salesid).first()
         if existing_salesid:
+            print(f"❌ Sales ID {user_data.salesid} already exists")
             return {"error": "This Sales ID is already registered. Please contact your administrator."}
+        print(f"✅ Sales ID {user_data.salesid} is available")
 
         # Generate verification token
+        print("\n🔑 Step 3: Creating user account...")
         verification_token = secrets.token_urlsafe(32)
         token_expiry = datetime.utcnow() + timedelta(hours=24)  # Token valid for 24 hours
 
@@ -178,12 +195,15 @@ async def signup(request: Request, user_data: UserSignup):
 
         db.add(new_user)
         db.commit()
+        print(f"✅ User created with ID: {new_user.userid}")
 
         # Construct verification link
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
         verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+        print(f"🔗 Verification link: {verification_link}")
 
         # Send verification email
+        print("\n📧 Step 4: Sending verification email...")
         try:
             await send_verification_email(
                 email=user_data.email,
@@ -191,12 +211,18 @@ async def signup(request: Request, user_data: UserSignup):
                 verification_link=verification_link
             )
             email_sent = True
-            print(f"✓ Verification email sent to {user_data.email}")
+            print(f"✅ Verification email sent successfully to {user_data.email}")
         except Exception as e:
             # Log the error but don't fail the signup
-            print(f"✗ Failed to send verification email: {str(e)}")
-            print(f"Verification link: {verification_link}")
+            print(f"❌ Failed to send verification email!")
+            print(f"   Error type: {type(e).__name__}")
+            print(f"   Error message: {str(e)}")
+            print(f"   Manual verification link: {verification_link}")
             email_sent = False
+
+    print("\n" + "="*60)
+    print(f"✅ SIGNUP COMPLETE - Email sent: {email_sent}")
+    print("="*60 + "\n")
 
     return {
         "message": "successful signup",

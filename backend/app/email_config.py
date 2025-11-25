@@ -14,26 +14,38 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+# Get email configuration from environment
+MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
+MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
+MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
+MAIL_STARTTLS = os.getenv("MAIL_STARTTLS", "True").lower() == "true"
+MAIL_SSL_TLS = os.getenv("MAIL_SSL_TLS", "False").lower() == "true"
+
+# Log email configuration at module load (without sensitive data)
+print(f"\n🔧 EMAIL_CONFIG MODULE LOADING...")
+print(f"   MAIL_SERVER: {MAIL_SERVER}")
+print(f"   MAIL_PORT: {MAIL_PORT}")
+print(f"   MAIL_FROM: {MAIL_FROM}")
+print(f"   MAIL_USERNAME: {MAIL_USERNAME[:15]}..." if len(MAIL_USERNAME) > 15 else f"   MAIL_USERNAME: {MAIL_USERNAME}")
+print(f"   MAIL_PASSWORD: {'SET (' + str(len(MAIL_PASSWORD)) + ' chars, starts with ' + MAIL_PASSWORD[:5] + '...)' if MAIL_PASSWORD else 'NOT SET'}")
+print(f"   MAIL_STARTTLS: {MAIL_STARTTLS}")
+print(f"   MAIL_SSL_TLS: {MAIL_SSL_TLS}")
+
 conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME", ""),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD", ""),
-    MAIL_FROM=os.getenv("MAIL_FROM", "noreply@salesorder.com"),
-    MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
-    MAIL_SERVER=os.getenv("MAIL_SERVER", "smtp.gmail.com"),
-    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", "True").lower() == "true",
-    MAIL_SSL_TLS=os.getenv("MAIL_SSL_TLS", "False").lower() == "true",
+    MAIL_USERNAME=MAIL_USERNAME,
+    MAIL_PASSWORD=MAIL_PASSWORD,
+    MAIL_FROM=MAIL_FROM,
+    MAIL_PORT=MAIL_PORT,
+    MAIL_SERVER=MAIL_SERVER,
+    MAIL_STARTTLS=MAIL_STARTTLS,
+    MAIL_SSL_TLS=MAIL_SSL_TLS,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True
 )
 
-# Log email configuration (without sensitive data)
-logger.info(f"📧 Email configuration loaded:")
-logger.info(f"   MAIL_SERVER: {os.getenv('MAIL_SERVER', 'smtp.gmail.com')}")
-logger.info(f"   MAIL_PORT: {os.getenv('MAIL_PORT', '587')}")
-logger.info(f"   MAIL_FROM: {os.getenv('MAIL_FROM', 'noreply@salesorder.com')}")
-logger.info(f"   MAIL_USERNAME: {'***' + os.getenv('MAIL_USERNAME', '')[-10:] if os.getenv('MAIL_USERNAME') else 'NOT SET'}")
-logger.info(f"   MAIL_STARTTLS: {os.getenv('MAIL_STARTTLS', 'True')}")
-logger.info(f"   MAIL_SSL_TLS: {os.getenv('MAIL_SSL_TLS', 'False')}")
+print(f"✅ Email ConnectionConfig created with server: {MAIL_SERVER}:{MAIL_PORT}")
 
 fast_mail = FastMail(conf)
 
@@ -136,11 +148,21 @@ async def send_verification_email(email: EmailStr, name: str, verification_link:
         subtype=MessageType.html
     )
 
-    logger.info(f"📤 Sending verification email to {email}")
+    print(f"📤 ATTEMPTING TO SEND EMAIL...")
+    print(f"   To: {email}")
+    print(f"   Server: {MAIL_SERVER}:{MAIL_PORT}")
+    print(f"   From: {MAIL_FROM}")
+    print(f"   Username: {MAIL_USERNAME[:10]}..." if len(MAIL_USERNAME) > 10 else f"   Username: {MAIL_USERNAME}")
+    print(f"   STARTTLS: {MAIL_STARTTLS}, SSL: {MAIL_SSL_TLS}")
+    
     try:
         await fast_mail.send_message(message)
+        print(f"✅ EMAIL SENT SUCCESSFULLY to {email}")
         logger.info(f"✅ Successfully sent verification email to {email}")
     except Exception as e:
+        print(f"❌ EMAIL SEND FAILED!")
+        print(f"   Error type: {type(e).__name__}")
+        print(f"   Error message: {str(e)}")
         logger.error(f"❌ Failed to send verification email to {email}: {str(e)}")
         raise
 

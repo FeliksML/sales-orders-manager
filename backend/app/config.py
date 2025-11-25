@@ -77,6 +77,18 @@ def validate_environment() -> None:
                 "⚠️  FRONTEND_URL uses http:// in production. HTTPS is strongly recommended."
             )
 
+    # Log email configuration for debugging
+    print("\n📧 EMAIL CONFIGURATION:")
+    print(f"   MAIL_SERVER: {os.getenv('MAIL_SERVER', 'NOT SET')}")
+    print(f"   MAIL_PORT: {os.getenv('MAIL_PORT', 'NOT SET')}")
+    print(f"   MAIL_FROM: {os.getenv('MAIL_FROM', 'NOT SET')}")
+    mail_user = os.getenv('MAIL_USERNAME', '')
+    print(f"   MAIL_USERNAME: {mail_user[:10]}...{mail_user[-5:] if len(mail_user) > 15 else mail_user}")
+    mail_pass = os.getenv('MAIL_PASSWORD', '')
+    print(f"   MAIL_PASSWORD: {'SET (' + str(len(mail_pass)) + ' chars)' if mail_pass else 'NOT SET'}")
+    print(f"   MAIL_STARTTLS: {os.getenv('MAIL_STARTTLS', 'NOT SET')}")
+    print(f"   MAIL_SSL_TLS: {os.getenv('MAIL_SSL_TLS', 'NOT SET')}")
+
     # Print warnings
     if warnings:
         print("\n⚠️  CONFIGURATION WARNINGS:")
