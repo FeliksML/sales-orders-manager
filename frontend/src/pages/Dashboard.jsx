@@ -42,6 +42,9 @@ function Dashboard() {
   const [isBulkRescheduleModalOpen, setIsBulkRescheduleModalOpen] = useState(false)
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
+  
+  // Chart refresh key to force re-render on data changes
+  const [chartsKey, setChartsKey] = useState(0)
 
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters)
@@ -57,10 +60,11 @@ function Dashboard() {
       setIsOrderModalOpen(false)
       setSubmitSuccess(true)
 
-      // Refetch orders and stats
-      refetch()
-      refetchAllOrders()
-      refetchStats()
+      // Refetch orders and stats - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      
+      // Force chart re-render
+      setChartsKey(k => k + 1)
 
       // Hide success message after 3 seconds
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -81,10 +85,11 @@ function Dashboard() {
       await orderService.updateOrder(orderId, orderData)
       console.log('Dashboard: Order updated successfully')
 
-      // Refetch orders and stats
-      refetch()
-      refetchAllOrders()
-      refetchStats()
+      // Refetch orders and stats - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      
+      // Force chart re-render
+      setChartsKey(k => k + 1)
 
       // Update selected order with new data
       console.log('Dashboard: Updating selectedOrder state')
@@ -109,10 +114,11 @@ function Dashboard() {
       await orderService.deleteOrder(orderId)
       console.log('Dashboard: Order deleted successfully')
 
-      // Refetch orders and stats
-      refetch()
-      refetchAllOrders()
-      refetchStats()
+      // Refetch orders and stats - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      
+      // Force chart re-render
+      setChartsKey(k => k + 1)
 
       setIsDetailsModalOpen(false)
       setSubmitSuccess(true)
@@ -156,6 +162,9 @@ function Dashboard() {
 
       // Refetch orders and stats to update both calendar and table views
       await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      
+      // Force chart re-render
+      setChartsKey(k => k + 1)
 
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -169,6 +178,7 @@ function Dashboard() {
     try {
       await orderService.bulkMarkInstalled(selectedOrders)
       await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      setChartsKey(k => k + 1)
       setSelectedOrders([])
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -181,6 +191,7 @@ function Dashboard() {
     try {
       await orderService.bulkReschedule(selectedOrders, newDate)
       await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      setChartsKey(k => k + 1)
       setSelectedOrders([])
       setIsBulkRescheduleModalOpen(false)
       setSubmitSuccess(true)
@@ -194,6 +205,7 @@ function Dashboard() {
     try {
       await orderService.bulkDelete(selectedOrders)
       await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      setChartsKey(k => k + 1)
       setSelectedOrders([])
       setIsBulkDeleteModalOpen(false)
       setSubmitSuccess(true)
@@ -347,7 +359,7 @@ function Dashboard() {
                   <LoadingSpinner />
                 </div>
               }>
-                <OrderCharts orders={allOrders} stats={stats} />
+                <OrderCharts key={chartsKey} orders={allOrders} stats={stats} />
               </Suspense>
             )}
           </div>
