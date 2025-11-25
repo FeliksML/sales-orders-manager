@@ -1,16 +1,29 @@
-from fastapi_mail import FastMail, MessageSchema, MessageType
+"""
+Notification service for sending email and SMS notifications
+Uses SendGrid HTTP API for emails
+"""
 from twilio.rest import Client
 from datetime import datetime
 from typing import Optional
 import os
-from .email_config import conf
+import logging
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 from .models import User, Order, Notification
 from sqlalchemy.orm import Session
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# SendGrid configuration
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
+
+# Initialize SendGrid client
+sg = None
+if SENDGRID_API_KEY:
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
 
 # Twilio configuration (from environment variables)
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
@@ -35,7 +48,11 @@ async def send_email_notification(
     message: str,
     order: Optional[Order] = None
 ):
-    """Send email notification"""
+    """Send email notification using SendGrid HTTP API"""
+
+    if not sg:
+        logger.error("SendGrid API key not configured")
+        return False
 
     # Build order details if order is provided
     order_details = ""
@@ -135,16 +152,15 @@ async def send_email_notification(
     """
 
     try:
-        message_obj = MessageSchema(
+        mail = Mail(
+            from_email=MAIL_FROM,
+            to_emails=user_email,
             subject=subject,
-            recipients=[user_email],
-            body=html_body,
-            subtype=MessageType.html
+            html_content=html_body
         )
-
-        fm = FastMail(conf)
-        await fm.send_message(message_obj)
-        logger.info(f"Email notification sent to {user_email}")
+        
+        response = sg.send(mail)
+        logger.info(f"Email notification sent to {user_email} (status: {response.status_code})")
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {user_email}: {str(e)}")
@@ -333,7 +349,11 @@ async def send_order_details_email(
     user: User,
     order: Order
 ):
-    """Send complete order details via email"""
+    """Send complete order details via email using SendGrid HTTP API"""
+
+    if not sg:
+        logger.error("SendGrid API key not configured")
+        return False
 
     # Build comprehensive order details including products
     products_html = ""
@@ -497,16 +517,15 @@ async def send_order_details_email(
     """
 
     try:
-        message_obj = MessageSchema(
+        mail = Mail(
+            from_email=MAIL_FROM,
+            to_emails=user.email,
             subject=f"Order Details - {order.business_name} (Order #{order.orderid})",
-            recipients=[user.email],
-            body=html_body,
-            subtype=MessageType.html
+            html_content=html_body
         )
-
-        fm = FastMail(conf)
-        await fm.send_message(message_obj)
-        logger.info(f"Order details email sent to {user.email} for order {order.orderid}")
+        
+        response = sg.send(mail)
+        logger.info(f"Order details email sent to {user.email} for order {order.orderid} (status: {response.status_code})")
         return True
     except Exception as e:
         logger.error(f"Failed to send order details email to {user.email}: {str(e)}")
