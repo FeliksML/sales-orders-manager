@@ -47,17 +47,15 @@ export const useOrders = (filters = {}) => {
   return { orders, pagination, loading, error, refetch }
 }
 
-export const useOrderStats = () => {
+export const useOrderStats = (refreshTrigger = 0) => {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const fetchStats = async () => {
-    console.log('📈 fetchStats() called')
     // Check if token exists before fetching
     const token = localStorage.getItem('token')
     if (!token) {
-      console.log('📈 No token, skipping stats fetch')
       setLoading(false)
       return
     }
@@ -65,13 +63,11 @@ export const useOrderStats = () => {
     try {
       setLoading(true)
       setError(null)
-      console.log('📈 Calling orderService.getStats()...')
       const data = await orderService.getStats()
-      console.log('📈 Stats received:', data)
       setStats(data)
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch statistics')
-      console.error('📈 Stats fetch error:', err)
+      console.error('Stats fetch error:', err)
     } finally {
       setLoading(false)
     }
@@ -79,7 +75,7 @@ export const useOrderStats = () => {
 
   useEffect(() => {
     fetchStats()
-  }, [])
+  }, [refreshTrigger])
 
   const refetch = async () => {
     await fetchStats()

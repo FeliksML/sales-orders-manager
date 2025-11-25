@@ -26,7 +26,8 @@ function Dashboard() {
   const { orders, loading: ordersLoading, error: ordersError, refetch } = useOrders(filters)
   // Fetch all orders (unfiltered) for analytics
   const { orders: allOrders, refetch: refetchAllOrders } = useOrders({})
-  const { stats, loading: statsLoading, error: statsError, refetch: refetchStats } = useOrderStats()
+  const [statsRefreshTrigger, setStatsRefreshTrigger] = useState(0)
+  const { stats, loading: statsLoading, error: statsError } = useOrderStats(statsRefreshTrigger)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -61,17 +62,10 @@ function Dashboard() {
       setSubmitSuccess(true)
 
       // Refetch orders and stats - await all to ensure data is fresh
-      console.log('📊 Starting data refresh after order creation...')
-      try {
-        const [ordersResult, allOrdersResult, statsResult] = await Promise.all([
-          refetch().then(r => { console.log('✅ refetch() completed'); return r }),
-          refetchAllOrders().then(r => { console.log('✅ refetchAllOrders() completed'); return r }),
-          refetchStats().then(r => { console.log('✅ refetchStats() completed'); return r })
-        ])
-        console.log('📊 All refetches completed')
-      } catch (refetchError) {
-        console.error('❌ Refetch error:', refetchError)
-      }
+      await Promise.all([refetch(), refetchAllOrders()])
+      
+      // Trigger stats refresh
+      setStatsRefreshTrigger(t => t + 1)
       
       // Force chart re-render
       setChartsKey(k => k + 1)
@@ -96,7 +90,10 @@ function Dashboard() {
       console.log('Dashboard: Order updated successfully')
 
       // Refetch orders and stats - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders()])
+      
+      // Trigger stats refresh
+      setStatsRefreshTrigger(t => t + 1)
       
       // Force chart re-render
       setChartsKey(k => k + 1)
@@ -125,7 +122,10 @@ function Dashboard() {
       console.log('Dashboard: Order deleted successfully')
 
       // Refetch orders and stats - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders()])
+      
+      // Trigger stats refresh
+      setStatsRefreshTrigger(t => t + 1)
       
       // Force chart re-render
       setChartsKey(k => k + 1)
@@ -171,7 +171,10 @@ function Dashboard() {
       await orderService.updateOrder(orderId, { install_date: formattedDate })
 
       // Refetch orders and stats to update both calendar and table views
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders()])
+      
+      // Trigger stats refresh
+      setStatsRefreshTrigger(t => t + 1)
       
       // Force chart re-render
       setChartsKey(k => k + 1)
@@ -187,7 +190,8 @@ function Dashboard() {
   const handleBulkMarkInstalled = async () => {
     try {
       await orderService.bulkMarkInstalled(selectedOrders)
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders()])
+      setStatsRefreshTrigger(t => t + 1)
       setChartsKey(k => k + 1)
       setSelectedOrders([])
       setSubmitSuccess(true)
@@ -200,7 +204,8 @@ function Dashboard() {
   const handleBulkReschedule = async (newDate) => {
     try {
       await orderService.bulkReschedule(selectedOrders, newDate)
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders()])
+      setStatsRefreshTrigger(t => t + 1)
       setChartsKey(k => k + 1)
       setSelectedOrders([])
       setIsBulkRescheduleModalOpen(false)
@@ -214,7 +219,8 @@ function Dashboard() {
   const handleBulkDelete = async () => {
     try {
       await orderService.bulkDelete(selectedOrders)
-      await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+      await Promise.all([refetch(), refetchAllOrders()])
+      setStatsRefreshTrigger(t => t + 1)
       setChartsKey(k => k + 1)
       setSelectedOrders([])
       setIsBulkDeleteModalOpen(false)
@@ -236,7 +242,8 @@ function Dashboard() {
 
   // Pull to refresh handler
   const handleRefresh = async () => {
-    await Promise.all([refetch(), refetchAllOrders(), refetchStats()])
+    await Promise.all([refetch(), refetchAllOrders()])
+    setStatsRefreshTrigger(t => t + 1)
   }
 
   return (
