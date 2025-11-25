@@ -78,14 +78,14 @@ if [ "$TABLES" -gt "0" ]; then
     read -p "Do you want to reinitialize? This will DELETE ALL DATA! (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker compose -f docker-compose.prod.yml run --rm backend python scripts/init_db.py
+        docker compose -f docker-compose.prod.yml run --rm backend python init_database.py
         echo -e "${GREEN}Database reinitialized${NC}"
     else
         echo "Skipping database initialization"
     fi
 else
     echo "Initializing database for the first time..."
-    docker compose -f docker-compose.prod.yml run --rm backend python scripts/init_db.py
+    docker compose -f docker-compose.prod.yml run --rm backend python init_database.py
     echo -e "${GREEN}Database initialized successfully${NC}"
 fi
 
