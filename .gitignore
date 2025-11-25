@@ -14,7 +14,11 @@ __pycache__/
 .env.development
 backend/.env
 frontend/.env
-*.env
+
+# Allow .env.example files (templates)
+!.env.example
+!backend/.env.example
+!frontend/.env.example
 
 # Database
 *.db
