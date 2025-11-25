@@ -1,12 +1,12 @@
 """
 Email configuration for sending verification and notification emails
+Uses SendGrid HTTP API to bypass SMTP port blocks on cloud providers
 """
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
-from pydantic import EmailStr
-from typing import List
 import os
 import logging
 from dotenv import load_dotenv
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, To, Content
 
 load_dotenv()
 
@@ -15,44 +15,26 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Get email configuration from environment
-MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
-MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
-MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
-MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
-MAIL_STARTTLS = os.getenv("MAIL_STARTTLS", "True").lower() == "true"
-MAIL_SSL_TLS = os.getenv("MAIL_SSL_TLS", "False").lower() == "true"
 
 # Log email configuration at module load (without sensitive data)
-print(f"\n🔧 EMAIL_CONFIG MODULE LOADING...")
-print(f"   MAIL_SERVER: {MAIL_SERVER}")
-print(f"   MAIL_PORT: {MAIL_PORT}")
+print(f"\n🔧 EMAIL_CONFIG MODULE LOADING (SendGrid HTTP API)...")
 print(f"   MAIL_FROM: {MAIL_FROM}")
-print(f"   MAIL_USERNAME: {MAIL_USERNAME[:15]}..." if len(MAIL_USERNAME) > 15 else f"   MAIL_USERNAME: {MAIL_USERNAME}")
-print(f"   MAIL_PASSWORD: {'SET (' + str(len(MAIL_PASSWORD)) + ' chars, starts with ' + MAIL_PASSWORD[:5] + '...)' if MAIL_PASSWORD else 'NOT SET'}")
-print(f"   MAIL_STARTTLS: {MAIL_STARTTLS}")
-print(f"   MAIL_SSL_TLS: {MAIL_SSL_TLS}")
+print(f"   SENDGRID_API_KEY: {'SET (' + str(len(SENDGRID_API_KEY)) + ' chars, starts with ' + SENDGRID_API_KEY[:10] + '...)' if SENDGRID_API_KEY else 'NOT SET'}")
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=MAIL_USERNAME,
-    MAIL_PASSWORD=MAIL_PASSWORD,
-    MAIL_FROM=MAIL_FROM,
-    MAIL_PORT=MAIL_PORT,
-    MAIL_SERVER=MAIL_SERVER,
-    MAIL_STARTTLS=MAIL_STARTTLS,
-    MAIL_SSL_TLS=MAIL_SSL_TLS,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
-)
-
-print(f"✅ Email ConnectionConfig created with server: {MAIL_SERVER}:{MAIL_PORT}")
-
-fast_mail = FastMail(conf)
+# Initialize SendGrid client
+sg = None
+if SENDGRID_API_KEY:
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
+    print(f"✅ SendGrid client initialized (HTTP API)")
+else:
+    print(f"⚠️ SendGrid API key not set - emails will fail")
 
 
-async def send_verification_email(email: EmailStr, name: str, verification_link: str):
+async def send_verification_email(email: str, name: str, verification_link: str):
     """
-    Send email verification link to user
+    Send email verification link to user using SendGrid HTTP API
 
     Args:
         email: User's email address
@@ -60,6 +42,10 @@ async def send_verification_email(email: EmailStr, name: str, verification_link:
         verification_link: The verification URL with token
     """
     logger.info(f"📧 Starting verification email to {email}")
+    
+    if not sg:
+        raise Exception("SendGrid API key not configured")
+    
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -141,24 +127,26 @@ async def send_verification_email(email: EmailStr, name: str, verification_link:
     </html>
     """
 
-    message = MessageSchema(
-        subject="Verify Your Email - Sales Order Manager",
-        recipients=[email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-
-    print(f"📤 ATTEMPTING TO SEND EMAIL...")
+    print(f"📤 ATTEMPTING TO SEND EMAIL VIA SENDGRID HTTP API...")
     print(f"   To: {email}")
-    print(f"   Server: {MAIL_SERVER}:{MAIL_PORT}")
     print(f"   From: {MAIL_FROM}")
-    print(f"   Username: {MAIL_USERNAME[:10]}..." if len(MAIL_USERNAME) > 10 else f"   Username: {MAIL_USERNAME}")
-    print(f"   STARTTLS: {MAIL_STARTTLS}, SSL: {MAIL_SSL_TLS}")
+    print(f"   Method: HTTP API (port 443)")
     
     try:
-        await fast_mail.send_message(message)
-        print(f"✅ EMAIL SENT SUCCESSFULLY to {email}")
-        logger.info(f"✅ Successfully sent verification email to {email}")
+        message = Mail(
+            from_email=MAIL_FROM,
+            to_emails=email,
+            subject="Verify Your Email - Sales Order Manager",
+            html_content=html_content
+        )
+        
+        response = sg.send(message)
+        
+        print(f"✅ EMAIL SENT SUCCESSFULLY!")
+        print(f"   Status code: {response.status_code}")
+        print(f"   To: {email}")
+        logger.info(f"✅ Successfully sent verification email to {email} (status: {response.status_code})")
+        
     except Exception as e:
         print(f"❌ EMAIL SEND FAILED!")
         print(f"   Error type: {type(e).__name__}")
@@ -167,9 +155,9 @@ async def send_verification_email(email: EmailStr, name: str, verification_link:
         raise
 
 
-async def send_password_reset_email(email: EmailStr, name: str, reset_link: str):
+async def send_password_reset_email(email: str, name: str, reset_link: str):
     """
-    Send password reset link to user
+    Send password reset link to user using SendGrid HTTP API
 
     Args:
         email: User's email address
@@ -177,6 +165,10 @@ async def send_password_reset_email(email: EmailStr, name: str, reset_link: str)
         reset_link: The password reset URL with token
     """
     logger.info(f"📧 Starting password reset email to {email}")
+    
+    if not sg:
+        raise Exception("SendGrid API key not configured")
+    
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
@@ -263,17 +255,27 @@ async def send_password_reset_email(email: EmailStr, name: str, reset_link: str)
     </html>
     """
 
-    message = MessageSchema(
-        subject="Reset Your Password - Sales Order Manager",
-        recipients=[email],
-        body=html_content,
-        subtype=MessageType.html
-    )
-
-    logger.info(f"📤 Sending password reset email to {email}")
+    print(f"📤 ATTEMPTING TO SEND PASSWORD RESET EMAIL VIA SENDGRID HTTP API...")
+    print(f"   To: {email}")
+    print(f"   From: {MAIL_FROM}")
+    
     try:
-        await fast_mail.send_message(message)
-        logger.info(f"✅ Successfully sent password reset email to {email}")
+        message = Mail(
+            from_email=MAIL_FROM,
+            to_emails=email,
+            subject="Reset Your Password - Sales Order Manager",
+            html_content=html_content
+        )
+        
+        response = sg.send(message)
+        
+        print(f"✅ PASSWORD RESET EMAIL SENT SUCCESSFULLY!")
+        print(f"   Status code: {response.status_code}")
+        logger.info(f"✅ Successfully sent password reset email to {email} (status: {response.status_code})")
+        
     except Exception as e:
+        print(f"❌ PASSWORD RESET EMAIL SEND FAILED!")
+        print(f"   Error type: {type(e).__name__}")
+        print(f"   Error message: {str(e)}")
         logger.error(f"❌ Failed to send password reset email to {email}: {str(e)}")
         raise

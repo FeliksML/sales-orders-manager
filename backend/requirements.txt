@@ -16,3 +16,4 @@ httpx
 slowapi
 gunicorn
 sentry-sdk[fastapi]
+sendgrid
