@@ -218,8 +218,8 @@ def get_order_stats(
         Order.userid == user_id
     ).scalar() or 0
 
-    # Add Cache-Control header (cache for 5 minutes)
-    response.headers["Cache-Control"] = "private, max-age=300"
+    # Disable caching for real-time stats updates
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
 
     return OrderStats(
         total_orders=total_orders,
