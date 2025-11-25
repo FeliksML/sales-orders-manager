@@ -1,11 +1,24 @@
-from fastapi_mail import FastMail, MessageSchema, MessageType
+"""
+Email service for sending scheduled reports and export emails with attachments
+Uses SendGrid HTTP API
+"""
 from datetime import datetime
 import base64
 import asyncio
 import tempfile
 import os
 import logging
-from .email_config import conf
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+
+# Get SendGrid configuration
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
+
+# Initialize SendGrid client
+sg = None
+if SENDGRID_API_KEY:
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -20,6 +33,9 @@ async def send_scheduled_report_email(
 ):
     """Send scheduled report email with Excel attachment"""
     logger.info(f"📧 Starting scheduled report email to {user_email} (type: {schedule_type})")
+    
+    if not sg:
+        raise Exception("SendGrid API key not configured")
 
     # Create HTML body
     html_body = f"""
@@ -146,48 +162,35 @@ async def send_scheduled_report_email(
     </html>
     """
 
-    # Create temporary file for attachment
     filename = f'sales_report_{schedule_type}_{datetime.now().strftime("%Y%m%d")}.xlsx'
 
-    # Create temp file
-    temp_file = None
     try:
-        # Write Excel data to temporary file
-        with tempfile.NamedTemporaryFile(mode='wb', suffix='.xlsx', delete=False) as tmp:
-            tmp.write(excel_data)
-            temp_file = tmp.name
-
-        # Create message - fastapi-mail wants file paths in attachments
-        from fastapi_mail import MessageSchema, MessageType
-        from pydantic import EmailStr
-
-        message = MessageSchema(
+        # Create message
+        message = Mail(
+            from_email=MAIL_FROM,
+            to_emails=user_email,
             subject=f"Your {schedule_type.capitalize()} Sales Report - {datetime.now().strftime('%B %d, %Y')}",
-            recipients=[user_email],
-            body=html_body,
-            subtype=MessageType.html,
-            attachments=[temp_file]  # Pass file path directly
+            html_content=html_body
         )
+        
+        # Add attachment
+        encoded_file = base64.b64encode(excel_data).decode()
+        attachment = Attachment(
+            FileContent(encoded_file),
+            FileName(filename),
+            FileType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+            Disposition('attachment')
+        )
+        message.attachment = attachment
 
         # Send email
-        fm = FastMail(conf)
         logger.info(f"📤 Sending scheduled report email to {user_email}")
-        try:
-            await fm.send_message(message)
-            logger.info(f"✅ Successfully sent scheduled report email to {user_email}")
-        except Exception as e:
-            logger.error(f"❌ Failed to send scheduled report email to {user_email}: {str(e)}")
-            raise
+        response = sg.send(message)
+        logger.info(f"✅ Successfully sent scheduled report email to {user_email} (status: {response.status_code})")
 
-    finally:
-        # Clean up temp file after a delay to ensure email is sent
-        if temp_file and os.path.exists(temp_file):
-            try:
-                import time
-                time.sleep(1)  # Give email time to send
-                os.unlink(temp_file)
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to cleanup temp file {temp_file}: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ Failed to send scheduled report email to {user_email}: {str(e)}")
+        raise
 
 async def send_export_email(
     user_email: str,
@@ -198,14 +201,19 @@ async def send_export_email(
 ):
     """Send export file via email"""
     logger.info(f"📧 Starting export email to {user_email} (format: {file_format}, count: {order_count})")
+    
+    if not sg:
+        raise Exception("SendGrid API key not configured")
 
     # Determine file extension and media type
     if file_format == 'excel':
         file_ext = 'xlsx'
         file_type = 'Excel'
+        mime_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     else:
         file_ext = 'csv'
         file_type = 'CSV'
+        mime_type = 'text/csv'
 
     # Create HTML body
     html_body = f"""
@@ -282,45 +290,36 @@ async def send_export_email(
     </html>
     """
 
-    # Create temporary file for attachment
     filename = f'orders_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{file_ext}'
 
-    # Create temp file
-    temp_file = None
     try:
-        # Write data to temporary file
-        mode = 'wb' if file_format == 'excel' else 'w'
-        encoding = None if file_format == 'excel' else 'utf-8'
-
-        with tempfile.NamedTemporaryFile(mode=mode, suffix=f'.{file_ext}', delete=False, encoding=encoding) as tmp:
-            tmp.write(file_data)
-            temp_file = tmp.name
-
         # Create message
-        message = MessageSchema(
+        message = Mail(
+            from_email=MAIL_FROM,
+            to_emails=user_email,
             subject=f"Your Orders Export - {datetime.now().strftime('%B %d, %Y')}",
-            recipients=[user_email],
-            body=html_body,
-            subtype=MessageType.html,
-            attachments=[temp_file]
+            html_content=html_body
         )
+        
+        # Handle file_data - could be bytes or string for CSV
+        if isinstance(file_data, str):
+            file_data = file_data.encode('utf-8')
+        
+        # Add attachment
+        encoded_file = base64.b64encode(file_data).decode()
+        attachment = Attachment(
+            FileContent(encoded_file),
+            FileName(filename),
+            FileType(mime_type),
+            Disposition('attachment')
+        )
+        message.attachment = attachment
 
         # Send email
-        fm = FastMail(conf)
         logger.info(f"📤 Sending export email to {user_email}")
-        try:
-            await fm.send_message(message)
-            logger.info(f"✅ Successfully sent export email to {user_email}")
-        except Exception as e:
-            logger.error(f"❌ Failed to send export email to {user_email}: {str(e)}")
-            raise
+        response = sg.send(message)
+        logger.info(f"✅ Successfully sent export email to {user_email} (status: {response.status_code})")
 
-    finally:
-        # Clean up temp file
-        if temp_file and os.path.exists(temp_file):
-            try:
-                import time
-                time.sleep(1)
-                os.unlink(temp_file)
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to cleanup temp file {temp_file}: {str(e)}")
+    except Exception as e:
+        logger.error(f"❌ Failed to send export email to {user_email}: {str(e)}")
+        raise
