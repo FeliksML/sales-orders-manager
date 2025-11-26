@@ -94,7 +94,7 @@ def update_notification_preferences(
 
 
 # Notification History Endpoints
-@router.get("/", response_model=List[NotificationResponse])
+@router.get("", response_model=List[NotificationResponse])  # Empty string, not "/" to match /api/notifications exactly
 def get_notifications(
     skip: int = 0,
     limit: int = 50,
@@ -214,7 +214,7 @@ def delete_notification(
     return {"message": "Notification deleted successfully"}
 
 
-@router.delete("/")
+@router.delete("")  # Empty string, not "/" to match /api/notifications exactly
 def delete_all_notifications(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
