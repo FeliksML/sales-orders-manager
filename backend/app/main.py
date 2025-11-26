@@ -45,7 +45,10 @@ async def lifespan(app: FastAPI):
     print("🛑 Application shutting down...")
     # shutdown_scheduler()  # Temporarily disabled for debugging
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    redirect_slashes=False  # Disable automatic trailing slash redirects to prevent HTTP redirect issues
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
