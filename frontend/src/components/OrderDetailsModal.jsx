@@ -225,6 +225,15 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     return phone
   }
 
+  // Format phone as user types
+  const formatPhoneAsYouType = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10)
+    if (digits.length === 0) return ''
+    if (digits.length <= 3) return `(${digits}`
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+  }
+
   // Check if installation is complete (past install date)
   const installDate = formData.install_date ? new Date(formData.install_date + 'T00:00:00') : new Date()
   const today = new Date()
@@ -555,7 +564,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                         icon={Phone}
                         label="Phone Number"
                         value={formData.customer_phone}
-                        onChange={(v) => handleChange('customer_phone', v)}
+                        onChange={(v) => handleChange('customer_phone', formatPhoneAsYouType(v))}
                         error={errors.customer_phone}
                         required
                         type="tel"
