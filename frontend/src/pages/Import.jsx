@@ -121,13 +121,21 @@ function Import() {
         notes: extractedData.notes || ''
       }
 
-      await orderService.createOrder(orderData)
+      console.log('📋 Creating order with data:', orderData)
+      const result = await orderService.createOrder(orderData)
+      console.log('✅ Order created successfully:', result)
+      console.log('🔑 Token still in localStorage:', !!localStorage.getItem('token'))
+      
       setSubmitSuccess(true)
       setTimeout(() => {
+        console.log('🔄 Navigating to dashboard...')
+        console.log('🔑 Token before navigation:', !!localStorage.getItem('token'))
         navigate('/')
       }, 1500)
     } catch (error) {
-      console.error('Failed to create order:', error)
+      console.error('❌ Failed to create order:', error)
+      console.error('❌ Error response:', error.response)
+      console.error('❌ Error status:', error.response?.status)
       setUploadError('Failed to create order. Please try again.')
     } finally {
       setIsSubmitting(false)

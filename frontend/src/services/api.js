@@ -33,7 +33,16 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('🚨 API Error:', {
+      status: error.response?.status,
+      url: error.config?.url,
+      method: error.config?.method,
+      data: error.response?.data
+    })
+    
     if (error.response?.status === 401) {
+      console.error('🔒 401 Unauthorized - logging out user')
+      console.error('🔒 Request that caused 401:', error.config?.url)
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem('token')
       localStorage.removeItem('user')

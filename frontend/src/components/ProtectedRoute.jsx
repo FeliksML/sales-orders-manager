@@ -1,8 +1,9 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -13,6 +14,10 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) {
+    console.warn('🚫 ProtectedRoute: Not authenticated, redirecting to login')
+    console.warn('🚫 Current path:', location.pathname)
+    console.warn('🚫 Token in localStorage:', !!localStorage.getItem('token'))
+    console.warn('🚫 User in localStorage:', !!localStorage.getItem('user'))
     return <Navigate to="/login" replace />
   }
 
