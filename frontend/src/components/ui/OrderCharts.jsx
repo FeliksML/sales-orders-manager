@@ -1,4 +1,5 @@
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BarChart3 } from 'lucide-react'
 import Card from './Card'
 
 function OrderCharts({ orders = [], stats }) {
@@ -51,7 +52,19 @@ function OrderCharts({ orders = [], stats }) {
   }
 
   if (productData.length === 0 && orders.length === 0) {
-    return null
+    return (
+      <Card>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-16 h-16 mb-4 rounded-full bg-blue-500/20 flex items-center justify-center">
+            <BarChart3 className="w-8 h-8 text-blue-400" />
+          </div>
+          <h3 className="text-white text-xl font-bold mb-2">No Analytics Data Yet</h3>
+          <p className="text-gray-400 max-w-sm">
+            Create your first order to see trends and product distribution charts here.
+          </p>
+        </div>
+      </Card>
+    )
   }
 
   return (
