@@ -228,7 +228,13 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
 
     setIsSubmitting(true)
     try {
-      await onSubmit(formData)
+      // Prepare data - convert empty strings to null for optional numeric fields
+      const submitData = {
+        ...formData,
+        monthly_total: formData.monthly_total === '' ? null : parseFloat(formData.monthly_total) || null,
+        initial_payment: formData.initial_payment === '' ? null : parseFloat(formData.initial_payment) || null,
+      }
+      await onSubmit(submitData)
       // Reset form
       setFormData({
         spectrum_reference: '',
