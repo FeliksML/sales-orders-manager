@@ -15,6 +15,15 @@ const apiClient = axios.create({
 // Request interceptor - Add auth token to requests
 apiClient.interceptors.request.use(
   (config) => {
+    // Debug: Log the full URL being used
+    const fullUrl = config.baseURL ? `${config.baseURL}${config.url}` : config.url
+    console.log('🔗 Axios Request:', {
+      baseURL: config.baseURL,
+      url: config.url,
+      fullUrl: fullUrl,
+      method: config.method
+    })
+    
     const token = localStorage.getItem('token')
     console.log('🔑 Token from localStorage:', token ? 'Token exists' : 'No token')
     if (token) {
