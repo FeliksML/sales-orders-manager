@@ -1,19 +1,26 @@
-// Get API base URL with automatic HTTPS upgrade when page is loaded over HTTPS
+// Get API base URL - ALWAYS use HTTPS in production to prevent mixed content errors
 export const getApiBaseUrl = () => {
-  // If explicitly set, upgrade to HTTPS if page is HTTPS
-  if (import.meta.env.VITE_API_URL) {
-    const envUrl = import.meta.env.VITE_API_URL
-    // If page is HTTPS but env URL is HTTP, upgrade it
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && envUrl.startsWith('http://')) {
-      return envUrl.replace('http://', 'https://')
-    }
-    return envUrl
+  const debugInfo = {
+    envUrl: import.meta.env.VITE_API_URL || 'NOT_SET',
+    windowProtocol: typeof window !== 'undefined' ? window.location.protocol : 'N/A',
+    windowHostname: typeof window !== 'undefined' ? window.location.hostname : 'N/A',
   }
-  // In production (non-localhost), use same protocol (no port, assume reverse proxy)
+  
+  // Production (non-localhost) - ALWAYS use HTTPS regardless of env var
+  // This prevents mixed content errors when page is loaded over HTTPS
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return `${window.location.protocol}//${window.location.hostname}`
+    const prodUrl = `https://${window.location.hostname}`
+    console.log('🔍 API URL Debug:', { ...debugInfo, finalUrl: prodUrl, reason: 'PRODUCTION_FORCE_HTTPS' })
+    return prodUrl
   }
-  // Local development
+  
+  // Local development - use env var or default
+  if (import.meta.env.VITE_API_URL) {
+    console.log('🔍 API URL Debug:', { ...debugInfo, finalUrl: import.meta.env.VITE_API_URL, reason: 'LOCAL_ENV_VAR' })
+    return import.meta.env.VITE_API_URL
+  }
+  
+  console.log('🔍 API URL Debug:', { ...debugInfo, finalUrl: 'http://localhost:8000', reason: 'LOCAL_DEV_DEFAULT' })
   return 'http://localhost:8000'
 }
 
