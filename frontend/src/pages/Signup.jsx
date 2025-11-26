@@ -51,7 +51,7 @@ function Signup() {
     uppercase: /[A-Z]/.test(password),
     lowercase: /[a-z]/.test(password),
     number: /[0-9]/.test(password),
-    special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>-]/.test(password),
   };
 
   const allPasswordChecksPassed = Object.values(passwordChecks).every(Boolean);
@@ -775,7 +775,7 @@ function Signup() {
                     ) : (
                       <X className="text-red-500" size={16} />
                     )}
-                    <span>One special character (!@#$%^&*...)</span>
+                    <span>One special character (!@#$%^&*-...)</span>
                   </li>
                 </ul>
               </div>
