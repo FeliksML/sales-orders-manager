@@ -14,11 +14,7 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    console.warn('🚫 ProtectedRoute: Not authenticated, redirecting to login')
-    console.warn('🚫 Current path:', location.pathname)
-    console.warn('🚫 Token in localStorage:', !!localStorage.getItem('token'))
-    console.warn('🚫 User in localStorage:', !!localStorage.getItem('user'))
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   return children
