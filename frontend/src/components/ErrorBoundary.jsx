@@ -2,7 +2,7 @@ import React from 'react'
 import axios from 'axios'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../utils/apiUrl'
 
 class ErrorBoundary extends React.Component {
   constructor(props) {

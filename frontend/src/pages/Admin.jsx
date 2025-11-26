@@ -13,7 +13,7 @@ const ErrorLogsTable = lazy(() => import('../components/admin/ErrorLogsTable'))
 const SystemAnalytics = lazy(() => import('../components/admin/SystemAnalytics'))
 const AuditLogViewer = lazy(() => import('../components/admin/AuditLogViewer'))
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../utils/apiUrl'
 
 function Admin() {
   const [activeTab, setActiveTab] = useState('overview')

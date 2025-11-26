@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { Eye, EyeOff, Loader2, ArrowLeft } from "lucide-react"
 import ReCAPTCHA from "react-google-recaptcha"
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../utils/apiUrl'
 
 function ResetPassword() {
   const navigate = useNavigate()

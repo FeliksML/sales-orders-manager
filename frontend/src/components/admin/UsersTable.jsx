@@ -4,7 +4,7 @@ import Card from '../ui/Card'
 import LoadingSpinner from '../ui/LoadingSpinner'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../../utils/apiUrl'
 
 function UsersTable({ onRefresh }) {
   const [users, setUsers] = useState([])

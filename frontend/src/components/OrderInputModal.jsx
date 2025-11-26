@@ -4,7 +4,7 @@ import { validateEmail, validatePhone, validateName, validateRequired } from '@s
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../utils/apiUrl'
 
 // Generate 24 one-hour time slots
 const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {

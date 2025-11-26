@@ -1,20 +1,6 @@
 import axios from 'axios'
+import { API_BASE_URL } from '../utils/apiUrl'
 
-// Use environment variable, or auto-detect in production
-const getApiBaseUrl = () => {
-  // If explicitly set, use that
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
-  }
-  // In production (non-localhost), use same protocol with port 8000
-  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return `${window.location.protocol}//${window.location.hostname}:8000`
-  }
-  // Local development
-  return 'http://localhost:8000'
-}
-
-const API_BASE_URL = getApiBaseUrl()
 console.log('🌐 API Base URL:', API_BASE_URL)
 
 // Create axios instance with default config

@@ -5,7 +5,7 @@ import LoadingSpinner from '../ui/LoadingSpinner'
 import CustomCheckbox from '../ui/CustomCheckbox'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+import { API_BASE_URL } from '../../utils/apiUrl'
 
 function ErrorLogsTable({ onRefresh }) {
   const [errors, setErrors] = useState([])

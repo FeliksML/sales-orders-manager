@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { API_BASE_URL } from '../utils/apiUrl';
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -30,7 +31,6 @@ function VerifyEmail() {
     const verifyEmail = async () => {
       try {
         console.log("🔍 Starting email verification...");
-        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
         const response = await fetch(`${API_BASE_URL}/auth/verify-email/${token}`);
         console.log("📡 Response status:", response.status, response.statusText);
 
