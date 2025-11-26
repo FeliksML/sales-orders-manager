@@ -20,7 +20,13 @@ const NotificationCenter = ({ isOpen, onClose }) => {
       });
       setNotifications(data);
     } catch (error) {
-      console.error('Failed to load notifications:', error);
+      console.error('Failed to load notifications:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url,
+        fullError: error
+      });
     } finally {
       setLoading(false);
     }
