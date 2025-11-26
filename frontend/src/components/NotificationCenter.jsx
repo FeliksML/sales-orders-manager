@@ -5,12 +5,20 @@ const NotificationCenter = ({ isOpen, onClose }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' or 'unread'
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       loadNotifications();
     }
   }, [isOpen, filter]);
+
+  // Reset confirmation when panel closes
+  useEffect(() => {
+    if (!isOpen) {
+      setShowClearConfirm(false);
+    }
+  }, [isOpen]);
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -60,13 +68,12 @@ const NotificationCenter = ({ isOpen, onClose }) => {
   };
 
   const handleClearAll = async () => {
-    if (window.confirm('Are you sure you want to delete all notifications?')) {
-      try {
-        await notificationService.deleteAllNotifications();
-        loadNotifications();
-      } catch (error) {
-        console.error('Failed to clear notifications:', error);
-      }
+    try {
+      await notificationService.deleteAllNotifications();
+      setShowClearConfirm(false);
+      loadNotifications();
+    } catch (error) {
+      console.error('Failed to clear notifications:', error);
     }
   };
 
@@ -145,20 +152,46 @@ const NotificationCenter = ({ isOpen, onClose }) => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="border-b border-white/20 p-3 flex justify-between items-center backdrop-blur-md bg-white/30">
-          <button
-            onClick={handleMarkAllRead}
-            className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:bg-blue-50/50 px-3 py-1.5 rounded-lg transition-all"
-          >
-            Mark all as read
-          </button>
-          <button
-            onClick={handleClearAll}
-            className="text-sm text-red-600 hover:text-red-800 font-medium hover:bg-red-50/50 px-3 py-1.5 rounded-lg transition-all"
-          >
-            Clear all
-          </button>
+        {/* Actions / Confirmation */}
+        <div className="border-b border-white/20 p-3 backdrop-blur-md bg-white/30">
+          {showClearConfirm ? (
+            // Inline Confirmation
+            <div className="flex items-center justify-between gap-2 animate-fade-in">
+              <span className="text-sm text-gray-700 font-medium">
+                Delete all notifications?
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className="text-sm text-gray-600 hover:text-gray-800 font-medium bg-gray-100/70 hover:bg-gray-200/70 px-3 py-1.5 rounded-lg transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleClearAll}
+                  className="text-sm text-white font-medium bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                >
+                  Yes, delete all
+                </button>
+              </div>
+            </div>
+          ) : (
+            // Normal Actions
+            <div className="flex justify-between items-center">
+              <button
+                onClick={handleMarkAllRead}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:bg-blue-50/50 px-3 py-1.5 rounded-lg transition-all"
+              >
+                Mark all as read
+              </button>
+              <button
+                onClick={() => setShowClearConfirm(true)}
+                className="text-sm text-red-600 hover:text-red-800 font-medium hover:bg-red-50/50 px-3 py-1.5 rounded-lg transition-all"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Notification List */}
