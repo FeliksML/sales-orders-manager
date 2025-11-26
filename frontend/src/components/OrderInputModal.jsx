@@ -79,7 +79,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
       formDataUpload.append('file', file)
 
       const token = localStorage.getItem('token')
-      const response = await fetch(`${API_BASE_URL}/orders/extract-pdf`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/extract-pdf`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
