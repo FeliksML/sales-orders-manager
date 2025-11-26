@@ -19,6 +19,7 @@ const Terms = lazy(() => import('./pages/Terms'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
+const Import = lazy(() => import('./pages/Import'))
 
 function App() {
   return (
@@ -61,6 +62,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <NotificationSettings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/import"
+                  element={
+                    <ProtectedRoute>
+                      <Import />
                     </ProtectedRoute>
                   }
                 />

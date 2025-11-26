@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield } from 'lucide-react'
+import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield, FileUp } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
 import NotificationCenter from './NotificationCenter'
 
@@ -83,6 +83,21 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             <FileBarChart size={16} />
             {/* Shows text when Export + User can fit with text (500px+) */}
             <span className="hidden min-[500px]:inline text-sm">Export</span>
+          </button>
+
+          <button
+            onClick={() => navigate('/import')}
+            className="flex items-center justify-center gap-2 h-10 px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            style={{
+              backgroundColor: 'rgba(5, 150, 105, 0.3)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(16, 185, 129, 0.4)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+            }}
+            title="Import PDF"
+          >
+            <FileUp size={16} />
+            <span className="hidden min-[700px]:inline text-sm">Import PDF</span>
           </button>
 
           {/* Secondary Controls: Notifications, Settings, User */}

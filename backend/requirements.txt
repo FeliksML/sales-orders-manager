@@ -17,3 +17,4 @@ slowapi
 gunicorn
 sentry-sdk[fastapi]
 sendgrid
+pdfplumber==0.11.0

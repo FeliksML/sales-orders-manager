@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   X, Edit2, Save, Calendar, User, MapPin, Phone, Briefcase, Package,
   CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
-  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send, Trash2
+  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send, Trash2, DollarSign
 } from 'lucide-react'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
@@ -43,6 +43,9 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
         has_mobile: order.has_mobile || 0,
         mobile_activated: order.mobile_activated || 0,
         has_wib: order.has_wib || false,
+        internet_tier: order.internet_tier || '',
+        monthly_total: order.monthly_total || '',
+        initial_payment: order.initial_payment || '',
         notes: order.notes || ''
       })
     }
@@ -694,6 +697,38 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                     </p>
                   )}
                 </div>
+
+                {/* Pricing Card - Only show if any pricing data exists */}
+                {(formData.internet_tier || formData.monthly_total || formData.initial_payment) && (
+                  <div className="p-5 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="p-2 rounded-lg bg-emerald-500/20">
+                        <DollarSign className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-white">Pricing & Plan</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {formData.internet_tier && (
+                        <InfoRow icon={Wifi} label="Internet Tier" value={formData.internet_tier} highlight />
+                      )}
+                      {formData.monthly_total && (
+                        <InfoRow 
+                          icon={DollarSign} 
+                          label="Monthly Total" 
+                          value={`$${parseFloat(formData.monthly_total).toFixed(2)}`} 
+                          highlight 
+                        />
+                      )}
+                      {formData.initial_payment && (
+                        <InfoRow 
+                          icon={DollarSign} 
+                          label="Initial Payment" 
+                          value={`$${parseFloat(formData.initial_payment).toFixed(2)}`} 
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Right Column - Products */}

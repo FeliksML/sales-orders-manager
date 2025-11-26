@@ -59,6 +59,11 @@ class Order(Base):
     mobile_activated = Column(Integer, default=0)
     has_wib = Column(Boolean, default=False)
 
+    # PDF extracted fields
+    internet_tier = Column(String(100), nullable=True)
+    monthly_total = Column(Float, nullable=True)
+    initial_payment = Column(Float, nullable=True)
+
     # Additional notes
     notes = Column(Text)
 

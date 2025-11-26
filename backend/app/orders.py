@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, or_
@@ -13,9 +13,63 @@ from .export_utils import generate_excel, generate_csv, generate_stats_excel, AL
 from .email_service import send_export_email
 from .notification_service import send_order_details_email
 from . import audit_service
+from .pdf_extractor import extract_order_from_pdf, validate_pdf
 from pydantic import BaseModel
 
 router = APIRouter()
+
+# Maximum file size for PDF upload (10MB)
+MAX_PDF_SIZE = 10 * 1024 * 1024
+
+
+@router.post("/extract-pdf")
+async def extract_pdf(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Extract order data from an uploaded Spectrum Business PDF.
+    Returns extracted fields that can be used to populate an order form.
+    """
+    # Validate file type
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be a PDF"
+        )
+    
+    # Read file content
+    content = await file.read()
+    
+    # Validate file size
+    if len(content) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File size exceeds maximum limit of {MAX_PDF_SIZE // (1024 * 1024)}MB"
+        )
+    
+    # Validate PDF magic bytes
+    if not validate_pdf(content):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PDF file"
+        )
+    
+    try:
+        # Extract data from PDF
+        extracted_data = extract_order_from_pdf(content)
+        
+        return {
+            "success": True,
+            "message": "PDF extracted successfully",
+            "data": extracted_data
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract PDF data: {str(e)}"
+        )
+
 
 class EmailExportRequest(BaseModel):
     file_format: str  # 'excel' or 'csv'

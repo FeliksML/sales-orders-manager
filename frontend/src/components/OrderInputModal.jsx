@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
-import { X, User, MapPin, Calendar, Package, FileText, CheckCircle, ArrowRight, ArrowLeft, Mail, Phone } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, User, MapPin, Calendar, Package, FileText, CheckCircle, ArrowRight, ArrowLeft, Mail, Phone, Upload, FileUp, Loader2 } from 'lucide-react'
 import { validateEmail, validatePhone, validateName, validateRequired } from '@sales-order-manager/shared'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const STEPS = {
   CUSTOMER: 0,
@@ -15,6 +17,13 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
   const [currentStep, setCurrentStep] = useState(STEPS.CUSTOMER)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState({})
+  
+  // PDF upload state
+  const [isUploading, setIsUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [uploadSuccess, setUploadSuccess] = useState(false)
+  const fileInputRef = useRef(null)
 
   const [formData, setFormData] = useState({
     spectrum_reference: '',
@@ -35,6 +44,9 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     has_mobile: 0,
     mobile_activated: 0,
     has_wib: false,
+    internet_tier: '',
+    monthly_total: '',
+    initial_payment: '',
     notes: ''
   })
 
@@ -44,6 +56,106 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
       setFormData(prev => ({ ...prev, install_date: prefilledDate }))
     }
   }, [prefilledDate, isOpen])
+
+  // PDF upload handler
+  const handlePdfUpload = async (file) => {
+    if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+      setUploadError('Please select a PDF file')
+      return
+    }
+
+    // Check file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File size must be less than 10MB')
+      return
+    }
+
+    setIsUploading(true)
+    setUploadError('')
+    setUploadSuccess(false)
+
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append('file', file)
+
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE_URL}/orders/extract-pdf`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formDataUpload
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Failed to extract PDF')
+      }
+
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        // Populate form with extracted data
+        const extracted = result.data
+        setFormData(prev => ({
+          ...prev,
+          spectrum_reference: extracted.spectrum_reference || prev.spectrum_reference,
+          customer_account_number: extracted.customer_account_number || prev.customer_account_number,
+          customer_security_code: extracted.customer_security_code || prev.customer_security_code,
+          job_number: extracted.job_number || prev.job_number,
+          business_name: extracted.business_name || prev.business_name,
+          customer_name: extracted.customer_name || prev.customer_name,
+          customer_email: extracted.customer_email || prev.customer_email,
+          customer_address: extracted.customer_address || prev.customer_address,
+          customer_phone: extracted.customer_phone || prev.customer_phone,
+          install_date: extracted.install_date || prev.install_date,
+          install_time: extracted.install_time || prev.install_time,
+          has_internet: extracted.has_internet ?? prev.has_internet,
+          has_voice: extracted.has_voice ?? prev.has_voice,
+          has_tv: extracted.has_tv ?? prev.has_tv,
+          has_mobile: extracted.has_mobile ?? prev.has_mobile,
+          has_wib: extracted.has_wib ?? prev.has_wib,
+          internet_tier: extracted.internet_tier || prev.internet_tier,
+          monthly_total: extracted.monthly_total || prev.monthly_total,
+          initial_payment: extracted.initial_payment || prev.initial_payment,
+          notes: extracted.notes || prev.notes
+        }))
+        setUploadSuccess(true)
+        setTimeout(() => setUploadSuccess(false), 3000)
+      }
+    } catch (error) {
+      console.error('PDF upload error:', error)
+      setUploadError(error.message || 'Failed to extract PDF data')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const files = e.dataTransfer.files
+    if (files.length > 0) {
+      handlePdfUpload(files[0])
+    }
+  }
+
+  const handleFileSelect = (e) => {
+    const files = e.target.files
+    if (files.length > 0) {
+      handlePdfUpload(files[0])
+    }
+  }
 
   const validateStep = (step) => {
     const newErrors = {}
@@ -124,6 +236,9 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
         has_mobile: 0,
         mobile_activated: 0,
         has_wib: false,
+        internet_tier: '',
+        monthly_total: '',
+        initial_payment: '',
         notes: ''
       })
       setCurrentStep(STEPS.CUSTOMER)
@@ -175,6 +290,58 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+
+          {/* PDF Upload Zone */}
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`mb-4 p-4 rounded-lg border-2 border-dashed cursor-pointer transition-all ${
+              isDragging
+                ? 'border-blue-500 bg-blue-500/10'
+                : uploadSuccess
+                ? 'border-green-500 bg-green-500/10'
+                : uploadError
+                ? 'border-red-500 bg-red-500/10'
+                : 'border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10'
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <div className="flex items-center justify-center gap-3">
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
+                  <span className="text-blue-400 text-sm font-medium">Extracting PDF data...</span>
+                </>
+              ) : uploadSuccess ? (
+                <>
+                  <CheckCircle className="w-5 h-5 text-green-400" />
+                  <span className="text-green-400 text-sm font-medium">PDF data extracted successfully!</span>
+                </>
+              ) : uploadError ? (
+                <>
+                  <X className="w-5 h-5 text-red-400" />
+                  <span className="text-red-400 text-sm font-medium">{uploadError}</span>
+                </>
+              ) : (
+                <>
+                  <FileUp className="w-5 h-5 text-gray-400" />
+                  <span className="text-gray-400 text-sm">
+                    <span className="hidden sm:inline">Drag & drop a Spectrum PDF here, or </span>
+                    <span className="text-blue-400 hover:underline">browse</span>
+                    <span className="hidden sm:inline"> to auto-fill form</span>
+                  </span>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Progress Steps */}
@@ -657,6 +824,56 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
             {/* Step 4: Notes */}
             {currentStep === STEPS.NOTES && (
               <div className="space-y-4 animate-fadeIn">
+                {/* PDF-extracted fields */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Internet Tier
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.internet_tier}
+                      onChange={(e) => handleChange('internet_tier', e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                      placeholder="e.g., Ultra (1000 Mbps)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Monthly Total
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.monthly_total}
+                        onChange={(e) => handleChange('monthly_total', e.target.value)}
+                        className="w-full pl-7 pr-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Initial Payment
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.initial_payment}
+                        onChange={(e) => handleChange('initial_payment', e.target.value)}
+                        className="w-full pl-7 pr-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
                     Additional Notes
@@ -664,7 +881,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                   <textarea
                     value={formData.notes}
                     onChange={(e) => handleChange('notes', e.target.value)}
-                    rows={6}
+                    rows={4}
                     className="w-full px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors resize-none"
                     placeholder="Any special instructions or notes about this order..."
                   />
