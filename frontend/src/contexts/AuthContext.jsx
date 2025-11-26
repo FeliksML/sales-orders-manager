@@ -13,20 +13,22 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  // Check for existing session on mount
-  useEffect(() => {
-    const storedToken = localStorage.getItem('token')
+  // Initialize from localStorage synchronously to prevent flash
+  const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user')
+    console.log('🔐 AuthContext init - user:', storedUser ? 'exists' : 'null')
+    return storedUser ? JSON.parse(storedUser) : null
+  })
+  const [token, setToken] = useState(() => {
+    const storedToken = localStorage.getItem('token')
+    console.log('🔐 AuthContext init - token:', storedToken ? 'exists' : 'null')
+    return storedToken || null
+  })
+  const [loading, setLoading] = useState(false) // No loading needed since we init from localStorage
 
-    if (storedToken && storedUser) {
-      setToken(storedToken)
-      setUser(JSON.parse(storedUser))
-    }
-    setLoading(false)
+  // This effect is now just for logging/debugging
+  useEffect(() => {
+    console.log('🔐 AuthContext mounted, isAuthenticated:', !!token)
   }, [])
 
   const login = async (email, password, recaptchaToken) => {
