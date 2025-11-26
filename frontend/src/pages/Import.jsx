@@ -130,7 +130,7 @@ function Import() {
       setTimeout(() => {
         console.log('🔄 Navigating to dashboard...')
         console.log('🔑 Token before navigation:', !!localStorage.getItem('token'))
-        navigate('/')
+        navigate('/dashboard')
       }, 1500)
     } catch (error) {
       console.error('❌ Failed to create order:', error)
