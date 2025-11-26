@@ -6,6 +6,19 @@ import AddressAutocomplete from './AddressAutocomplete'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// Generate 24 one-hour time slots
+const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
+  const startHour = i
+  const endHour = (i + 1) % 24
+  const formatHour = (h) => {
+    const period = h < 12 ? 'AM' : 'PM'
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+    return `${hour12}:00 ${period}`
+  }
+  const label = `${formatHour(startHour)} - ${formatHour(endHour)}`
+  return { value: label, label }
+})
+
 const STEPS = {
   CUSTOMER: 0,
   INSTALLATION: 1,
@@ -572,14 +585,20 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Installation Time <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="time"
+                    <select
                       value={formData.install_time}
                       onChange={(e) => handleChange('install_time', e.target.value)}
                       className={`w-full px-4 py-2.5 rounded-lg bg-white/5 border ${
                         errors.install_time ? 'border-red-500' : 'border-white/10'
                       } text-white focus:outline-none focus:border-blue-500 transition-colors`}
-                    />
+                    >
+                      <option value="" className="bg-gray-800">Select time slot</option>
+                      {TIME_SLOTS.map(slot => (
+                        <option key={slot.value} value={slot.value} className="bg-gray-800">
+                          {slot.label}
+                        </option>
+                      ))}
+                    </select>
                     {errors.install_time && (
                       <p className="text-red-400 text-xs mt-1">{errors.install_time}</p>
                     )}

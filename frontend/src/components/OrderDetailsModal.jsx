@@ -10,6 +10,19 @@ import AuditLog from './AuditLog'
 import { orderService } from '../services/orderService'
 import { formatErrorMessage } from '../utils/errorHandler'
 
+// Generate 24 one-hour time slots
+const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
+  const startHour = i
+  const endHour = (i + 1) % 24
+  const formatHour = (h) => {
+    const period = h < 12 ? 'AM' : 'PM'
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+    return `${hour12}:00 ${period}`
+  }
+  const label = `${formatHour(startHour)} - ${formatHour(endHour)}`
+  return { value: label, label }
+})
+
 function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -1014,14 +1027,31 @@ function EditField({ icon: Icon, label, value, onChange, type = 'text', error, r
         <Icon className="w-4 h-4" />
         {label} {required && <span className="text-red-400">*</span>}
       </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`w-full px-4 py-2.5 rounded-lg bg-white/5 border ${
-          error ? 'border-red-500' : 'border-white/10'
-        } text-white focus:outline-none focus:border-blue-500 transition-colors`}
-      />
+      {type === 'time' ? (
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full px-4 py-2.5 rounded-lg bg-white/5 border ${
+            error ? 'border-red-500' : 'border-white/10'
+          } text-white focus:outline-none focus:border-blue-500 transition-colors`}
+        >
+          <option value="" className="bg-gray-800">Select time slot</option>
+          {TIME_SLOTS.map(slot => (
+            <option key={slot.value} value={slot.value} className="bg-gray-800">
+              {slot.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full px-4 py-2.5 rounded-lg bg-white/5 border ${
+            error ? 'border-red-500' : 'border-white/10'
+          } text-white focus:outline-none focus:border-blue-500 transition-colors`}
+        />
+      )}
       {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
     </div>
   )
