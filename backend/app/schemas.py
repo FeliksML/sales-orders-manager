@@ -387,8 +387,11 @@ class OrderCommissionEstimate(BaseModel):
 
 # Sales Goal Schemas
 class SalesGoalBase(BaseModel):
-    """Base schema for sales goals"""
-    target_orders: Optional[int] = None
+    """Base schema for sales goals
+    
+    PSU = Primary Service Unit (1 per product category: Internet, Voice, Mobile, TV, SBC)
+    """
+    target_psu: Optional[int] = None  # PSU target
     target_revenue: Optional[float] = None  # MRR target
     target_internet: Optional[int] = None
     target_mobile: Optional[int] = None
@@ -436,7 +439,7 @@ class GoalProgressResponse(BaseModel):
     has_goal: bool
     
     # Progress for each metric (only included if target is set)
-    orders: Optional[GoalProgressItem] = None
+    psu: Optional[GoalProgressItem] = None  # PSU progress
     revenue: Optional[GoalProgressItem] = None
     internet: Optional[GoalProgressItem] = None
     mobile: Optional[GoalProgressItem] = None
@@ -454,8 +457,8 @@ class GoalHistoryItem(BaseModel):
     had_goal: bool
     achieved: bool
     # Breakdown if goal existed
-    orders_target: Optional[int] = None
-    orders_actual: Optional[int] = None
+    psu_target: Optional[int] = None
+    psu_actual: Optional[int] = None
     revenue_target: Optional[float] = None
     revenue_actual: Optional[float] = None
     internet_target: Optional[int] = None

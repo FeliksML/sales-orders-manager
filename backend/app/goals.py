@@ -100,13 +100,45 @@ def get_orders_in_fiscal_month(db: Session, user_id: int, start_dt: datetime, en
     return [o for o in all_orders if is_order_in_fiscal_month(o, start_dt, end_dt)]
 
 
+def calculate_psu_from_order(order) -> int:
+    """Calculate PSU (Primary Service Units) from a single order.
+    
+    PSU = 1 per product category (not per unit quantity):
+    - Internet = 1 PSU (if has_internet is True)
+    - Voice = 1 PSU (if has_voice > 0, regardless of line count)
+    - Mobile = 1 PSU (if has_mobile > 0, regardless of line count)
+    - TV = 1 PSU (if has_tv is True)
+    - SBC = 1 PSU (if has_sbc > 0, regardless of seat count)
+    
+    WIB does NOT count as PSU (a-la-carte bonus only)
+    """
+    psu = 0
+    if order.has_internet:
+        psu += 1
+    if order.has_voice and order.has_voice > 0:
+        psu += 1
+    if order.has_mobile and order.has_mobile > 0:
+        psu += 1
+    if order.has_tv:
+        psu += 1
+    if order.has_sbc and order.has_sbc > 0:
+        psu += 1
+    return psu
+
+
 def calculate_order_metrics(orders: list) -> dict:
-    """Calculate metrics from a list of orders."""
+    """Calculate metrics from a list of orders including PSU count."""
+    # Calculate total PSU across all orders
+    total_psu = sum(calculate_psu_from_order(o) for o in orders)
+    
     return {
-        'orders': len(orders),
+        'psu': total_psu,
         'revenue': sum(o.monthly_total or 0 for o in orders),
         'internet': sum(1 for o in orders if o.has_internet),
-        'mobile': sum(o.has_mobile or 0 for o in orders)
+        'mobile': sum(1 for o in orders if o.has_mobile and o.has_mobile > 0),
+        'voice': sum(1 for o in orders if o.has_voice and o.has_voice > 0),
+        'tv': sum(1 for o in orders if o.has_tv),
+        'sbc': sum(1 for o in orders if o.has_sbc and o.has_sbc > 0)
     }
 
 
@@ -175,7 +207,7 @@ def get_goal_progress(
     
     # Check if user has any targets set
     has_goal = goal is not None and any([
-        goal.target_orders,
+        goal.target_psu,
         goal.target_revenue,
         goal.target_internet,
         goal.target_mobile
@@ -199,14 +231,14 @@ def get_goal_progress(
     metrics = calculate_order_metrics(orders)
     
     # Calculate progress for each target
-    orders_progress = None
+    psu_progress = None
     revenue_progress = None
     internet_progress = None
     mobile_progress = None
     
-    if goal.target_orders:
-        orders_progress = calculate_progress_item(
-            goal.target_orders, metrics['orders'], days_elapsed, days_total
+    if goal.target_psu:
+        psu_progress = calculate_progress_item(
+            goal.target_psu, metrics['psu'], days_elapsed, days_total
         )
     
     if goal.target_revenue:
@@ -225,7 +257,7 @@ def get_goal_progress(
         )
     
     # Calculate overall status
-    progress_items = [p for p in [orders_progress, revenue_progress, internet_progress, mobile_progress] if p]
+    progress_items = [p for p in [psu_progress, revenue_progress, internet_progress, mobile_progress] if p]
     
     if not progress_items:
         overall_status = 'none'
@@ -254,7 +286,7 @@ def get_goal_progress(
         days_remaining=days_remaining,
         days_total=days_total,
         has_goal=True,
-        orders=orders_progress,
+        psu=psu_progress,
         revenue=revenue_progress,
         internet=internet_progress,
         mobile=mobile_progress,
@@ -302,7 +334,7 @@ def get_goal_history(
         ).first()
         
         had_goal = goal is not None and any([
-            goal.target_orders if goal else None,
+            goal.target_psu if goal else None,
             goal.target_revenue if goal else None,
             goal.target_internet if goal else None,
             goal.target_mobile if goal else None
@@ -317,7 +349,7 @@ def get_goal_history(
             
             # Check if goal was achieved
             achieved = True
-            if goal.target_orders and metrics['orders'] < goal.target_orders:
+            if goal.target_psu and metrics['psu'] < goal.target_psu:
                 achieved = False
             if goal.target_revenue and metrics['revenue'] < goal.target_revenue:
                 achieved = False
@@ -335,8 +367,8 @@ def get_goal_history(
                 period=period_label,
                 had_goal=True,
                 achieved=achieved,
-                orders_target=goal.target_orders,
-                orders_actual=metrics['orders'],
+                psu_target=goal.target_psu,
+                psu_actual=metrics['psu'],
                 revenue_target=goal.target_revenue,
                 revenue_actual=metrics['revenue'],
                 internet_target=goal.target_internet,
@@ -382,7 +414,7 @@ def clear_goal(
     ).first()
     
     if goal:
-        goal.target_orders = None
+        goal.target_psu = None
         goal.target_revenue = None
         goal.target_internet = None
         goal.target_mobile = None

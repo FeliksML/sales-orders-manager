@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import { X, Target, Package, DollarSign, Wifi, Smartphone, Save, RotateCcw, Zap, TrendingUp, Award } from 'lucide-react'
+import { X, Target, Layers, DollarSign, Wifi, Smartphone, Save, RotateCcw, Zap, TrendingUp, Award } from 'lucide-react'
 import { useGoal } from '../hooks/useGoals'
 
 // Preset configurations
+// PSU = Primary Service Unit (1 per product category: Internet, Voice, Mobile, TV, SBC)
 const PRESETS = [
   { 
     name: 'Conservative',
     icon: '🎯',
     description: 'Achievable baseline',
-    orders: 15,
+    psu: 30,
     internet: 12,
     mobile: 8,
     revenue: 3000
@@ -17,7 +18,7 @@ const PRESETS = [
     name: 'Standard',
     icon: '⚡',
     description: 'Solid performance',
-    orders: 25,
+    psu: 50,
     internet: 20,
     mobile: 15,
     revenue: 5000
@@ -26,7 +27,7 @@ const PRESETS = [
     name: 'Aggressive',
     icon: '🚀',
     description: 'Top performer',
-    orders: 40,
+    psu: 80,
     internet: 35,
     mobile: 25,
     revenue: 8000
@@ -40,7 +41,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
   
   // Form state
   const [formData, setFormData] = useState({
-    target_orders: '',
+    target_psu: '',
     target_revenue: '',
     target_internet: '',
     target_mobile: ''
@@ -50,7 +51,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
   useEffect(() => {
     if (goal) {
       setFormData({
-        target_orders: goal.target_orders || '',
+        target_psu: goal.target_psu || '',
         target_revenue: goal.target_revenue || '',
         target_internet: goal.target_internet || '',
         target_mobile: goal.target_mobile || ''
@@ -67,7 +68,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
   
   const handlePreset = (preset) => {
     setFormData({
-      target_orders: preset.orders,
+      target_psu: preset.psu,
       target_revenue: preset.revenue,
       target_internet: preset.internet,
       target_mobile: preset.mobile
@@ -81,7 +82,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
     try {
       // Convert to numbers, treating empty strings as null
       const goalData = {
-        target_orders: formData.target_orders === '' ? null : Number(formData.target_orders),
+        target_psu: formData.target_psu === '' ? null : Number(formData.target_psu),
         target_revenue: formData.target_revenue === '' ? null : Number(formData.target_revenue),
         target_internet: formData.target_internet === '' ? null : Number(formData.target_internet),
         target_mobile: formData.target_mobile === '' ? null : Number(formData.target_mobile)
@@ -110,7 +111,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
     try {
       await clearGoal()
       setFormData({
-        target_orders: '',
+        target_psu: '',
         target_revenue: '',
         target_internet: '',
         target_mobile: ''
@@ -225,7 +226,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
               Custom Targets
             </label>
             
-            {/* Orders */}
+            {/* PSU */}
             <div className="flex items-center gap-3">
               <div 
                 className="p-2.5 rounded-xl flex-shrink-0"
@@ -234,16 +235,19 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
                   border: '1px solid rgba(168, 85, 247, 0.3)'
                 }}
               >
-                <Package className="w-5 h-5 text-purple-400" />
+                <Layers className="w-5 h-5 text-purple-400" />
               </div>
               <div className="flex-1">
-                <label className="block text-sm text-gray-300 mb-1">Total Orders</label>
+                <label className="block text-sm text-gray-300 mb-1">
+                  Total PSU
+                  <span className="ml-1 text-xs text-gray-500">(Internet + Voice + Mobile + TV + SBC)</span>
+                </label>
                 <input
                   type="number"
                   min="0"
-                  value={formData.target_orders}
-                  onChange={(e) => handleChange('target_orders', e.target.value)}
-                  placeholder="e.g. 25"
+                  value={formData.target_psu}
+                  onChange={(e) => handleChange('target_psu', e.target.value)}
+                  placeholder="e.g. 50"
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
                   style={{ fontFamily: "'Space Mono', monospace" }}
                 />

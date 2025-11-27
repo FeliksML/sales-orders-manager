@@ -78,7 +78,7 @@ export function useGoal() {
       // Reset goal targets locally
       setGoal(prev => prev ? {
         ...prev,
-        target_orders: null,
+        target_psu: null,
         target_revenue: null,
         target_internet: null,
         target_mobile: null

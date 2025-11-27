@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Target, TrendingUp, Settings, Trophy, Flame, Package, DollarSign, Wifi, Smartphone, ChevronRight, AlertCircle } from 'lucide-react'
+import { Target, TrendingUp, Settings, Trophy, Flame, Layers, DollarSign, Wifi, Smartphone, ChevronRight, AlertCircle } from 'lucide-react'
 import { useGoalProgress, useGoalHistory } from '../hooks/useGoals'
 
 // Status colors
@@ -27,9 +27,9 @@ const STATUS_COLORS = {
   }
 }
 
-// Metric icons
+// Metric icons - PSU = Primary Service Unit (Internet + Voice + Mobile + TV + SBC)
 const METRIC_ICONS = {
-  orders: Package,
+  psu: Layers,
   revenue: DollarSign,
   internet: Wifi,
   mobile: Smartphone
@@ -37,7 +37,7 @@ const METRIC_ICONS = {
 
 // Metric labels
 const METRIC_LABELS = {
-  orders: 'Orders',
+  psu: 'PSU',
   revenue: 'Revenue',
   internet: 'Internet',
   mobile: 'Mobile'
@@ -308,7 +308,7 @@ function GoalProgress({ onSettingsClick }) {
   const overallColors = STATUS_COLORS[progress.overall_status] || STATUS_COLORS.green
   
   // Get active metrics (ones with targets)
-  const activeMetrics = ['orders', 'revenue', 'internet', 'mobile'].filter(m => progress[m])
+  const activeMetrics = ['psu', 'revenue', 'internet', 'mobile'].filter(m => progress[m])
   
   return (
     <div 

@@ -200,7 +200,8 @@ class SalesGoal(Base):
     month = Column(Integer, nullable=False)  # 1-12
 
     # Targets (all optional - users choose what to track)
-    target_orders = Column(Integer, nullable=True)
+    # PSU = Primary Service Unit (1 per product category: Internet, Voice, Mobile, TV, SBC)
+    target_psu = Column(Integer, nullable=True)  # PSU target (maps to 'target_orders' column in DB)
     target_revenue = Column(Float, nullable=True)  # MRR target
     target_internet = Column(Integer, nullable=True)
     target_mobile = Column(Integer, nullable=True)
