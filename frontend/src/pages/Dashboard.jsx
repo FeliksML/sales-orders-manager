@@ -12,7 +12,9 @@ import GoalProgress from '../components/GoalProgress'
 import { useOrders, useOrderStats } from '../hooks/useOrders'
 import { useEarnings } from '../hooks/useCommission'
 import { useGoalProgress } from '../hooks/useGoals'
+import { useTodaysFollowups } from '../hooks/useFollowups'
 import { orderService } from '../services/orderService'
+import TodaysFollowUps from '../components/TodaysFollowUps'
 
 // Lazy load heavy components for better performance
 const OrderCharts = lazy(() => import('../components/ui/OrderCharts'))
@@ -35,6 +37,14 @@ function Dashboard() {
   const { stats, loading: statsLoading, error: statsError } = useOrderStats(statsRefreshTrigger)
   const { currentInternetCount, refetch: refetchEarnings } = useEarnings()
   const { refetch: refetchGoalProgress } = useGoalProgress()
+  const { 
+    todaysFollowups, 
+    overdueCount, 
+    loading: followupsLoading, 
+    refetch: refetchFollowups,
+    completeFollowup,
+    snoozeFollowup 
+  } = useTodaysFollowups()
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [isGoalSettingsModalOpen, setIsGoalSettingsModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -250,8 +260,24 @@ function Dashboard() {
 
   // Pull to refresh handler
   const handleRefresh = async () => {
-    await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
+    await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress(), refetchFollowups()])
     setStatsRefreshTrigger(t => t + 1)
+  }
+
+  // Follow-up handlers
+  const handleFollowupComplete = async (followupId) => {
+    await completeFollowup(followupId)
+  }
+
+  const handleFollowupSnooze = async (followupId, days) => {
+    await snoozeFollowup(followupId, days)
+  }
+
+  const handleFollowupOrderClick = (order) => {
+    // Convert the embedded order info to full order format
+    const fullOrder = orders.find(o => o.orderid === order.orderid) || order
+    setSelectedOrder(fullOrder)
+    setIsDetailsModalOpen(true)
   }
 
   // Goal save handler - refresh goal progress
@@ -287,6 +313,20 @@ function Dashboard() {
               Order updated successfully!
             </p>
           </div>
+        )}
+
+        {/* Today's Follow-Ups Section - Only show if there are follow-ups */}
+        {todaysFollowups.length > 0 && (
+          <section className="mb-8">
+            <TodaysFollowUps
+              followups={todaysFollowups}
+              overdueCount={overdueCount}
+              onComplete={handleFollowupComplete}
+              onSnooze={handleFollowupSnooze}
+              onOrderClick={handleFollowupOrderClick}
+              loading={followupsLoading}
+            />
+          </section>
         )}
 
         {/* Earnings & Goals Section */}

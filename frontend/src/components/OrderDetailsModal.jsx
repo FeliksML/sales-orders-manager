@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import {
   X, Edit2, Save, Calendar, User, MapPin, Phone, Briefcase, Package,
   CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
-  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send, Trash2, DollarSign
+  Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send, Trash2, DollarSign, Bell
 } from 'lucide-react'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 import AuditLog from './AuditLog'
+import FollowUpModal from './FollowUpModal'
 import { orderService } from '../services/orderService'
+import { useCreateFollowup } from '../hooks/useFollowups'
 import { formatErrorMessage } from '../utils/errorHandler'
 
 // Generate 24 one-hour time slots
@@ -28,11 +30,13 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false)
   const [copiedField, setCopiedField] = useState(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailMessage, setEmailMessage] = useState(null)
   const [errors, setErrors] = useState({})
   const [formData, setFormData] = useState({})
+  const { createFollowup, loading: followupLoading } = useCreateFollowup()
 
   useEffect(() => {
     if (order) {
@@ -319,6 +323,15 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
               <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
                 {!isEditing && !showReschedule && (
                   <>
+                    {/* Schedule Follow-up Button */}
+                    <button
+                      onClick={() => setShowFollowUpModal(true)}
+                      className="px-3 sm:px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 transition-all hover:scale-105 text-amber-300 hover:text-amber-200 text-sm font-medium flex items-center gap-2 shadow-sm"
+                      title="Schedule follow-up reminder"
+                    >
+                      <Bell className="w-4 h-4" />
+                      <span>Follow-Up</span>
+                    </button>
                     {isPending && (
                       <button
                         onClick={() => setShowReschedule(true)}
@@ -418,6 +431,15 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
               <div className="flex items-center gap-3 flex-shrink-0">
                 {!isEditing && !showReschedule && (
                   <>
+                    {/* Schedule Follow-up Button */}
+                    <button
+                      onClick={() => setShowFollowUpModal(true)}
+                      className="px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 transition-all hover:scale-105 text-amber-300 hover:text-amber-200 text-sm font-medium flex items-center gap-2 shadow-sm"
+                      title="Schedule follow-up reminder"
+                    >
+                      <Bell className="w-4 h-4" />
+                      <span>Follow-Up</span>
+                    </button>
                     {isPending && (
                       <button
                         onClick={() => setShowReschedule(true)}
@@ -984,6 +1006,15 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
           </div>
         )}
       </div>
+
+      {/* Follow-Up Modal */}
+      <FollowUpModal
+        isOpen={showFollowUpModal}
+        onClose={() => setShowFollowUpModal(false)}
+        onSubmit={createFollowup}
+        order={order}
+        loading={followupLoading}
+      />
 
       {/* Custom Scrollbar Styles */}
       <style>{`

@@ -216,3 +216,30 @@ class SalesGoal(Base):
 
     # Unique constraint per user per month
     __table_args__ = (UniqueConstraint('user_id', 'year', 'month', name='uq_user_year_month'),)
+
+
+class FollowUp(Base):
+    """Follow-up reminders for post-installation customer contact"""
+    __tablename__ = 'followups'
+
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, ForeignKey('orders.orderid'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.userid'), nullable=False)
+
+    # When the follow-up is due
+    due_date = Column(DateTime, nullable=False)
+    
+    # Optional note: "Ask about referral", "Check if TV working", etc.
+    note = Column(Text, nullable=True)
+
+    # Status: pending, completed, snoozed
+    status = Column(String(20), default='pending', nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    snoozed_until = Column(DateTime, nullable=True)
+    
+    # Track if notification was already sent for this follow-up
+    notification_sent = Column(Boolean, default=False, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

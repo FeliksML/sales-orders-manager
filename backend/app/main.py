@@ -16,6 +16,7 @@ from .audit import router as audit_router
 from .admin import router as admin_router
 from .commission import router as commission_router
 from .goals import router as goals_router
+from .followups import router as followups_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
@@ -128,6 +129,7 @@ app.include_router(audit_router, prefix="/api/audit", tags=["audit"])
 app.include_router(admin_router)
 app.include_router(commission_router, prefix="/api/commission", tags=["commission"])
 app.include_router(goals_router, prefix="/api/goals", tags=["goals"])
+app.include_router(followups_router, prefix="/api/followups", tags=["followups"])
 
 # Add security headers middleware (first, so it applies to all responses)
 app.add_middleware(SecurityHeadersMiddleware)

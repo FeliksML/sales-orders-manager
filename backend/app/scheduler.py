@@ -6,10 +6,10 @@ from typing import Optional
 import logging
 import asyncio
 from .database import SessionLocal
-from .models import User, Order, Notification
+from .models import User, Order, Notification, FollowUp
 from .export_utils import generate_stats_excel
 from .email_service import send_scheduled_report_email
-from .notification_service import send_install_reminder, send_today_install_notification
+from .notification_service import send_install_reminder, send_today_install_notification, send_custom_notification
 from sqlalchemy import func, and_, extract
 
 # Configure logging
@@ -293,6 +293,79 @@ def check_today_installations():
         db.close()
 
 
+def check_due_followups():
+    """Check and send notifications for due follow-up reminders"""
+    logger.info("=" * 50)
+    logger.info("Running follow-up reminder check")
+    logger.info(f"Current time: {datetime.now()}")
+
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        # Check for follow-ups due within the next hour that haven't been notified
+        one_hour_from_now = now + timedelta(hours=1)
+        
+        # Get pending follow-ups that are due and haven't been notified
+        followups = db.query(FollowUp).filter(
+            and_(
+                FollowUp.status == 'pending',
+                FollowUp.due_date <= one_hour_from_now,
+                FollowUp.notification_sent == False
+            )
+        ).all()
+
+        logger.info(f"Found {len(followups)} follow-ups due for notification")
+
+        notifications_sent = 0
+        for followup in followups:
+            # Get user
+            user = db.query(User).filter(User.userid == followup.user_id).first()
+            if not user:
+                logger.warning(f"User not found for follow-up {followup.id}")
+                continue
+
+            # Get order
+            order = db.query(Order).filter(Order.orderid == followup.order_id).first()
+            if not order:
+                logger.warning(f"Order not found for follow-up {followup.id}")
+                continue
+
+            logger.info(f"Processing follow-up {followup.id} for user {user.email}")
+
+            # Check if user wants notifications
+            if user.email_notifications or user.sms_notifications or user.browser_notifications:
+                # Build notification message
+                note_text = f" Note: {followup.note}" if followup.note else ""
+                title = "Follow-Up Reminder"
+                message = f"Time to follow up with {order.customer_name} at {order.business_name}.{note_text}"
+
+                logger.info(f"Sending follow-up notification to {user.email} for order {order.orderid}")
+                asyncio.run(send_custom_notification(
+                    db=db,
+                    user=user,
+                    notification_type='followup_due',
+                    title=title,
+                    message=message,
+                    order=order
+                ))
+                
+                # Mark as notified
+                followup.notification_sent = True
+                db.commit()
+                
+                notifications_sent += 1
+            else:
+                logger.info(f"User {user.email} has all notifications disabled")
+
+        logger.info(f"Sent {notifications_sent} follow-up notifications")
+        logger.info("=" * 50)
+
+    except Exception as e:
+        logger.error(f"Failed to send follow-up notifications: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """Start the scheduler"""
     if not scheduler.running:
@@ -318,6 +391,15 @@ def start_scheduler():
         )
         logger.info("✓ Added today installation notification job (runs every 2 hours)")
 
+        # Add follow-up reminder job (runs every 30 minutes)
+        scheduler.add_job(
+            check_due_followups,
+            trigger=CronTrigger(minute='0,30'),  # Every 30 minutes
+            id='followup_reminders',
+            replace_existing=True
+        )
+        logger.info("✓ Added follow-up reminder job (runs every 30 minutes)")
+
         scheduler.start()
         logger.info("✓ Scheduler started successfully")
         logger.info("=" * 70)
@@ -327,6 +409,7 @@ def start_scheduler():
         try:
             check_installation_reminders()
             check_today_installations()
+            check_due_followups()
         except Exception as e:
             logger.error(f"Failed to run initial checks: {str(e)}")
     else:

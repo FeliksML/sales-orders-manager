@@ -490,3 +490,68 @@ class GoalHistoryResponse(BaseModel):
     goals_achieved: int
     achievement_rate: float  # Percentage
     history: List[GoalHistoryItem]
+
+
+# Follow-Up Reminder Schemas
+class FollowUpCreate(BaseModel):
+    """Schema for creating a follow-up reminder"""
+    order_id: int
+    due_date: datetime
+    note: Optional[str] = None
+
+
+class FollowUpUpdate(BaseModel):
+    """Schema for updating a follow-up reminder"""
+    due_date: Optional[datetime] = None
+    note: Optional[str] = None
+    status: Optional[str] = None  # pending, completed, snoozed
+
+
+class FollowUpSnooze(BaseModel):
+    """Schema for snoozing a follow-up"""
+    days: int = 1  # Number of days to snooze
+
+
+class FollowUpOrderInfo(BaseModel):
+    """Embedded order info for follow-up response"""
+    orderid: int
+    customer_name: str
+    business_name: str
+    customer_phone: str
+    install_date: date
+
+    class Config:
+        from_attributes = True
+
+
+class FollowUpResponse(BaseModel):
+    """Schema for follow-up response with order details"""
+    id: int
+    order_id: int
+    user_id: int
+    due_date: datetime
+    note: Optional[str] = None
+    status: str
+    completed_at: Optional[datetime] = None
+    snoozed_until: Optional[datetime] = None
+    notification_sent: bool
+    created_at: datetime
+    updated_at: datetime
+    # Embedded order info
+    order: Optional[FollowUpOrderInfo] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TodaysFollowUpsResponse(BaseModel):
+    """Response for today's follow-ups dashboard section"""
+    count: int
+    overdue_count: int
+    followups: List[FollowUpResponse]
+
+
+class PaginatedFollowUpResponse(BaseModel):
+    """Paginated list of follow-ups"""
+    data: List[FollowUpResponse]
+    meta: PaginationMeta

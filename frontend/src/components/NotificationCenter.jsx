@@ -98,6 +98,8 @@ const NotificationCenter = ({ isOpen, onClose }) => {
         return '⏰';
       case 'today_install':
         return '📅';
+      case 'followup_due':
+        return '📞';
       default:
         return '🔔';
     }
