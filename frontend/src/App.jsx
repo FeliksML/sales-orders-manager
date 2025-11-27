@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import GoogleMapsLoader from './components/GoogleMapsLoader'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -7,6 +7,32 @@ import LoadingSpinner from './components/ui/LoadingSpinner'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import SyncStatus from './components/SyncStatus'
 import ErrorBoundary from './components/ErrorBoundary'
+
+// Version check - auto-refresh when new version is deployed
+const checkForUpdates = async () => {
+  try {
+    // Fetch version.json with cache-busting query string
+    const response = await fetch(`/version.json?t=${Date.now()}`)
+    if (!response.ok) return
+    
+    const data = await response.json()
+    const serverVersion = data.version
+    const storedVersion = localStorage.getItem('app_version')
+    
+    if (storedVersion && storedVersion !== serverVersion) {
+      console.log('🔄 New version detected, refreshing...')
+      localStorage.setItem('app_version', serverVersion)
+      // Force hard refresh to bypass all caches
+      window.location.reload(true)
+    } else if (!storedVersion) {
+      // First visit, just store the version
+      localStorage.setItem('app_version', serverVersion)
+    }
+  } catch (error) {
+    // Silently fail - version check is not critical
+    console.log('Version check skipped:', error.message)
+  }
+}
 
 // Lazy load route components for code splitting
 const Signup = lazy(() => import('./pages/Signup'))
@@ -22,6 +48,11 @@ const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 const Import = lazy(() => import('./pages/Import'))
 
 function App() {
+  // Check for updates on mount
+  useEffect(() => {
+    checkForUpdates()
+  }, [])
+
   return (
     <ErrorBoundary>
       <GoogleMapsLoader>
