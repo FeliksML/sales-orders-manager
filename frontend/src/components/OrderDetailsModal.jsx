@@ -98,7 +98,18 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
 
     setIsSubmitting(true)
     try {
-      await onUpdate(order.orderid, formData)
+      // Clean up form data - convert empty strings to null for numeric fields
+      const cleanedData = {
+        ...formData,
+        monthly_total: formData.monthly_total === '' ? null : parseFloat(formData.monthly_total) || null,
+        initial_payment: formData.initial_payment === '' ? null : parseFloat(formData.initial_payment) || null,
+        internet_tier: formData.internet_tier === '' ? null : formData.internet_tier,
+        customer_security_code: formData.customer_security_code === '' ? null : formData.customer_security_code,
+        job_number: formData.job_number === '' ? null : formData.job_number,
+        notes: formData.notes === '' ? null : formData.notes,
+      }
+      
+      await onUpdate(order.orderid, cleanedData)
       // Update local state is already done via formData
       setIsEditing(false)
       setShowReschedule(false)
@@ -118,7 +129,14 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     const updatedData = {
       ...formData,
       install_date: twoDaysAgo.toISOString().split('T')[0],
-      install_time: now.toTimeString().split(' ')[0].substring(0, 5)
+      install_time: now.toTimeString().split(' ')[0].substring(0, 5),
+      // Clean up numeric fields
+      monthly_total: formData.monthly_total === '' ? null : parseFloat(formData.monthly_total) || null,
+      initial_payment: formData.initial_payment === '' ? null : parseFloat(formData.initial_payment) || null,
+      internet_tier: formData.internet_tier === '' ? null : formData.internet_tier,
+      customer_security_code: formData.customer_security_code === '' ? null : formData.customer_security_code,
+      job_number: formData.job_number === '' ? null : formData.job_number,
+      notes: formData.notes === '' ? null : formData.notes,
     }
 
     setIsSubmitting(true)
