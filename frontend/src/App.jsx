@@ -8,6 +8,25 @@ import PWAInstallPrompt from './components/PWAInstallPrompt'
 import SyncStatus from './components/SyncStatus'
 import ErrorBoundary from './components/ErrorBoundary'
 
+// Kill old service workers and clear caches
+const killOldServiceWorkers = async () => {
+  if ('serviceWorker' in navigator) {
+    try {
+      // Register the kill-switch service worker to replace any old ones
+      const registration = await navigator.serviceWorker.register('/sw.js', { 
+        updateViaCache: 'none' 
+      })
+      
+      // Force update check
+      registration.update()
+      
+      console.log('🧹 Service worker cleanup initiated')
+    } catch (error) {
+      console.log('Service worker registration skipped:', error.message)
+    }
+  }
+}
+
 // Version check - auto-refresh when new version is deployed
 const checkForUpdates = async () => {
   try {
@@ -48,8 +67,9 @@ const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 const Import = lazy(() => import('./pages/Import'))
 
 function App() {
-  // Check for updates on mount
+  // Check for updates and clean up old service workers on mount
   useEffect(() => {
+    killOldServiceWorkers()
     checkForUpdates()
   }, [])
 
