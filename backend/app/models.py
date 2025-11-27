@@ -157,3 +157,27 @@ class ErrorLog(Base):
 
     # Timestamps
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
+class CommissionSettings(Base):
+    __tablename__ = 'commission_settings'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.userid'), unique=True, nullable=False)
+
+    # AE Type and New Hire status
+    ae_type = Column(String(50), default='Account Executive', nullable=False)  # 'Account Executive' or 'Sr Account Executive'
+    is_new_hire = Column(Boolean, default=False, nullable=False)
+    new_hire_month = Column(Integer, nullable=True)  # 1-6 for ramp period
+
+    # Rate overrides (JSON) - allows users to customize commission rates
+    # Structure: { "internet": 100, "mobile": 75, "voice": 75, "video": 60, "mrr": 0.25, ... }
+    rate_overrides = Column(JSON, nullable=True)
+
+    # Value overrides (JSON) - allows users to correct auto-calculated totals
+    # Structure: { "internet": 15, "mobile": 10, "voice": 8, "video": 5, "mrr": 2500, ... }
+    value_overrides = Column(JSON, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

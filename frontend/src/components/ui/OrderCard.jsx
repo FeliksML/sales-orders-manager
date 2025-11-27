@@ -1,7 +1,8 @@
-import { Calendar, MapPin, Phone, Mail, Package, Check } from 'lucide-react'
+import { Calendar, MapPin, Phone, Mail, Package, Check, DollarSign } from 'lucide-react'
 import { format } from 'date-fns'
 import { getInstallStatus, isDateToday, isDatePast, formatDate, DATE_FORMATS } from '@sales-order-manager/shared'
 import CustomCheckbox from './CustomCheckbox'
+import { estimateOrderCommission, formatCommission } from '../../utils/commissionUtils'
 
 function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
   const status = getInstallStatus(order.install_date)
@@ -10,6 +11,9 @@ function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
 
   const statusColor = status === 'installed' ? 'green' : status === 'today' ? 'yellow' : 'blue'
   const statusText = status === 'installed' ? 'Installed' : status === 'today' ? 'Today' : 'Pending'
+
+  // Calculate estimated commission for this order
+  const estimatedCommission = estimateOrderCommission(order)
 
   const products = []
   if (order.has_internet) products.push('Internet')
@@ -124,10 +128,25 @@ function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
         </div>
       )}
 
-      {/* Reference Numbers */}
+      {/* Reference Numbers & Commission */}
       <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-        <span className="text-white/50">Ref: {order.spectrum_reference}</span>
-        <span className="text-white/50">Acct: {order.customer_account_number}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-white/50">Ref: {order.spectrum_reference}</span>
+          <span className="text-white/50">Acct: {order.customer_account_number}</span>
+        </div>
+        
+        {/* Commission Estimate Badge */}
+        {estimatedCommission > 0 && (
+          <div 
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25"
+            title="Estimated commission (actual may vary based on monthly tier)"
+          >
+            <DollarSign size={12} className="text-emerald-400" />
+            <span className="text-emerald-300 font-semibold" style={{ fontFamily: "'Space Mono', monospace" }}>
+              {formatCommission(estimatedCommission)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   )

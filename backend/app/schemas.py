@@ -230,3 +230,129 @@ class PaginatedErrorLogResponse(BaseModel):
 class PaginatedUserResponse(BaseModel):
     data: List[AdminUserResponse]
     meta: PaginationMeta
+
+
+# Commission Settings Schemas
+class CommissionSettingsBase(BaseModel):
+    ae_type: str = "Account Executive"  # 'Account Executive' or 'Sr Account Executive'
+    is_new_hire: bool = False
+    new_hire_month: Optional[int] = None  # 1-6 for ramp period
+    rate_overrides: Optional[Dict[str, Any]] = None
+    value_overrides: Optional[Dict[str, Any]] = None
+
+
+class CommissionSettingsUpdate(BaseModel):
+    ae_type: Optional[str] = None
+    is_new_hire: Optional[bool] = None
+    new_hire_month: Optional[int] = None
+    rate_overrides: Optional[Dict[str, Any]] = None
+    value_overrides: Optional[Dict[str, Any]] = None
+
+
+class CommissionSettingsResponse(CommissionSettingsBase):
+    id: int
+    user_id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AutoTotalsResponse(BaseModel):
+    """Auto-aggregated product counts from orders with override capability"""
+    # Auto-calculated values
+    auto_internet: int = 0
+    auto_mobile: int = 0
+    auto_voice: int = 0
+    auto_video: int = 0
+    auto_mrr: float = 0.0
+    auto_wib: int = 0
+    auto_gig_internet: int = 0
+    auto_sbc: int = 0
+
+    # Effective values (override if set, otherwise auto)
+    internet: int = 0
+    mobile: int = 0
+    voice: int = 0
+    video: int = 0
+    mrr: float = 0.0
+    wib: int = 0
+    gig_internet: int = 0
+    sbc: int = 0
+
+    # Override flags
+    overrides: Dict[str, bool] = {}
+
+
+class ProductBreakdown(BaseModel):
+    """Commission breakdown for a single product type"""
+    product: str
+    count: int
+    rate: float
+    payout: float
+
+
+class EarningsResponse(BaseModel):
+    """Monthly commission earnings with breakdown"""
+    # Period info
+    period: str  # e.g., "November 2025"
+    period_start: date
+    period_end: date
+
+    # Totals
+    total_commission: float
+    psu_total: float
+    mrr_payout: float
+    alacarte_total: float
+    ramp_amount: float
+    sae_bonus: float
+
+    # Product breakdown
+    breakdown: List[ProductBreakdown]
+
+    # Comparison to last month
+    last_month_total: float
+    month_over_month_change: float
+    month_over_month_percent: float
+
+    # Order counts
+    eligible_orders: int
+    total_orders_this_month: int
+
+    # Current tier info
+    current_tier: str
+    sae_eligible: bool
+
+
+class RateTier(BaseModel):
+    """Rate tier for commission calculation"""
+    min_internet: int
+    max_internet: Optional[int]
+    internet_rate: float
+    mobile_rate: float
+    voice_rate: float
+    video_rate: float
+    mrr_rate: float
+
+
+class RateTableResponse(BaseModel):
+    """Commission rate tables"""
+    regular_rates: List[RateTier]
+    new_hire_rates: List[RateTier]
+    alacarte_rates: Dict[str, float]
+    ramp_table: Dict[int, float]  # month -> amount
+
+
+class OrderCommissionEstimate(BaseModel):
+    """Estimated commission for a single order"""
+    order_id: int
+    internet_payout: float
+    mobile_payout: float
+    voice_payout: float
+    video_payout: float
+    mrr_payout: float
+    wib_payout: float
+    gig_bonus: float
+    sbc_payout: float
+    total_estimate: float

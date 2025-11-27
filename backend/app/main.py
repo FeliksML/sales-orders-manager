@@ -14,6 +14,7 @@ from .scheduled_reports import router as scheduled_reports_router
 from .notifications import router as notifications_router
 from .audit import router as audit_router
 from .admin import router as admin_router
+from .commission import router as commission_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
@@ -124,6 +125,7 @@ app.include_router(scheduled_reports_router, prefix="/api/scheduled-reports", ta
 app.include_router(notifications_router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(audit_router, prefix="/api/audit", tags=["audit"])
 app.include_router(admin_router)
+app.include_router(commission_router, prefix="/api/commission", tags=["commission"])
 
 # Add security headers middleware (first, so it applies to all responses)
 app.add_middleware(SecurityHeadersMiddleware)

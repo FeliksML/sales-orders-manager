@@ -63,6 +63,7 @@ const Privacy = lazy(() => import('./pages/Privacy'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 const Import = lazy(() => import('./pages/Import'))
+const CommissionSettings = lazy(() => import('./pages/CommissionSettings'))
 
 function App() {
   // Check for updates and clean up old service workers on mount
@@ -119,6 +120,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <Import />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/commission-settings"
+                  element={
+                    <ProtectedRoute>
+                      <CommissionSettings />
                     </ProtectedRoute>
                   }
                 />

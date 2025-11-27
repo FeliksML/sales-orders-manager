@@ -7,6 +7,7 @@ import FilterBar from '../components/ui/FilterBar'
 import LoadingSpinner from '../components/ui/LoadingSpinner'
 import BulkActionsToolbar from '../components/ui/BulkActionsToolbar'
 import PullToRefresh from '../components/ui/PullToRefresh'
+import EarningsCard from '../components/EarningsCard'
 import { useOrders, useOrderStats } from '../hooks/useOrders'
 import { orderService } from '../services/orderService'
 
@@ -275,6 +276,12 @@ function Dashboard() {
             </p>
           </div>
         )}
+
+        {/* Earnings Section */}
+        <section className="mb-8">
+          <h2 className="text-white text-2xl font-bold mb-4">Earnings</h2>
+          <EarningsCard />
+        </section>
 
         {/* Statistics Section */}
         <section className="mb-8">

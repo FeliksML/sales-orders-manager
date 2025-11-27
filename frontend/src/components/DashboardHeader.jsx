@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield, FileUp } from 'lucide-react'
+import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield, FileUp, DollarSign } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
 import NotificationCenter from './NotificationCenter'
 
@@ -173,7 +173,18 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-gray-300 hover:bg-white/5 hover:text-white transition-colors"
                       >
                         <Settings size={16} />
-                        <span className="text-sm">Settings</span>
+                        <span className="text-sm">Notification Settings</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          navigate('/commission-settings')
+                          setIsUserMenuOpen(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
+                      >
+                        <DollarSign size={16} />
+                        <span className="text-sm">Commission Settings</span>
                       </button>
 
                       {/* Admin Panel - Only show for admin users */}

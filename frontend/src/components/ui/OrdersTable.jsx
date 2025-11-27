@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom'
 import {
   Hash, User, Briefcase, Package, Calendar,
   Wifi, Tv, Smartphone, Phone, Radio, Settings2,
-  ChevronDown, CheckCircle, Clock, AlertCircle
+  ChevronDown, CheckCircle, Clock, AlertCircle, DollarSign
 } from 'lucide-react'
 import Card from './Card'
 import CustomCheckbox from './CustomCheckbox'
 import OrderCard from './OrderCard'
+import { estimateOrderCommission, formatCommission } from '../../utils/commissionUtils'
 
 function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange }) {
   const [isMobile, setIsMobile] = useState(false)
@@ -20,7 +21,8 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
     customer_name: true,
     business_name: true,
     products: true,
-    install_date: true
+    install_date: true,
+    commission: true
   })
   const columnSettingsRef = useRef(null)
   const columnButtonRef = useRef(null)
@@ -294,7 +296,8 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                   { key: 'customer_name', label: 'Customer Name', icon: User },
                   { key: 'business_name', label: 'Business Name', icon: Briefcase },
                   { key: 'products', label: 'Products', icon: Package },
-                  { key: 'install_date', label: 'Install Date', icon: Calendar }
+                  { key: 'install_date', label: 'Install Date', icon: Calendar },
+                  { key: 'commission', label: 'Commission', icon: DollarSign }
                 ].map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
@@ -412,6 +415,14 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                   </div>
                 </th>
               )}
+              {visibleColumns.commission && (
+                <th className="text-left p-4 text-gray-400 font-semibold last:rounded-tr-lg">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Est. Commission
+                  </div>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -516,6 +527,29 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                         </div>
                         <span className="text-xs text-gray-500 ml-6">{order.install_time}</span>
                       </div>
+                    </td>
+                  )}
+                  {visibleColumns.commission && (
+                    <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
+                      {(() => {
+                        const commission = estimateOrderCommission(order)
+                        return commission > 0 ? (
+                          <div 
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25"
+                            title="Estimated commission (actual may vary based on monthly tier)"
+                          >
+                            <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                            <span 
+                              className="text-emerald-300 font-semibold text-sm"
+                              style={{ fontFamily: "'Space Mono', monospace" }}
+                            >
+                              {formatCommission(commission)}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-sm">-</span>
+                        )
+                      })()}
                     </td>
                   )}
                 </tr>
