@@ -8,8 +8,10 @@ import LoadingSpinner from '../components/ui/LoadingSpinner'
 import BulkActionsToolbar from '../components/ui/BulkActionsToolbar'
 import PullToRefresh from '../components/ui/PullToRefresh'
 import EarningsCard from '../components/EarningsCard'
+import GoalProgress from '../components/GoalProgress'
 import { useOrders, useOrderStats } from '../hooks/useOrders'
 import { useEarnings } from '../hooks/useCommission'
+import { useGoalProgress } from '../hooks/useGoals'
 import { orderService } from '../services/orderService'
 
 // Lazy load heavy components for better performance
@@ -22,6 +24,7 @@ const CalendarView = lazy(() => import('../components/CalendarView'))
 const BulkRescheduleModal = lazy(() => import('../components/BulkRescheduleModal'))
 const BulkDeleteModal = lazy(() => import('../components/BulkDeleteModal'))
 const BulkExportModal = lazy(() => import('../components/BulkExportModal'))
+const GoalSettingsModal = lazy(() => import('../components/GoalSettingsModal'))
 
 function Dashboard() {
   const [filters, setFilters] = useState({})
@@ -31,7 +34,9 @@ function Dashboard() {
   const [statsRefreshTrigger, setStatsRefreshTrigger] = useState(0)
   const { stats, loading: statsLoading, error: statsError } = useOrderStats(statsRefreshTrigger)
   const { currentInternetCount, refetch: refetchEarnings } = useEarnings()
+  const { refetch: refetchGoalProgress } = useGoalProgress()
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [isGoalSettingsModalOpen, setIsGoalSettingsModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
@@ -64,8 +69,8 @@ function Dashboard() {
       setIsOrderModalOpen(false)
       setSubmitSuccess(true)
 
-      // Refetch orders, stats, and earnings - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
+      // Refetch orders, stats, earnings, and goal progress - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
       
       // Trigger stats refresh
       setStatsRefreshTrigger(t => t + 1)
@@ -92,8 +97,8 @@ function Dashboard() {
       await orderService.updateOrder(orderId, orderData)
       console.log('Dashboard: Order updated successfully')
 
-      // Refetch orders, stats, and earnings - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
+      // Refetch orders, stats, earnings, and goal progress - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
       
       // Trigger stats refresh
       setStatsRefreshTrigger(t => t + 1)
@@ -124,8 +129,8 @@ function Dashboard() {
       await orderService.deleteOrder(orderId)
       console.log('Dashboard: Order deleted successfully')
 
-      // Refetch orders, stats, and earnings - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
+      // Refetch orders, stats, earnings, and goal progress - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
       
       // Trigger stats refresh
       setStatsRefreshTrigger(t => t + 1)
@@ -245,8 +250,13 @@ function Dashboard() {
 
   // Pull to refresh handler
   const handleRefresh = async () => {
-    await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
+    await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
     setStatsRefreshTrigger(t => t + 1)
+  }
+
+  // Goal save handler - refresh goal progress
+  const handleGoalSave = async () => {
+    await refetchGoalProgress()
   }
 
   return (
@@ -279,10 +289,13 @@ function Dashboard() {
           </div>
         )}
 
-        {/* Earnings Section */}
+        {/* Earnings & Goals Section */}
         <section className="mb-8">
           <h2 className="text-white text-2xl font-bold mb-4">Earnings</h2>
-          <EarningsCard />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <EarningsCard />
+            <GoalProgress onSettingsClick={() => setIsGoalSettingsModalOpen(true)} />
+          </div>
         </section>
 
         {/* Statistics Section */}
@@ -629,6 +642,15 @@ function Dashboard() {
             onClose={() => setIsBulkExportModalOpen(false)}
             onExport={handleBulkExport}
             selectedCount={selectedOrders.length}
+          />
+        </Suspense>
+
+        {/* Goal Settings Modal */}
+        <Suspense fallback={null}>
+          <GoalSettingsModal
+            isOpen={isGoalSettingsModalOpen}
+            onClose={() => setIsGoalSettingsModalOpen(false)}
+            onSave={handleGoalSave}
           />
         </Suspense>
       </div>

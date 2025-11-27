@@ -1,5 +1,5 @@
 from .database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary, DateTime, JSON, Float, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary, DateTime, JSON, Float, Numeric, UniqueConstraint
 from datetime import datetime
 
 class User(Base):
@@ -187,3 +187,27 @@ class CommissionSettings(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class SalesGoal(Base):
+    __tablename__ = 'sales_goals'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.userid'), nullable=False)
+
+    # Period (fiscal month - aligned with commission system)
+    year = Column(Integer, nullable=False)
+    month = Column(Integer, nullable=False)  # 1-12
+
+    # Targets (all optional - users choose what to track)
+    target_orders = Column(Integer, nullable=True)
+    target_revenue = Column(Float, nullable=True)  # MRR target
+    target_internet = Column(Integer, nullable=True)
+    target_mobile = Column(Integer, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Unique constraint per user per month
+    __table_args__ = (UniqueConstraint('user_id', 'year', 'month', name='uq_user_year_month'),)

@@ -383,3 +383,91 @@ class OrderCommissionEstimate(BaseModel):
     gig_bonus: float
     sbc_payout: float
     total_estimate: float
+
+
+# Sales Goal Schemas
+class SalesGoalBase(BaseModel):
+    """Base schema for sales goals"""
+    target_orders: Optional[int] = None
+    target_revenue: Optional[float] = None  # MRR target
+    target_internet: Optional[int] = None
+    target_mobile: Optional[int] = None
+
+
+class SalesGoalUpdate(SalesGoalBase):
+    """Schema for updating a sales goal"""
+    pass
+
+
+class SalesGoalResponse(SalesGoalBase):
+    """Schema for sales goal response"""
+    id: int
+    user_id: int
+    year: int
+    month: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class GoalProgressItem(BaseModel):
+    """Progress for a single goal metric"""
+    target: int
+    current: int
+    percentage: float
+    projected: int  # Pace projection
+    status: str  # 'green', 'yellow', 'red'
+    on_track: bool
+
+
+class GoalProgressResponse(BaseModel):
+    """Full progress response with all metrics"""
+    # Period info
+    period: str  # e.g., "November 2025"
+    year: int
+    month: int
+    days_elapsed: int
+    days_remaining: int
+    days_total: int
+    
+    # Goal exists?
+    has_goal: bool
+    
+    # Progress for each metric (only included if target is set)
+    orders: Optional[GoalProgressItem] = None
+    revenue: Optional[GoalProgressItem] = None
+    internet: Optional[GoalProgressItem] = None
+    mobile: Optional[GoalProgressItem] = None
+    
+    # Overall status
+    overall_status: str  # 'green', 'yellow', 'red', 'none'
+    goal_achieved: bool  # True if all targets met
+
+
+class GoalHistoryItem(BaseModel):
+    """Historical goal achievement for a single month"""
+    year: int
+    month: int
+    period: str  # e.g., "October 2025"
+    had_goal: bool
+    achieved: bool
+    # Breakdown if goal existed
+    orders_target: Optional[int] = None
+    orders_actual: Optional[int] = None
+    revenue_target: Optional[float] = None
+    revenue_actual: Optional[float] = None
+    internet_target: Optional[int] = None
+    internet_actual: Optional[int] = None
+    mobile_target: Optional[int] = None
+    mobile_actual: Optional[int] = None
+
+
+class GoalHistoryResponse(BaseModel):
+    """Historical goal achievement summary"""
+    total_months: int
+    months_with_goals: int
+    goals_achieved: int
+    achievement_rate: float  # Percentage
+    history: List[GoalHistoryItem]
