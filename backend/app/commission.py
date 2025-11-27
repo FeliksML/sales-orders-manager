@@ -8,11 +8,31 @@ from .models import CommissionSettings, Order, User
 from .schemas import (
     CommissionSettingsResponse, CommissionSettingsUpdate,
     AutoTotalsResponse, EarningsResponse, ProductBreakdown,
-    RateTableResponse, RateTier, OrderCommissionEstimate
+    RateTableResponse, RateTier, OrderCommissionEstimate, TaxBreakdown
 )
 from .auth import get_current_user
 
 router = APIRouter()
+
+# ============================================================================
+# TAX RATES
+# ============================================================================
+
+TAX_RATES = {
+    "social_security": 0.062,  # 6.2%
+    "medicare": 0.0145,  # 1.45%
+}
+
+# Federal tax brackets for 2024 (simplified - using marginal rates)
+FEDERAL_TAX_BRACKETS = {
+    0.10: "10%",
+    0.12: "12%",
+    0.22: "22%",
+    0.24: "24%",
+    0.32: "32%",
+    0.35: "35%",
+    0.37: "37%",
+}
 
 # ============================================================================
 # RATE TABLES (from SMB Commission Calculator)
@@ -136,13 +156,46 @@ def get_or_create_settings(db: Session, user_id: int) -> CommissionSettings:
             is_new_hire=False,
             new_hire_month=None,
             rate_overrides=None,
-            value_overrides=None
+            value_overrides=None,
+            federal_bracket=0.22,
+            state_code="CA",
+            state_tax_rate=0.093
         )
         db.add(settings)
         db.commit()
         db.refresh(settings)
     
     return settings
+
+
+def calculate_tax_breakdown(gross_commission: float, settings: CommissionSettings) -> TaxBreakdown:
+    """Calculate tax breakdown for commission"""
+    # Get tax rates from settings
+    federal_rate = float(settings.federal_bracket) if settings.federal_bracket else 0.22
+    state_rate = float(settings.state_tax_rate) if settings.state_tax_rate else 0.093
+    state_code = settings.state_code or "CA"
+    
+    # Calculate individual taxes
+    federal_tax = gross_commission * federal_rate
+    state_tax = gross_commission * state_rate
+    social_security = gross_commission * TAX_RATES["social_security"]
+    medicare = gross_commission * TAX_RATES["medicare"]
+    
+    total_tax = federal_tax + state_tax + social_security + medicare
+    net_commission = gross_commission - total_tax
+    
+    return TaxBreakdown(
+        gross_commission=round(gross_commission, 2),
+        federal_tax=round(federal_tax, 2),
+        federal_rate=federal_rate,
+        state_tax=round(state_tax, 2),
+        state_rate=state_rate,
+        state_code=state_code,
+        social_security=round(social_security, 2),
+        medicare=round(medicare, 2),
+        total_tax=round(total_tax, 2),
+        net_commission=round(net_commission, 2)
+    )
 
 
 # ============================================================================
@@ -485,6 +538,9 @@ def get_earnings(
     # Period string
     period = today.strftime("%B %Y")
     
+    # Calculate tax breakdown
+    tax_breakdown = calculate_tax_breakdown(total_commission, settings)
+    
     # Disable caching
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     
@@ -505,7 +561,8 @@ def get_earnings(
         eligible_orders=len(eligible_orders),
         total_orders_this_month=total_orders_this_month,
         current_tier=tier_str,
-        sae_eligible=sae_eligible
+        sae_eligible=sae_eligible,
+        tax_breakdown=tax_breakdown
     )
 
 

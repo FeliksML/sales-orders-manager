@@ -1,5 +1,5 @@
 from .database import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary, DateTime, JSON, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Boolean, Text, LargeBinary, DateTime, JSON, Float, Numeric
 from datetime import datetime
 
 class User(Base):
@@ -177,6 +177,11 @@ class CommissionSettings(Base):
     # Value overrides (JSON) - allows users to correct auto-calculated totals
     # Structure: { "internet": 15, "mobile": 10, "voice": 8, "video": 5, "mrr": 2500, ... }
     value_overrides = Column(JSON, nullable=True)
+
+    # Tax settings
+    federal_bracket = Column(Numeric(5, 4), default=0.22, nullable=False)  # 22% default
+    state_code = Column(String(2), default='CA', nullable=False)
+    state_tax_rate = Column(Numeric(5, 4), default=0.093, nullable=False)  # CA default 9.3%
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

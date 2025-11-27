@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Save, RotateCcw, DollarSign, User, Calendar, 
   Wifi, Smartphone, Phone, Tv, Radio, Package, Edit2, Check, X,
-  AlertCircle, Info
+  AlertCircle, Info, Receipt, Landmark, Building2, Shield, Heart
 } from 'lucide-react'
 import { commissionService } from '../services/commissionService'
+import { US_STATES, FEDERAL_TAX_BRACKETS, FIXED_TAX_RATES, formatTaxRate } from '../utils/stateTaxRates'
 
 function CommissionSettings() {
   const navigate = useNavigate()
@@ -17,7 +18,10 @@ function CommissionSettings() {
   const [settings, setSettings] = useState({
     ae_type: 'Account Executive',
     is_new_hire: false,
-    new_hire_month: 1
+    new_hire_month: 1,
+    federal_bracket: 0.22,
+    state_code: 'CA',
+    state_tax_rate: 0.093
   })
   
   // Auto totals state
@@ -46,7 +50,10 @@ function CommissionSettings() {
       setSettings({
         ae_type: settingsData.ae_type || 'Account Executive',
         is_new_hire: settingsData.is_new_hire || false,
-        new_hire_month: settingsData.new_hire_month || 1
+        new_hire_month: settingsData.new_hire_month || 1,
+        federal_bracket: settingsData.federal_bracket ?? 0.22,
+        state_code: settingsData.state_code || 'CA',
+        state_tax_rate: settingsData.state_tax_rate ?? 0.093
       })
       
       setAutoTotals(totalsData)
@@ -65,7 +72,10 @@ function CommissionSettings() {
       await commissionService.updateSettings({
         ae_type: settings.ae_type,
         is_new_hire: settings.is_new_hire,
-        new_hire_month: settings.is_new_hire ? settings.new_hire_month : null
+        new_hire_month: settings.is_new_hire ? settings.new_hire_month : null,
+        federal_bracket: settings.federal_bracket,
+        state_code: settings.state_code,
+        state_tax_rate: settings.state_tax_rate
       })
       setMessage({ type: 'success', text: 'Settings saved successfully!' })
       setTimeout(() => setMessage({ type: '', text: '' }), 3000)
@@ -75,6 +85,24 @@ function CommissionSettings() {
     } finally {
       setSaving(false)
     }
+  }
+
+  // Handle state selection change
+  const handleStateChange = (stateCode) => {
+    const selectedState = US_STATES.find(s => s.code === stateCode)
+    setSettings({
+      ...settings,
+      state_code: stateCode,
+      state_tax_rate: selectedState?.rate || 0
+    })
+  }
+
+  // Calculate effective tax rate
+  const calculateEffectiveTaxRate = () => {
+    return settings.federal_bracket + 
+           settings.state_tax_rate + 
+           FIXED_TAX_RATES.socialSecurity + 
+           FIXED_TAX_RATES.medicare
   }
 
   const handleStartEdit = (field, currentValue) => {
@@ -273,6 +301,137 @@ function CommissionSettings() {
           >
             <Save className="w-4 h-4" />
             {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+
+        {/* Tax Settings Card */}
+        <div 
+          className="rounded-2xl p-6 mb-6"
+          style={{
+            backgroundColor: 'rgba(0, 15, 33, 0.4)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(244, 63, 94, 0.2)',
+          }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-lg bg-rose-500/20">
+              <Receipt className="w-5 h-5 text-rose-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Tax Settings</h2>
+              <p className="text-sm text-gray-400">Configure estimated tax deductions</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Federal Tax Bracket */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                <div className="flex items-center gap-2">
+                  <Landmark className="w-4 h-4 text-rose-400" />
+                  Federal Tax Bracket
+                </div>
+              </label>
+              <select
+                value={settings.federal_bracket}
+                onChange={(e) => setSettings({ ...settings, federal_bracket: parseFloat(e.target.value) })}
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-rose-500 transition-colors"
+              >
+                {FEDERAL_TAX_BRACKETS.map(bracket => (
+                  <option key={bracket.rate} value={bracket.rate}>
+                    {bracket.label} Federal
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select your marginal federal tax bracket
+              </p>
+            </div>
+
+            {/* State Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-orange-400" />
+                  State
+                </div>
+              </label>
+              <select
+                value={settings.state_code}
+                onChange={(e) => handleStateChange(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-orange-500 transition-colors"
+              >
+                {US_STATES.map(state => (
+                  <option key={state.code} value={state.code}>
+                    {state.name} ({state.rate === 0 ? 'No tax' : formatTaxRate(state.rate)})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                State income tax: {formatTaxRate(settings.state_tax_rate)}
+              </p>
+            </div>
+          </div>
+
+          {/* Fixed Taxes Info */}
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-gray-400">Social Security</span>
+              </div>
+              <span className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Mono', monospace" }}>
+                6.2%
+              </span>
+              <p className="text-xs text-gray-500 mt-1">Fixed rate (2024)</p>
+            </div>
+            
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex items-center gap-2 mb-2">
+                <Heart className="w-4 h-4 text-pink-400" />
+                <span className="text-sm text-gray-400">Medicare</span>
+              </div>
+              <span className="text-2xl font-bold text-white" style={{ fontFamily: "'Space Mono', monospace" }}>
+                1.45%
+              </span>
+              <p className="text-xs text-gray-500 mt-1">Fixed rate (2024)</p>
+            </div>
+          </div>
+
+          {/* Effective Tax Rate Summary */}
+          <div 
+            className="mt-6 p-4 rounded-xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.1) 0%, rgba(251, 146, 60, 0.1) 100%)',
+              border: '1px solid rgba(244, 63, 94, 0.2)'
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm text-gray-400">Total Effective Tax Rate</span>
+                <p className="text-xs text-gray-500 mt-1">
+                  Federal ({formatTaxRate(settings.federal_bracket)}) + 
+                  State ({formatTaxRate(settings.state_tax_rate)}) + 
+                  SS (6.2%) + 
+                  Medicare (1.45%)
+                </p>
+              </div>
+              <span 
+                className="text-3xl font-bold text-rose-400"
+                style={{ fontFamily: "'Space Mono', monospace" }}
+              >
+                {formatTaxRate(calculateEffectiveTaxRate())}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveSettings}
+            disabled={saving}
+            className="mt-6 flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 text-white font-medium hover:from-rose-700 hover:to-orange-600 transition-all disabled:opacity-50"
+          >
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Tax Settings'}
           </button>
         </div>
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw, ChevronDown, Receipt, Building2, Landmark, Shield, Heart } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { commissionService } from '../services/commissionService'
+import { getStateByCode } from '../utils/stateTaxRates'
 
 function EarningsCard() {
   const navigate = useNavigate()
@@ -9,6 +10,7 @@ function EarningsCard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [showTaxBreakdown, setShowTaxBreakdown] = useState(false)
 
   const fetchEarnings = async () => {
     try {
@@ -201,6 +203,167 @@ function EarningsCard() {
             Tier: <span className="text-cyan-400">{earnings.current_tier}</span>
           </p>
         </div>
+
+        {/* Tax Toggle Section */}
+        {earnings.tax_breakdown && (
+          <div className="mb-6">
+            {/* Toggle Button */}
+            <button
+              onClick={() => setShowTaxBreakdown(!showTaxBreakdown)}
+              className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-gradient-to-r from-rose-500/10 to-orange-500/10 border border-rose-500/20 hover:border-rose-500/40 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-rose-500/20">
+                  <Receipt className="w-4 h-4 text-rose-400" />
+                </div>
+                <div className="text-left">
+                  <span className="text-sm font-medium text-white">Tax Breakdown</span>
+                  <p className="text-xs text-gray-400">
+                    {showTaxBreakdown ? 'Hide' : 'Show'} estimated tax deductions
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {!showTaxBreakdown && (
+                  <span className="text-sm font-bold text-emerald-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    Net: {formatCurrency(earnings.tax_breakdown.net_commission)}
+                  </span>
+                )}
+                <ChevronDown 
+                  className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${showTaxBreakdown ? 'rotate-180' : ''}`}
+                />
+              </div>
+            </button>
+
+            {/* Animated Tax Breakdown Panel */}
+            <div 
+              className={`overflow-hidden transition-all duration-500 ease-out ${
+                showTaxBreakdown ? 'max-h-[500px] opacity-100 mt-3' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div 
+                className="p-4 rounded-xl space-y-3"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.08) 0%, rgba(251, 146, 60, 0.08) 100%)',
+                  border: '1px solid rgba(244, 63, 94, 0.15)'
+                }}
+              >
+                {/* Gross Commission */}
+                <div className="flex items-center justify-between py-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    <span className="text-sm text-gray-300">Gross Commission</span>
+                  </div>
+                  <span className="text-lg font-bold text-emerald-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    {formatCurrency(earnings.tax_breakdown.gross_commission)}
+                  </span>
+                </div>
+
+                {/* Federal Tax */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-rose-400" />
+                    <span className="text-sm text-gray-300">Federal Tax</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300">
+                      {(earnings.tax_breakdown.federal_rate * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-rose-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    -{formatCurrency(earnings.tax_breakdown.federal_tax)}
+                  </span>
+                </div>
+
+                {/* State Tax */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-orange-400" />
+                    <span className="text-sm text-gray-300">
+                      State Tax ({getStateByCode(earnings.tax_breakdown.state_code)?.name || earnings.tax_breakdown.state_code})
+                    </span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">
+                      {(earnings.tax_breakdown.state_rate * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-orange-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    -{formatCurrency(earnings.tax_breakdown.state_tax)}
+                  </span>
+                </div>
+
+                {/* Social Security */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm text-gray-300">Social Security</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                      6.2%
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-amber-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    -{formatCurrency(earnings.tax_breakdown.social_security)}
+                  </span>
+                </div>
+
+                {/* Medicare */}
+                <div className="flex items-center justify-between py-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-pink-400" />
+                    <span className="text-sm text-gray-300">Medicare</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300">
+                      1.45%
+                    </span>
+                  </div>
+                  <span className="text-sm font-semibold text-pink-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    -{formatCurrency(earnings.tax_breakdown.medicare)}
+                  </span>
+                </div>
+
+                {/* Total Tax */}
+                <div className="flex items-center justify-between py-2 bg-white/5 -mx-4 px-4 rounded-lg">
+                  <span className="text-sm font-medium text-gray-300">Total Estimated Taxes</span>
+                  <span className="text-lg font-bold text-rose-400" style={{ fontFamily: "'Space Mono', monospace" }}>
+                    -{formatCurrency(earnings.tax_breakdown.total_tax)}
+                  </span>
+                </div>
+
+                {/* Net Take-Home */}
+                <div 
+                  className="flex items-center justify-between py-3 px-4 -mx-4 rounded-xl mt-2"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(34, 197, 94, 0.2) 100%)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)'
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-emerald-400" />
+                    <span className="text-base font-semibold text-white">Estimated Take-Home</span>
+                  </div>
+                  <span 
+                    className="text-2xl font-bold"
+                    style={{
+                      fontFamily: "'Space Mono', monospace",
+                      background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent'
+                    }}
+                  >
+                    {formatCurrency(earnings.tax_breakdown.net_commission)}
+                  </span>
+                </div>
+
+                {/* Disclaimer */}
+                <p className="text-xs text-gray-500 text-center pt-2">
+                  * Estimates based on your tax settings. Actual taxes may vary.
+                  <button 
+                    onClick={() => navigate('/commission-settings')}
+                    className="text-cyan-400 hover:text-cyan-300 ml-1 underline"
+                  >
+                    Configure rates
+                  </button>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Breakdown by Product */}
         <div className="mb-4">

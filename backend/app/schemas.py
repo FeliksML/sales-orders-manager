@@ -239,6 +239,10 @@ class CommissionSettingsBase(BaseModel):
     new_hire_month: Optional[int] = None  # 1-6 for ramp period
     rate_overrides: Optional[Dict[str, Any]] = None
     value_overrides: Optional[Dict[str, Any]] = None
+    # Tax settings
+    federal_bracket: float = 0.22  # 22% default
+    state_code: str = "CA"
+    state_tax_rate: float = 0.093  # CA default 9.3%
 
 
 class CommissionSettingsUpdate(BaseModel):
@@ -247,6 +251,10 @@ class CommissionSettingsUpdate(BaseModel):
     new_hire_month: Optional[int] = None
     rate_overrides: Optional[Dict[str, Any]] = None
     value_overrides: Optional[Dict[str, Any]] = None
+    # Tax settings
+    federal_bracket: Optional[float] = None
+    state_code: Optional[str] = None
+    state_tax_rate: Optional[float] = None
 
 
 class CommissionSettingsResponse(CommissionSettingsBase):
@@ -293,6 +301,20 @@ class ProductBreakdown(BaseModel):
     payout: float
 
 
+class TaxBreakdown(BaseModel):
+    """Tax breakdown showing deductions from commission"""
+    gross_commission: float
+    federal_tax: float
+    federal_rate: float
+    state_tax: float
+    state_rate: float
+    state_code: str
+    social_security: float  # 6.2%
+    medicare: float  # 1.45%
+    total_tax: float
+    net_commission: float
+
+
 class EarningsResponse(BaseModel):
     """Monthly commission earnings with breakdown"""
     # Period info
@@ -323,6 +345,9 @@ class EarningsResponse(BaseModel):
     # Current tier info
     current_tier: str
     sae_eligible: bool
+
+    # Tax breakdown (optional - included when user has tax settings)
+    tax_breakdown: Optional[TaxBreakdown] = None
 
 
 class RateTier(BaseModel):
