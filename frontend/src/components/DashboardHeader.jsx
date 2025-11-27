@@ -51,11 +51,11 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
         </Link>
 
         {/* Right: Actions + Account Controls */}
-        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
           {/* Primary Actions: Reports & Export */}
           <button
             onClick={onReportsClick}
-            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 sm:px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -65,12 +65,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Reports"
           >
             <Clock size={16} />
-            <span className="hidden min-[480px]:inline text-sm">Reports</span>
+            <span className="hidden min-[560px]:inline text-sm">Reports</span>
           </button>
 
           <button
             onClick={onExportClick}
-            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 sm:px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -80,12 +80,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Export"
           >
             <FileBarChart size={16} />
-            <span className="hidden min-[400px]:inline text-sm">Export</span>
+            <span className="hidden min-[480px]:inline text-sm">Export</span>
           </button>
 
           <button
             onClick={() => navigate('/import')}
-            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 sm:px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(5, 150, 105, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -95,7 +95,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Import PDF"
           >
             <FileUp size={16} />
-            <span className="hidden min-[520px]:inline text-sm">Import</span>
+            <span className="hidden min-[420px]:inline text-sm">Import</span>
           </button>
 
           {/* Notification Bell */}
@@ -104,7 +104,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
               setIsNotificationCenterOpen(true)
               loadUnreadCount()
             }}
-            className="flex-1 relative flex items-center justify-center h-10 min-w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="relative flex items-center justify-center h-10 w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -122,10 +122,10 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
           </button>
 
           {/* User Menu */}
-          <div className="flex-1 relative">
+          <div className="relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="w-full flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+                className="flex items-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
                 style={{
                   backgroundColor: 'rgba(0, 15, 33, 0.3)',
                   backdropFilter: 'blur(20px)',
