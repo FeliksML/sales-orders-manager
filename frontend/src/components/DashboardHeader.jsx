@@ -51,7 +51,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
         </Link>
 
         {/* Right: Actions + Account Controls */}
-        <div className="flex items-center gap-3 flex-wrap justify-end ml-auto">
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
           {/* Primary Actions: Reports & Export */}
           <button
             onClick={onReportsClick}
@@ -100,33 +100,31 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             <span className="hidden min-[700px]:inline text-sm">Import PDF</span>
           </button>
 
-          {/* Secondary Controls: Notifications, Settings, User */}
-          <div className="flex items-center gap-2">
-            {/* Notification Bell */}
-            <button
-              onClick={() => {
-                setIsNotificationCenterOpen(true)
-                loadUnreadCount()
-              }}
-              className="relative flex items-center justify-center h-10 w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
-              style={{
-                backgroundColor: 'rgba(0, 15, 33, 0.3)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(0, 200, 255, 0.3)',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-              }}
-              title="Notifications"
-            >
-              <Bell size={18} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
+          {/* Notification Bell */}
+          <button
+            onClick={() => {
+              setIsNotificationCenterOpen(true)
+              loadUnreadCount()
+            }}
+            className="relative flex items-center justify-center h-10 w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            style={{
+              backgroundColor: 'rgba(0, 15, 33, 0.3)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(0, 200, 255, 0.3)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+            }}
+            title="Notifications"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
 
-            {/* User Menu */}
-            <div className="relative">
+          {/* User Menu */}
+          <div className="relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="flex items-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
@@ -209,7 +207,6 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
                 </>
               )}
             </div>
-          </div>
         </div>
       </div>
 
