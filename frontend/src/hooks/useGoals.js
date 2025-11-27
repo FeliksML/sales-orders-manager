@@ -81,7 +81,11 @@ export function useGoal() {
         target_psu: null,
         target_revenue: null,
         target_internet: null,
-        target_mobile: null
+        target_mobile: null,
+        target_tv: null,
+        target_voice: null,
+        target_sbc: null,
+        target_wib: null
       } : null)
     } catch (err) {
       console.error('Failed to clear goal:', err)

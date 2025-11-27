@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, Target, Layers, DollarSign, Wifi, Smartphone, Save, RotateCcw, Zap, TrendingUp, Award } from 'lucide-react'
+import { X, Target, Layers, DollarSign, Wifi, Smartphone, Tv, Phone, Headphones, Radio, Save, RotateCcw, Zap, TrendingUp, Award } from 'lucide-react'
 import { useGoal } from '../hooks/useGoals'
 
 // Preset configurations
@@ -12,6 +12,10 @@ const PRESETS = [
     psu: 30,
     internet: 12,
     mobile: 8,
+    tv: 5,
+    voice: 8,
+    sbc: 3,
+    wib: 2,
     revenue: 3000
   },
   { 
@@ -21,6 +25,10 @@ const PRESETS = [
     psu: 50,
     internet: 20,
     mobile: 15,
+    tv: 10,
+    voice: 15,
+    sbc: 5,
+    wib: 4,
     revenue: 5000
   },
   { 
@@ -30,6 +38,10 @@ const PRESETS = [
     psu: 80,
     internet: 35,
     mobile: 25,
+    tv: 18,
+    voice: 25,
+    sbc: 10,
+    wib: 8,
     revenue: 8000
   }
 ]
@@ -44,7 +56,11 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
     target_psu: '',
     target_revenue: '',
     target_internet: '',
-    target_mobile: ''
+    target_mobile: '',
+    target_tv: '',
+    target_voice: '',
+    target_sbc: '',
+    target_wib: ''
   })
   
   // Initialize form when goal loads
@@ -54,7 +70,11 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
         target_psu: goal.target_psu || '',
         target_revenue: goal.target_revenue || '',
         target_internet: goal.target_internet || '',
-        target_mobile: goal.target_mobile || ''
+        target_mobile: goal.target_mobile || '',
+        target_tv: goal.target_tv || '',
+        target_voice: goal.target_voice || '',
+        target_sbc: goal.target_sbc || '',
+        target_wib: goal.target_wib || ''
       })
     }
   }, [goal])
@@ -71,7 +91,11 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
       target_psu: preset.psu,
       target_revenue: preset.revenue,
       target_internet: preset.internet,
-      target_mobile: preset.mobile
+      target_mobile: preset.mobile,
+      target_tv: preset.tv,
+      target_voice: preset.voice,
+      target_sbc: preset.sbc,
+      target_wib: preset.wib
     })
     setMessage({ type: 'info', text: `Applied "${preset.name}" preset` })
     setTimeout(() => setMessage({ type: '', text: '' }), 2000)
@@ -85,7 +109,11 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
         target_psu: formData.target_psu === '' ? null : Number(formData.target_psu),
         target_revenue: formData.target_revenue === '' ? null : Number(formData.target_revenue),
         target_internet: formData.target_internet === '' ? null : Number(formData.target_internet),
-        target_mobile: formData.target_mobile === '' ? null : Number(formData.target_mobile)
+        target_mobile: formData.target_mobile === '' ? null : Number(formData.target_mobile),
+        target_tv: formData.target_tv === '' ? null : Number(formData.target_tv),
+        target_voice: formData.target_voice === '' ? null : Number(formData.target_voice),
+        target_sbc: formData.target_sbc === '' ? null : Number(formData.target_sbc),
+        target_wib: formData.target_wib === '' ? null : Number(formData.target_wib)
       }
       
       await updateGoal(goalData)
@@ -114,7 +142,11 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
         target_psu: '',
         target_revenue: '',
         target_internet: '',
-        target_mobile: ''
+        target_mobile: '',
+        target_tv: '',
+        target_voice: '',
+        target_sbc: '',
+        target_wib: ''
       })
       setMessage({ type: 'success', text: 'Goals cleared' })
       setTimeout(() => setMessage({ type: '', text: '' }), 2000)
@@ -299,6 +331,106 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
                   onChange={(e) => handleChange('target_mobile', e.target.value)}
                   placeholder="e.g. 15"
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                  style={{ fontFamily: "'Space Mono', monospace" }}
+                />
+              </div>
+            </div>
+            
+            {/* TV */}
+            <div className="flex items-center gap-3">
+              <div 
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(219, 39, 119, 0.2) 100%)',
+                  border: '1px solid rgba(236, 72, 153, 0.3)'
+                }}
+              >
+                <Tv className="w-5 h-5 text-pink-400" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm text-gray-300 mb-1">TV Units</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.target_tv}
+                  onChange={(e) => handleChange('target_tv', e.target.value)}
+                  placeholder="e.g. 10"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-pink-500 transition-colors"
+                  style={{ fontFamily: "'Space Mono', monospace" }}
+                />
+              </div>
+            </div>
+            
+            {/* Voice */}
+            <div className="flex items-center gap-3">
+              <div 
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.2) 0%, rgba(2, 132, 199, 0.2) 100%)',
+                  border: '1px solid rgba(14, 165, 233, 0.3)'
+                }}
+              >
+                <Phone className="w-5 h-5 text-sky-400" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm text-gray-300 mb-1">Voice Lines</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.target_voice}
+                  onChange={(e) => handleChange('target_voice', e.target.value)}
+                  placeholder="e.g. 15"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-sky-500 transition-colors"
+                  style={{ fontFamily: "'Space Mono', monospace" }}
+                />
+              </div>
+            </div>
+            
+            {/* SBC */}
+            <div className="flex items-center gap-3">
+              <div 
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(234, 88, 12, 0.2) 100%)',
+                  border: '1px solid rgba(251, 146, 60, 0.3)'
+                }}
+              >
+                <Headphones className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm text-gray-300 mb-1">SBC Seats</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.target_sbc}
+                  onChange={(e) => handleChange('target_sbc', e.target.value)}
+                  placeholder="e.g. 5"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
+                  style={{ fontFamily: "'Space Mono', monospace" }}
+                />
+              </div>
+            </div>
+            
+            {/* WIB */}
+            <div className="flex items-center gap-3">
+              <div 
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)'
+                }}
+              >
+                <Radio className="w-5 h-5 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-sm text-gray-300 mb-1">WIB Units</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.target_wib}
+                  onChange={(e) => handleChange('target_wib', e.target.value)}
+                  placeholder="e.g. 4"
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-colors"
                   style={{ fontFamily: "'Space Mono', monospace" }}
                 />
               </div>

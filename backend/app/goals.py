@@ -138,7 +138,8 @@ def calculate_order_metrics(orders: list) -> dict:
         'mobile': sum(1 for o in orders if o.has_mobile and o.has_mobile > 0),
         'voice': sum(1 for o in orders if o.has_voice and o.has_voice > 0),
         'tv': sum(1 for o in orders if o.has_tv),
-        'sbc': sum(1 for o in orders if o.has_sbc and o.has_sbc > 0)
+        'sbc': sum(1 for o in orders if o.has_sbc and o.has_sbc > 0),
+        'wib': sum(1 for o in orders if o.has_wib)
     }
 
 
@@ -210,7 +211,11 @@ def get_goal_progress(
         goal.target_psu,
         goal.target_revenue,
         goal.target_internet,
-        goal.target_mobile
+        goal.target_mobile,
+        goal.target_tv,
+        goal.target_voice,
+        goal.target_sbc,
+        goal.target_wib
     ])
     
     if not has_goal:
@@ -235,6 +240,10 @@ def get_goal_progress(
     revenue_progress = None
     internet_progress = None
     mobile_progress = None
+    tv_progress = None
+    voice_progress = None
+    sbc_progress = None
+    wib_progress = None
     
     if goal.target_psu:
         psu_progress = calculate_progress_item(
@@ -256,8 +265,28 @@ def get_goal_progress(
             goal.target_mobile, metrics['mobile'], days_elapsed, days_total
         )
     
+    if goal.target_tv:
+        tv_progress = calculate_progress_item(
+            goal.target_tv, metrics['tv'], days_elapsed, days_total
+        )
+    
+    if goal.target_voice:
+        voice_progress = calculate_progress_item(
+            goal.target_voice, metrics['voice'], days_elapsed, days_total
+        )
+    
+    if goal.target_sbc:
+        sbc_progress = calculate_progress_item(
+            goal.target_sbc, metrics['sbc'], days_elapsed, days_total
+        )
+    
+    if goal.target_wib:
+        wib_progress = calculate_progress_item(
+            goal.target_wib, metrics['wib'], days_elapsed, days_total
+        )
+    
     # Calculate overall status
-    progress_items = [p for p in [psu_progress, revenue_progress, internet_progress, mobile_progress] if p]
+    progress_items = [p for p in [psu_progress, revenue_progress, internet_progress, mobile_progress, tv_progress, voice_progress, sbc_progress, wib_progress] if p]
     
     if not progress_items:
         overall_status = 'none'
@@ -290,6 +319,10 @@ def get_goal_progress(
         revenue=revenue_progress,
         internet=internet_progress,
         mobile=mobile_progress,
+        tv=tv_progress,
+        voice=voice_progress,
+        sbc=sbc_progress,
+        wib=wib_progress,
         overall_status=overall_status,
         goal_achieved=goal_achieved
     )
@@ -337,7 +370,11 @@ def get_goal_history(
             goal.target_psu if goal else None,
             goal.target_revenue if goal else None,
             goal.target_internet if goal else None,
-            goal.target_mobile if goal else None
+            goal.target_mobile if goal else None,
+            goal.target_tv if goal else None,
+            goal.target_voice if goal else None,
+            goal.target_sbc if goal else None,
+            goal.target_wib if goal else None
         ])
         
         if had_goal:
@@ -357,6 +394,14 @@ def get_goal_history(
                 achieved = False
             if goal.target_mobile and metrics['mobile'] < goal.target_mobile:
                 achieved = False
+            if goal.target_tv and metrics['tv'] < goal.target_tv:
+                achieved = False
+            if goal.target_voice and metrics['voice'] < goal.target_voice:
+                achieved = False
+            if goal.target_sbc and metrics['sbc'] < goal.target_sbc:
+                achieved = False
+            if goal.target_wib and metrics['wib'] < goal.target_wib:
+                achieved = False
             
             if achieved:
                 goals_achieved += 1
@@ -374,7 +419,15 @@ def get_goal_history(
                 internet_target=goal.target_internet,
                 internet_actual=metrics['internet'],
                 mobile_target=goal.target_mobile,
-                mobile_actual=metrics['mobile']
+                mobile_actual=metrics['mobile'],
+                tv_target=goal.target_tv,
+                tv_actual=metrics['tv'],
+                voice_target=goal.target_voice,
+                voice_actual=metrics['voice'],
+                sbc_target=goal.target_sbc,
+                sbc_actual=metrics['sbc'],
+                wib_target=goal.target_wib,
+                wib_actual=metrics['wib']
             ))
         else:
             history.append(GoalHistoryItem(
@@ -418,6 +471,10 @@ def clear_goal(
         goal.target_revenue = None
         goal.target_internet = None
         goal.target_mobile = None
+        goal.target_tv = None
+        goal.target_voice = None
+        goal.target_sbc = None
+        goal.target_wib = None
         goal.updated_at = datetime.utcnow()
         db.commit()
     

@@ -395,6 +395,10 @@ class SalesGoalBase(BaseModel):
     target_revenue: Optional[float] = None  # MRR target
     target_internet: Optional[int] = None
     target_mobile: Optional[int] = None
+    target_tv: Optional[int] = None
+    target_voice: Optional[int] = None
+    target_sbc: Optional[int] = None
+    target_wib: Optional[int] = None
 
 
 class SalesGoalUpdate(SalesGoalBase):
@@ -443,6 +447,10 @@ class GoalProgressResponse(BaseModel):
     revenue: Optional[GoalProgressItem] = None
     internet: Optional[GoalProgressItem] = None
     mobile: Optional[GoalProgressItem] = None
+    tv: Optional[GoalProgressItem] = None
+    voice: Optional[GoalProgressItem] = None
+    sbc: Optional[GoalProgressItem] = None
+    wib: Optional[GoalProgressItem] = None
     
     # Overall status
     overall_status: str  # 'green', 'yellow', 'red', 'none'
@@ -465,6 +473,14 @@ class GoalHistoryItem(BaseModel):
     internet_actual: Optional[int] = None
     mobile_target: Optional[int] = None
     mobile_actual: Optional[int] = None
+    tv_target: Optional[int] = None
+    tv_actual: Optional[int] = None
+    voice_target: Optional[int] = None
+    voice_actual: Optional[int] = None
+    sbc_target: Optional[int] = None
+    sbc_actual: Optional[int] = None
+    wib_target: Optional[int] = None
+    wib_actual: Optional[int] = None
 
 
 class GoalHistoryResponse(BaseModel):
