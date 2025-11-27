@@ -1,11 +1,11 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
-import { format, parse, startOfWeek, getDay } from 'date-fns'
+import { format, parse, startOfWeek, getDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths } from 'date-fns'
 import enUS from 'date-fns/locale/en-US'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
-import { Wifi, Tv, Smartphone, Phone, Server, Building } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Wifi, Tv, Smartphone, Phone } from 'lucide-react'
 
 const locales = {
   'en-US': enUS,
@@ -20,51 +20,279 @@ const localizer = dateFnsLocalizer({
 })
 const DragAndDropCalendar = withDragAndDrop(Calendar)
 
+// Color mapping for product types
+const productColors = {
+  internet: { bg: '#3b82f6', border: '#2563eb', text: '#ffffff' }, // Blue
+  tv: { bg: '#a855f7', border: '#9333ea', text: '#ffffff' }, // Purple
+  mobile: { bg: '#22c55e', border: '#16a34a', text: '#ffffff' }, // Green
+  voice: { bg: '#f97316', border: '#ea580c', text: '#ffffff' }, // Orange
+  wib: { bg: '#6366f1', border: '#4f46e5', text: '#ffffff' }, // Indigo
+  sbc: { bg: '#ec4899', border: '#db2777', text: '#ffffff' }, // Pink
+  default: { bg: '#6b7280', border: '#4b5563', text: '#ffffff' } // Gray
+}
+
+// Helper function to determine primary product type for color coding
+const getPrimaryProductType = (order) => {
+  if (order.has_internet) return 'internet'
+  if (order.has_tv) return 'tv'
+  if (order.has_mobile > 0) return 'mobile'
+  if (order.has_voice > 0) return 'voice'
+  if (order.has_wib) return 'wib'
+  if (order.has_sbc > 0) return 'sbc'
+  return 'default'
+}
+
+// Helper to get products list
+const getProductsList = (order) => {
+  const products = []
+  if (order.has_internet) products.push('Internet')
+  if (order.has_tv) products.push('TV')
+  if (order.has_mobile > 0) products.push(`Mobile (${order.has_mobile})`)
+  if (order.has_voice > 0) products.push(`Voice (${order.has_voice})`)
+  if (order.has_wib) products.push('WiB')
+  if (order.has_sbc > 0) products.push(`SBC (${order.has_sbc})`)
+  return products
+}
+
+// Mobile Calendar Component
+const MobileCalendarView = ({ orders, selectedDate, setSelectedDate, currentMonth, setCurrentMonth, onOrderClick, onDateClick, productColors }) => {
+  const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+  
+  // Get all days to display in the calendar grid
+  const calendarDays = useMemo(() => {
+    const start = startOfMonth(currentMonth)
+    const end = endOfMonth(currentMonth)
+    const days = eachDayOfInterval({ start, end })
+    
+    // Add padding days from previous month
+    const startDayOfWeek = start.getDay()
+    const paddingDays = []
+    for (let i = startDayOfWeek - 1; i >= 0; i--) {
+      const prevDate = new Date(start)
+      prevDate.setDate(prevDate.getDate() - (i + 1))
+      paddingDays.push(prevDate)
+    }
+    
+    // Add padding days for next month to complete the grid
+    const endDayOfWeek = end.getDay()
+    const trailingDays = []
+    for (let i = 1; i < 7 - endDayOfWeek; i++) {
+      const nextDate = new Date(end)
+      nextDate.setDate(nextDate.getDate() + i)
+      trailingDays.push(nextDate)
+    }
+    
+    return [...paddingDays, ...days, ...trailingDays]
+  }, [currentMonth])
+
+  // Get events for a specific date
+  const getEventsForDate = useCallback((date) => {
+    return orders.filter(order => {
+      const [year, month, day] = order.install_date.split('-').map(Number)
+      const orderDate = new Date(year, month - 1, day)
+      return isSameDay(orderDate, date)
+    })
+  }, [orders])
+
+  // Get events for selected date
+  const selectedDateEvents = useMemo(() => {
+    return getEventsForDate(selectedDate)
+  }, [selectedDate, getEventsForDate])
+
+  const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
+  const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
+  const handleToday = () => {
+    const today = new Date()
+    setCurrentMonth(today)
+    setSelectedDate(today)
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Compact Navigation Header */}
+      <div className="flex items-center justify-between mb-3 px-1">
+        <button
+          onClick={handleToday}
+          className="px-3 py-1.5 text-sm font-medium text-white/90 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+        >
+          Today
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrevMonth}
+            className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <span className="text-white font-semibold text-lg min-w-[140px] text-center">
+            {format(currentMonth, 'MMMM yyyy')}
+          </span>
+          <button
+            onClick={handleNextMonth}
+            className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+        <div className="w-[52px]" /> {/* Spacer for balance */}
+      </div>
+
+      {/* Compact Month Grid */}
+      <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden mb-3">
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 bg-blue-900/30">
+          {dayNames.map((day, i) => (
+            <div key={i} className="py-2 text-center text-white/70 text-sm font-semibold">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7">
+          {calendarDays.map((day, i) => {
+            const isCurrentMonth = isSameMonth(day, currentMonth)
+            const isSelected = isSameDay(day, selectedDate)
+            const isToday = isSameDay(day, new Date())
+            const dayEvents = getEventsForDate(day)
+            
+            // Get unique product types for dots (max 3)
+            const productTypes = [...new Set(dayEvents.map(e => getPrimaryProductType(e)))].slice(0, 3)
+
+            return (
+              <button
+                key={i}
+                onClick={() => setSelectedDate(day)}
+                className={`
+                  relative py-2 min-h-[52px] flex flex-col items-center justify-start gap-1
+                  transition-colors border-t border-white/5
+                  ${isCurrentMonth ? 'text-white' : 'text-white/30'}
+                  ${isSelected ? 'bg-blue-500/30' : 'hover:bg-white/5'}
+                  ${isToday && !isSelected ? 'bg-green-500/10' : ''}
+                `}
+              >
+                <span className={`
+                  text-sm font-medium
+                  ${isToday ? 'text-green-400 font-bold' : ''}
+                  ${isSelected ? 'text-white font-bold' : ''}
+                `}>
+                  {format(day, 'd')}
+                </span>
+                
+                {/* Event Dots */}
+                {productTypes.length > 0 && (
+                  <div className="flex gap-0.5">
+                    {productTypes.map((type, j) => (
+                      <div
+                        key={j}
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: productColors[type].bg }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Selected Date Header */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        <h3 className="text-white font-semibold">
+          {format(selectedDate, 'EEEE, MMM d')}
+        </h3>
+        <span className="text-white/60 text-sm">
+          {selectedDateEvents.length} {selectedDateEvents.length === 1 ? 'order' : 'orders'}
+        </span>
+      </div>
+
+      {/* Events List */}
+      <div className="flex-1 overflow-y-auto space-y-2 min-h-[150px] max-h-[300px]">
+        {selectedDateEvents.length === 0 ? (
+          <div className="text-center py-8 text-white/50">
+            <p>No orders scheduled</p>
+            <p className="text-sm mt-1">Tap + to add an order</p>
+          </div>
+        ) : (
+          selectedDateEvents.map(order => {
+            const productType = getPrimaryProductType(order)
+            const colors = productColors[productType]
+            const products = getProductsList(order)
+
+            return (
+              <button
+                key={order.orderid}
+                onClick={() => onOrderClick(order)}
+                className="w-full p-3 rounded-lg text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  backgroundColor: `${colors.bg}20`,
+                  borderLeft: `4px solid ${colors.bg}`
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
+                    style={{ backgroundColor: colors.bg }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-medium truncate">
+                      {order.customer_name}
+                    </p>
+                    <p className="text-white/70 text-sm truncate">
+                      {products.join(', ')}
+                    </p>
+                    {order.address && (
+                      <p className="text-white/50 text-xs truncate mt-1">
+                        {order.address}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </button>
+            )
+          })
+        )}
+      </div>
+
+      {/* Quick Add Button */}
+      <button
+        onClick={() => onDateClick(selectedDate)}
+        className="mt-3 w-full py-3 flex items-center justify-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-white font-medium transition-colors"
+      >
+        <Plus size={18} />
+        Add Order for {format(selectedDate, 'MMM d')}
+      </button>
+    </div>
+  )
+}
+
 const CalendarView = ({ orders, onOrderClick, onDateClick, onEventDrop }) => {
   const [view, setView] = useState('month')
   const [date, setDate] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 640 : false)
 
-  // Helper function to determine primary product type for color coding
-  const getPrimaryProductType = (order) => {
-    if (order.has_internet) return 'internet'
-    if (order.has_tv) return 'tv'
-    if (order.has_mobile > 0) return 'mobile'
-    if (order.has_voice > 0) return 'voice'
-    if (order.has_wib) return 'wib'
-    if (order.has_sbc > 0) return 'sbc'
-    return 'default'
-  }
-
-  // Color mapping for product types
-  const productColors = {
-    internet: { bg: '#3b82f6', border: '#2563eb', text: '#ffffff' }, // Blue
-    tv: { bg: '#a855f7', border: '#9333ea', text: '#ffffff' }, // Purple
-    mobile: { bg: '#22c55e', border: '#16a34a', text: '#ffffff' }, // Green
-    voice: { bg: '#f97316', border: '#ea580c', text: '#ffffff' }, // Orange
-    wib: { bg: '#6366f1', border: '#4f46e5', text: '#ffffff' }, // Indigo
-    sbc: { bg: '#ec4899', border: '#db2777', text: '#ffffff' }, // Pink
-    default: { bg: '#6b7280', border: '#4b5563', text: '#ffffff' } // Gray
-  }
+  // Mobile detection with resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Transform orders into calendar events
   const events = useMemo(() => {
     return orders.map(order => {
       const productType = getPrimaryProductType(order)
       const colors = productColors[productType]
-
-      // Create a display title with multiple products
-      const products = []
-      if (order.has_internet) products.push('Internet')
-      if (order.has_tv) products.push('TV')
-      if (order.has_mobile > 0) products.push(`Mobile (${order.has_mobile})`)
-      if (order.has_voice > 0) products.push(`Voice (${order.has_voice})`)
-      if (order.has_wib) products.push('WiB')
-      if (order.has_sbc > 0) products.push(`SBC (${order.has_sbc})`)
+      const products = getProductsList(order)
 
       // Parse date as LOCAL time, not UTC
-      // order.install_date is "YYYY-MM-DD" format
       const [year, month, day] = order.install_date.split('-').map(Number)
-      const localDate = new Date(year, month - 1, day) // month is 0-indexed in JS
+      const localDate = new Date(year, month - 1, day)
 
       return {
         id: order.orderid,
@@ -111,16 +339,52 @@ const CalendarView = ({ orders, onOrderClick, onDateClick, onEventDrop }) => {
   }, [onDateClick])
 
   // Handle event drop for rescheduling
-  const handleEventDrop = useCallback(({ event, start, end }) => {
-    // Call the parent handler with order ID and new date
+  const handleEventDrop = useCallback(({ event, start }) => {
     onEventDrop(event.resource.order.orderid, start)
   }, [onEventDrop])
 
-  // Handle navigation (TODAY, BACK, NEXT buttons)
+  // Handle navigation
   const handleNavigate = useCallback((newDate) => {
     setDate(newDate)
   }, [])
 
+  // Mobile View
+  if (isMobile) {
+    return (
+      <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-4 shadow-2xl">
+        {/* Compact Legend - Collapsible */}
+        <details className="mb-3">
+          <summary className="text-white/70 text-sm cursor-pointer hover:text-white transition-colors">
+            Product Colors
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.entries(productColors).filter(([key]) => key !== 'default').map(([type, colors]) => (
+              <div key={type} className="flex items-center gap-1.5">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: colors.bg }}
+                />
+                <span className="text-white/70 text-xs capitalize">{type}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+
+        <MobileCalendarView
+          orders={orders}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          currentMonth={currentMonth}
+          setCurrentMonth={setCurrentMonth}
+          onOrderClick={onOrderClick}
+          onDateClick={onDateClick}
+          productColors={productColors}
+        />
+      </div>
+    )
+  }
+
+  // Desktop View (existing implementation)
   return (
     <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 shadow-2xl">
       {/* Legend */}
