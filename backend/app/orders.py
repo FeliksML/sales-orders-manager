@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta, date
 import io
 from .database import get_db
-from .models import Order, User
+from .models import Order, User, Notification
 from .schemas import OrderCreate, OrderUpdate, OrderResponse, OrderStats, PaginatedOrderResponse, PaginationMeta
 from .auth import get_current_user, verify_recaptcha
 from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
@@ -861,6 +861,11 @@ def bulk_delete(
         reason="Bulk delete"
     )
 
+    # Delete related notifications first (to avoid foreign key constraint violation)
+    db.query(Notification).filter(
+        Notification.orderid.in_(request.order_ids)
+    ).delete(synchronize_session=False)
+
     # Delete all orders
     deleted_count = len(orders)
     for order in orders:
@@ -1043,6 +1048,11 @@ def delete_order(
         ip_address=None,
         reason="Order deleted"
     )
+
+    # Delete related notifications first (to avoid foreign key constraint violation)
+    db.query(Notification).filter(
+        Notification.orderid == order_id
+    ).delete(synchronize_session=False)
 
     db.delete(db_order)
     db.commit()
