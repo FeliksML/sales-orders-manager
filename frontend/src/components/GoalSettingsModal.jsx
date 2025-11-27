@@ -231,7 +231,7 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
             <label className="block text-sm font-medium text-gray-400 mb-3">
               Quick Presets
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-2">
               {PRESETS.map((preset) => (
                 <button
                   key={preset.name}
@@ -244,9 +244,9 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{preset.icon}</span>
-                    <span className="text-sm font-medium text-white">{preset.name}</span>
+                    <span className="text-sm font-medium text-white truncate">{preset.name}</span>
                   </div>
-                  <p className="text-xs text-gray-500">{preset.description}</p>
+                  <p className="text-xs text-gray-500 truncate">{preset.description}</p>
                 </button>
               ))}
             </div>
