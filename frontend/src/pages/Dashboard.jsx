@@ -27,6 +27,7 @@ const BulkRescheduleModal = lazy(() => import('../components/BulkRescheduleModal
 const BulkDeleteModal = lazy(() => import('../components/BulkDeleteModal'))
 const BulkExportModal = lazy(() => import('../components/BulkExportModal'))
 const GoalSettingsModal = lazy(() => import('../components/GoalSettingsModal'))
+const PerformanceInsights = lazy(() => import('../components/PerformanceInsights'))
 
 function Dashboard() {
   const [filters, setFilters] = useState({})
@@ -418,6 +419,17 @@ function Dashboard() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* Performance Insights Section */}
+        <section className="mb-8">
+          <Suspense fallback={
+            <div className="flex items-center justify-center p-8">
+              <LoadingSpinner />
+            </div>
+          }>
+            <PerformanceInsights />
+          </Suspense>
         </section>
 
         {/* Charts Section */}

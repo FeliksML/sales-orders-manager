@@ -131,5 +131,11 @@ export const orderService = {
       }
     })
     return response.data
+  },
+
+  // Get performance insights with comparisons and trends
+  getPerformanceInsights: async () => {
+    const response = await apiClient.get('/api/orders/performance-insights')
+    return response.data
   }
 }

@@ -555,3 +555,64 @@ class PaginatedFollowUpResponse(BaseModel):
     """Paginated list of follow-ups"""
     data: List[FollowUpResponse]
     meta: PaginationMeta
+
+
+# Performance Insights Schemas
+class PeriodMetrics(BaseModel):
+    """Metrics for a single time period"""
+    orders: int
+    internet: int
+    tv: int
+    mobile: int
+    voice: int
+    sbc: int
+    wib: int
+    psu: int
+    revenue: float
+
+
+class PerformanceComparison(BaseModel):
+    """Comparison between current and previous period"""
+    current: PeriodMetrics
+    previous: PeriodMetrics
+    change_percent: Dict[str, float]  # {orders: +12.5, internet: -5.0, ...}
+    change_absolute: Dict[str, float]
+
+
+class TrendDataPoint(BaseModel):
+    """Single data point in a trend series"""
+    period: str  # "Nov 2025", "Week 47"
+    orders: int
+    internet: int
+    mobile: int
+    psu: int
+    revenue: float
+
+
+class PersonalRecord(BaseModel):
+    """A personal best achievement"""
+    metric: str  # "orders", "psu", "revenue", "internet"
+    value: float
+    period: str  # "November 2025"
+    is_current_period: bool
+
+
+class PerformanceInsightsResponse(BaseModel):
+    """Comprehensive performance insights with comparisons and trends"""
+    # Period comparisons
+    month_comparison: PerformanceComparison
+    week_comparison: PerformanceComparison
+    
+    # Trend data (last 6 months + last 8 weeks)
+    monthly_trend: List[TrendDataPoint]
+    weekly_trend: List[TrendDataPoint]
+    
+    # Personal records
+    records: List[PersonalRecord]  # Best month, best week, highest PSU, etc.
+    
+    # Streaks
+    current_streak: int  # Consecutive months of growth
+    streak_type: str  # "growth" | "decline" | "none"
+    
+    # Smart insights (text-based)
+    insights: List[str]

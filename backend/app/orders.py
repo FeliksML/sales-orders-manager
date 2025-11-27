@@ -7,13 +7,17 @@ from datetime import datetime, timedelta, date
 import io
 from .database import get_db
 from .models import Order, User, Notification
-from .schemas import OrderCreate, OrderUpdate, OrderResponse, OrderStats, PaginatedOrderResponse, PaginationMeta
+from .schemas import (
+    OrderCreate, OrderUpdate, OrderResponse, OrderStats, PaginatedOrderResponse, PaginationMeta,
+    PerformanceInsightsResponse, PerformanceComparison, PeriodMetrics, TrendDataPoint, PersonalRecord
+)
 from .auth import get_current_user, verify_recaptcha
 from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
 from .email_service import send_export_email
 from .notification_service import send_order_details_email
 from . import audit_service
 from .pdf_extractor import extract_order_from_pdf, validate_pdf
+from .commission import get_fiscal_month_boundaries, get_previous_fiscal_month, is_order_in_fiscal_month
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -322,6 +326,388 @@ def get_delta_sync(
         updated_orders=updated_orders,
         deleted_order_ids=deleted_order_ids,
         sync_timestamp=current_timestamp
+    )
+
+
+# ============================================================================
+# PERFORMANCE INSIGHTS HELPERS
+# ============================================================================
+
+def calculate_psu_from_order(order) -> int:
+    """Calculate PSU (Primary Service Units) from a single order."""
+    psu = 0
+    if order.has_internet:
+        psu += 1
+    if order.has_voice and order.has_voice > 0:
+        psu += 1
+    if order.has_mobile and order.has_mobile > 0:
+        psu += 1
+    if order.has_tv:
+        psu += 1
+    if order.has_sbc and order.has_sbc > 0:
+        psu += 1
+    return psu
+
+
+def calculate_metrics_from_orders(orders: list) -> PeriodMetrics:
+    """Calculate all metrics from a list of orders."""
+    return PeriodMetrics(
+        orders=len(orders),
+        internet=sum(1 for o in orders if o.has_internet),
+        tv=sum(1 for o in orders if o.has_tv),
+        mobile=sum(1 for o in orders if o.has_mobile and o.has_mobile > 0),
+        voice=sum(1 for o in orders if o.has_voice and o.has_voice > 0),
+        sbc=sum(1 for o in orders if o.has_sbc and o.has_sbc > 0),
+        wib=sum(1 for o in orders if o.has_wib),
+        psu=sum(calculate_psu_from_order(o) for o in orders),
+        revenue=sum(o.monthly_total or 0 for o in orders)
+    )
+
+
+def calculate_change(current: float, previous: float) -> float:
+    """Calculate percentage change, handling division by zero."""
+    if previous == 0:
+        return 100.0 if current > 0 else 0.0
+    return round(((current - previous) / previous) * 100, 1)
+
+
+def get_week_boundaries(reference_date: date) -> tuple:
+    """Get ISO week boundaries (Monday to Sunday) for a given date."""
+    # Find Monday of this week
+    days_since_monday = reference_date.weekday()
+    week_start = reference_date - timedelta(days=days_since_monday)
+    week_end = week_start + timedelta(days=6)  # Sunday
+    return week_start, week_end
+
+
+def generate_insights(
+    month_comparison: PerformanceComparison,
+    week_comparison: PerformanceComparison,
+    records: list,
+    streak: int,
+    streak_type: str
+) -> list:
+    """Generate smart text insights based on performance data."""
+    insights = []
+    
+    # Month-over-month growth insight
+    order_change = month_comparison.change_percent.get("orders", 0)
+    if order_change > 20:
+        insights.append(f"Exceptional month! You're up {order_change:.0f}% in orders vs last month.")
+    elif order_change > 10:
+        insights.append(f"Strong performance! Orders are up {order_change:.0f}% vs last month.")
+    elif order_change > 0:
+        insights.append(f"Steady growth - orders up {order_change:.0f}% vs last month.")
+    elif order_change < -10:
+        insights.append(f"Orders are down {abs(order_change):.0f}% vs last month. Time to push!")
+    elif order_change < 0:
+        insights.append(f"Slight dip in orders ({order_change:.0f}%). You've got this!")
+    
+    # Streak insight
+    if streak >= 3 and streak_type == "growth":
+        insights.append(f"You're on a {streak}-month growth streak! Keep the momentum going.")
+    elif streak == 2 and streak_type == "growth":
+        insights.append("Two months of consecutive growth - you're building momentum!")
+    
+    # Personal record insight
+    current_records = [r for r in records if r.is_current_period]
+    if current_records:
+        record_names = [r.metric for r in current_records[:2]]
+        if len(record_names) == 1:
+            insights.append(f"New personal best in {record_names[0]}!")
+        else:
+            insights.append(f"Breaking records in {' and '.join(record_names)}!")
+    
+    # Product mix insights
+    internet_change = month_comparison.change_percent.get("internet", 0)
+    mobile_change = month_comparison.change_percent.get("mobile", 0)
+    
+    if internet_change < -5 and mobile_change > 10:
+        insights.append(f"Internet is down {abs(internet_change):.0f}%, but mobile is compensating with +{mobile_change:.0f}%.")
+    elif internet_change > 15:
+        insights.append(f"Internet sales are crushing it with +{internet_change:.0f}% growth!")
+    
+    # Week performance insight
+    week_order_change = week_comparison.change_percent.get("orders", 0)
+    if week_order_change > 50:
+        insights.append("This week is on fire! Way ahead of last week's pace.")
+    elif week_order_change < -30:
+        insights.append("Slower week so far. Time to pick up the pace!")
+    
+    # Limit to 4 insights max
+    return insights[:4]
+
+
+@router.get("/performance-insights", response_model=PerformanceInsightsResponse)
+def get_performance_insights(
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get comprehensive performance insights with comparisons and trends."""
+    user_id = current_user.userid
+    today = date.today()
+    
+    # Get all user orders for analysis
+    all_orders = db.query(Order).filter(Order.userid == user_id).all()
+    
+    # ========== MONTH COMPARISON ==========
+    # Current fiscal month
+    curr_start, curr_end, curr_label = get_fiscal_month_boundaries(today)
+    curr_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, curr_start, curr_end)]
+    curr_month_metrics = calculate_metrics_from_orders(curr_month_orders)
+    
+    # Previous fiscal month
+    prev_start, prev_end, prev_label = get_previous_fiscal_month(curr_start, curr_end)
+    prev_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, prev_start, prev_end)]
+    prev_month_metrics = calculate_metrics_from_orders(prev_month_orders)
+    
+    # Calculate month changes
+    month_change_percent = {
+        "orders": calculate_change(curr_month_metrics.orders, prev_month_metrics.orders),
+        "internet": calculate_change(curr_month_metrics.internet, prev_month_metrics.internet),
+        "tv": calculate_change(curr_month_metrics.tv, prev_month_metrics.tv),
+        "mobile": calculate_change(curr_month_metrics.mobile, prev_month_metrics.mobile),
+        "voice": calculate_change(curr_month_metrics.voice, prev_month_metrics.voice),
+        "psu": calculate_change(curr_month_metrics.psu, prev_month_metrics.psu),
+        "revenue": calculate_change(curr_month_metrics.revenue, prev_month_metrics.revenue),
+    }
+    month_change_absolute = {
+        "orders": curr_month_metrics.orders - prev_month_metrics.orders,
+        "internet": curr_month_metrics.internet - prev_month_metrics.internet,
+        "tv": curr_month_metrics.tv - prev_month_metrics.tv,
+        "mobile": curr_month_metrics.mobile - prev_month_metrics.mobile,
+        "voice": curr_month_metrics.voice - prev_month_metrics.voice,
+        "psu": curr_month_metrics.psu - prev_month_metrics.psu,
+        "revenue": curr_month_metrics.revenue - prev_month_metrics.revenue,
+    }
+    
+    month_comparison = PerformanceComparison(
+        current=curr_month_metrics,
+        previous=prev_month_metrics,
+        change_percent=month_change_percent,
+        change_absolute=month_change_absolute
+    )
+    
+    # ========== WEEK COMPARISON ==========
+    # Current week (Monday-Sunday)
+    curr_week_start, curr_week_end = get_week_boundaries(today)
+    curr_week_orders = [o for o in all_orders if curr_week_start <= o.install_date <= curr_week_end]
+    curr_week_metrics = calculate_metrics_from_orders(curr_week_orders)
+    
+    # Previous week
+    prev_week_start = curr_week_start - timedelta(days=7)
+    prev_week_end = curr_week_end - timedelta(days=7)
+    prev_week_orders = [o for o in all_orders if prev_week_start <= o.install_date <= prev_week_end]
+    prev_week_metrics = calculate_metrics_from_orders(prev_week_orders)
+    
+    week_change_percent = {
+        "orders": calculate_change(curr_week_metrics.orders, prev_week_metrics.orders),
+        "internet": calculate_change(curr_week_metrics.internet, prev_week_metrics.internet),
+        "tv": calculate_change(curr_week_metrics.tv, prev_week_metrics.tv),
+        "mobile": calculate_change(curr_week_metrics.mobile, prev_week_metrics.mobile),
+        "voice": calculate_change(curr_week_metrics.voice, prev_week_metrics.voice),
+        "psu": calculate_change(curr_week_metrics.psu, prev_week_metrics.psu),
+        "revenue": calculate_change(curr_week_metrics.revenue, prev_week_metrics.revenue),
+    }
+    week_change_absolute = {
+        "orders": curr_week_metrics.orders - prev_week_metrics.orders,
+        "internet": curr_week_metrics.internet - prev_week_metrics.internet,
+        "tv": curr_week_metrics.tv - prev_week_metrics.tv,
+        "mobile": curr_week_metrics.mobile - prev_week_metrics.mobile,
+        "voice": curr_week_metrics.voice - prev_week_metrics.voice,
+        "psu": curr_week_metrics.psu - prev_week_metrics.psu,
+        "revenue": curr_week_metrics.revenue - prev_week_metrics.revenue,
+    }
+    
+    week_comparison = PerformanceComparison(
+        current=curr_week_metrics,
+        previous=prev_week_metrics,
+        change_percent=week_change_percent,
+        change_absolute=week_change_absolute
+    )
+    
+    # ========== MONTHLY TREND (Last 6 months) ==========
+    monthly_trend = []
+    temp_start, temp_end = curr_start, curr_end
+    
+    for i in range(6):
+        if i > 0:
+            temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
+        
+        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
+        metrics = calculate_metrics_from_orders(month_orders)
+        
+        # Get the label from the end date's month
+        period_label = temp_end.strftime("%b %Y")
+        
+        monthly_trend.append(TrendDataPoint(
+            period=period_label,
+            orders=metrics.orders,
+            internet=metrics.internet,
+            mobile=metrics.mobile,
+            psu=metrics.psu,
+            revenue=metrics.revenue
+        ))
+    
+    # Reverse so oldest is first
+    monthly_trend.reverse()
+    
+    # ========== WEEKLY TREND (Last 8 weeks) ==========
+    weekly_trend = []
+    
+    for i in range(8):
+        week_offset = i * 7
+        week_start = curr_week_start - timedelta(days=week_offset)
+        week_end = week_start + timedelta(days=6)
+        
+        week_orders = [o for o in all_orders if week_start <= o.install_date <= week_end]
+        metrics = calculate_metrics_from_orders(week_orders)
+        
+        # Week number label
+        week_num = week_start.isocalendar()[1]
+        period_label = f"Week {week_num}"
+        
+        weekly_trend.append(TrendDataPoint(
+            period=period_label,
+            orders=metrics.orders,
+            internet=metrics.internet,
+            mobile=metrics.mobile,
+            psu=metrics.psu,
+            revenue=metrics.revenue
+        ))
+    
+    # Reverse so oldest is first
+    weekly_trend.reverse()
+    
+    # ========== PERSONAL RECORDS ==========
+    records = []
+    
+    # Find best month for orders, PSU, revenue
+    best_orders_month = {"value": 0, "period": ""}
+    best_psu_month = {"value": 0, "period": ""}
+    best_revenue_month = {"value": 0.0, "period": ""}
+    best_internet_month = {"value": 0, "period": ""}
+    
+    # Look at all monthly trends to find records
+    temp_start, temp_end = curr_start, curr_end
+    for i in range(12):  # Look back up to 12 months for records
+        if i > 0:
+            temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
+        
+        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
+        metrics = calculate_metrics_from_orders(month_orders)
+        period_label = temp_end.strftime("%B %Y")
+        
+        if metrics.orders > best_orders_month["value"]:
+            best_orders_month = {"value": metrics.orders, "period": period_label}
+        if metrics.psu > best_psu_month["value"]:
+            best_psu_month = {"value": metrics.psu, "period": period_label}
+        if metrics.revenue > best_revenue_month["value"]:
+            best_revenue_month = {"value": metrics.revenue, "period": period_label}
+        if metrics.internet > best_internet_month["value"]:
+            best_internet_month = {"value": metrics.internet, "period": period_label}
+    
+    # Build records list
+    if best_orders_month["value"] > 0:
+        records.append(PersonalRecord(
+            metric="Orders",
+            value=best_orders_month["value"],
+            period=best_orders_month["period"],
+            is_current_period=(best_orders_month["period"] == curr_label or 
+                               best_orders_month["value"] == curr_month_metrics.orders and curr_month_metrics.orders > 0)
+        ))
+    
+    if best_psu_month["value"] > 0:
+        records.append(PersonalRecord(
+            metric="PSU",
+            value=best_psu_month["value"],
+            period=best_psu_month["period"],
+            is_current_period=(best_psu_month["period"] == curr_label or
+                               best_psu_month["value"] == curr_month_metrics.psu and curr_month_metrics.psu > 0)
+        ))
+    
+    if best_revenue_month["value"] > 0:
+        records.append(PersonalRecord(
+            metric="Revenue",
+            value=best_revenue_month["value"],
+            period=best_revenue_month["period"],
+            is_current_period=(best_revenue_month["period"] == curr_label or
+                               best_revenue_month["value"] == curr_month_metrics.revenue and curr_month_metrics.revenue > 0)
+        ))
+    
+    if best_internet_month["value"] > 0:
+        records.append(PersonalRecord(
+            metric="Internet",
+            value=best_internet_month["value"],
+            period=best_internet_month["period"],
+            is_current_period=(best_internet_month["period"] == curr_label or
+                               best_internet_month["value"] == curr_month_metrics.internet and curr_month_metrics.internet > 0)
+        ))
+    
+    # ========== STREAK DETECTION ==========
+    current_streak = 0
+    streak_type = "none"
+    
+    # Look for consecutive months of growth/decline
+    temp_start, temp_end = curr_start, curr_end
+    prev_orders = curr_month_metrics.orders
+    growth_streak = 0
+    decline_streak = 0
+    
+    for i in range(1, 6):  # Check up to 5 previous months
+        temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
+        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
+        month_count = len(month_orders)
+        
+        if i == 1:
+            # Compare current to previous
+            if curr_month_metrics.orders > month_count:
+                growth_streak = 1
+            elif curr_month_metrics.orders < month_count:
+                decline_streak = 1
+        else:
+            # Continue checking streak
+            if growth_streak > 0 and prev_orders > month_count:
+                growth_streak += 1
+            elif decline_streak > 0 and prev_orders < month_count:
+                decline_streak += 1
+            else:
+                break
+        
+        prev_orders = month_count
+    
+    if growth_streak > 0:
+        current_streak = growth_streak
+        streak_type = "growth"
+    elif decline_streak > 0:
+        current_streak = decline_streak
+        streak_type = "decline"
+    
+    # ========== GENERATE INSIGHTS ==========
+    insights = generate_insights(
+        month_comparison, week_comparison, records, current_streak, streak_type
+    )
+    
+    # Add default insight if none generated
+    if not insights:
+        if curr_month_metrics.orders > 0:
+            insights.append(f"You have {curr_month_metrics.orders} orders this month. Keep pushing!")
+        else:
+            insights.append("No orders yet this month. Time to make some sales!")
+    
+    # Disable caching
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    
+    return PerformanceInsightsResponse(
+        month_comparison=month_comparison,
+        week_comparison=week_comparison,
+        monthly_trend=monthly_trend,
+        weekly_trend=weekly_trend,
+        records=records,
+        current_streak=current_streak,
+        streak_type=streak_type,
+        insights=insights
     )
 
 
