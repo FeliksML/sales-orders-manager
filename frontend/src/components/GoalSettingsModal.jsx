@@ -173,16 +173,16 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
       
       {/* Modal */}
       <div 
-        className="relative w-full max-w-lg rounded-2xl overflow-hidden"
+        className="relative w-full max-w-lg max-h-[90vh] rounded-2xl overflow-hidden flex flex-col"
         style={{
           background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.98) 100%)',
           border: '1px solid rgba(251, 191, 36, 0.2)',
           boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5), 0 0 100px rgba(251, 191, 36, 0.1)'
         }}
       >
-        {/* Header */}
+        {/* Header - Fixed */}
         <div 
-          className="px-6 py-4 flex items-center justify-between"
+          className="px-6 py-4 flex items-center justify-between flex-shrink-0"
           style={{
             background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.05) 100%)',
             borderBottom: '1px solid rgba(251, 191, 36, 0.1)'
@@ -211,8 +211,8 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
           </button>
         </div>
         
-        {/* Content */}
-        <div className="px-6 py-5">
+        {/* Content - Scrollable */}
+        <div className="px-6 py-5 overflow-y-auto flex-1">
           {/* Message */}
           {message.text && (
             <div 
@@ -478,9 +478,9 @@ function GoalSettingsModal({ isOpen, onClose, onSave }) {
           </div>
         </div>
         
-        {/* Footer */}
+        {/* Footer - Fixed */}
         <div 
-          className="px-6 py-4 flex items-center justify-between"
+          className="px-6 py-4 flex items-center justify-between flex-shrink-0"
           style={{
             background: 'rgba(0, 0, 0, 0.2)',
             borderTop: '1px solid rgba(255, 255, 255, 0.05)'
