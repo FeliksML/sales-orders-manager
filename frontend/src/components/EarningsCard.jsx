@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw, ChevronDown, Receipt, Building2, Landmark, Shield, Heart } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw, ChevronDown, Receipt, Building2, Landmark, Shield, Heart, Zap, Target, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { commissionService } from '../services/commissionService'
 import { getStateByCode } from '../utils/stateTaxRates'
+import { getNextTierInfo } from '../utils/commissionUtils'
 
 function EarningsCard() {
   const navigate = useNavigate()
@@ -109,6 +110,27 @@ function EarningsCard() {
 
   const isPositiveChange = earnings.month_over_month_change >= 0
 
+  // Calculate next tier motivation info
+  const nextTierInfo = useMemo(() => {
+    if (!earnings?.breakdown) return null
+    
+    // Extract current totals from breakdown
+    const getCount = (product) => earnings.breakdown.find(b => b.product === product)?.count || 0
+    const getPayout = (product) => earnings.breakdown.find(b => b.product === product)?.payout || 0
+    
+    const currentTotals = {
+      internet: getCount('Internet'),
+      mobile: getCount('Mobile'),
+      voice: getCount('Voice'),
+      video: getCount('Video'),
+      mrr: getPayout('MRR'),
+      alacarte: earnings.alacarte_total || 0,
+    }
+    
+    const internetCount = currentTotals.internet
+    return getNextTierInfo(internetCount, currentTotals)
+  }, [earnings])
+
   return (
     <div 
       className="relative overflow-hidden rounded-2xl"
@@ -203,6 +225,112 @@ function EarningsCard() {
             Tier: <span className="text-cyan-400">{earnings.current_tier}</span>
           </p>
         </div>
+
+        {/* Next Tier Motivation Banner */}
+        {nextTierInfo && (
+          <div 
+            className="mb-6 p-4 rounded-xl relative overflow-hidden"
+            style={{
+              background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.15) 50%, rgba(234, 88, 12, 0.1) 100%)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+            }}
+          >
+            {/* Animated glow effect */}
+            <div 
+              className="absolute inset-0 opacity-30"
+              style={{
+                background: 'radial-gradient(circle at 20% 50%, rgba(251, 191, 36, 0.4) 0%, transparent 50%)',
+                animation: 'pulse 3s ease-in-out infinite'
+              }}
+            />
+            
+            <div className="relative">
+              {/* Header */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-1.5 rounded-lg bg-amber-500/20">
+                  <Target className="w-4 h-4 text-amber-400" />
+                </div>
+                <span className="text-sm font-semibold text-amber-300">Next Tier Unlocks</span>
+                <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
+              </div>
+              
+              {/* Main motivation message */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                {/* Internet needed */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/20 border border-blue-500/30">
+                    <Wifi className="w-4 h-4 text-blue-400" />
+                    <span className="text-lg font-bold text-blue-300" style={{ fontFamily: "'Space Mono', monospace" }}>
+                      +{nextTierInfo.internetNeeded}
+                    </span>
+                  </div>
+                  <span className="text-sm text-gray-300">more internet</span>
+                </div>
+                
+                <ArrowRight className="w-4 h-4 text-gray-500 hidden sm:block" />
+                
+                {/* Tier badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">reach</span>
+                  <span className="px-2 py-1 rounded-md bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 font-bold text-sm">
+                    Tier {nextTierInfo.nextTierLabel}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Projected earnings */}
+              <div className="mt-4 pt-3 border-t border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">Projected earnings:</span>
+                  <span 
+                    className="text-xl font-bold text-white"
+                    style={{ fontFamily: "'Space Mono', monospace" }}
+                  >
+                    {formatCurrency(nextTierInfo.projectedTotal)}
+                  </span>
+                </div>
+                
+                {/* Increase badge */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30">
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    <span className="text-emerald-300 font-bold" style={{ fontFamily: "'Space Mono', monospace" }}>
+                      +{formatCurrency(nextTierInfo.increase)}
+                    </span>
+                    <span className="text-emerald-400 text-sm font-semibold">
+                      (+{nextTierInfo.percentIncrease}%)
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Motivational message */}
+              <p className="mt-3 text-xs text-amber-200/70 italic">
+                🔥 Sell {nextTierInfo.internetNeeded} more internet and unlock {nextTierInfo.percentIncrease}% higher rates on ALL your products!
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* At Max Tier Celebration */}
+        {!nextTierInfo && earnings.current_tier === '40+' && (
+          <div 
+            className="mb-6 p-4 rounded-xl text-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(34, 197, 94, 0.1) 100%)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+            }}
+          >
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="text-2xl">🏆</span>
+              <span className="text-lg font-bold text-emerald-300">Maximum Tier Achieved!</span>
+              <span className="text-2xl">🏆</span>
+            </div>
+            <p className="text-sm text-emerald-200/70">
+              You're earning the highest commission rates. Keep crushing it!
+            </p>
+          </div>
+        )}
 
         {/* Tax Toggle Section */}
         {earnings.tax_breakdown && (

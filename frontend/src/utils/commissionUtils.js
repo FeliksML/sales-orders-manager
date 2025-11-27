@@ -1,19 +1,112 @@
 // Commission estimation for individual orders based on current tier
 
 // Rate tables matching backend exactly
-const REGULAR_RATE_TABLE = [
-  { min: 0, max: 4, internet: 0, mobile: 0, voice: 0, video: 0, mrr: 0 },
-  { min: 5, max: 9, internet: 100, mobile: 75, voice: 75, video: 60, mrr: 0.25 },
-  { min: 10, max: 19, internet: 200, mobile: 150, voice: 150, video: 120, mrr: 0.5 },
-  { min: 20, max: 29, internet: 225, mobile: 175, voice: 175, video: 150, mrr: 0.55 },
-  { min: 30, max: 39, internet: 250, mobile: 200, voice: 200, video: 175, mrr: 0.6 },
-  { min: 40, max: Infinity, internet: 300, mobile: 225, voice: 225, video: 200, mrr: 0.75 },
+export const REGULAR_RATE_TABLE = [
+  { min: 0, max: 4, internet: 0, mobile: 0, voice: 0, video: 0, mrr: 0, label: '0-4' },
+  { min: 5, max: 9, internet: 100, mobile: 75, voice: 75, video: 60, mrr: 0.25, label: '5-9' },
+  { min: 10, max: 19, internet: 200, mobile: 150, voice: 150, video: 120, mrr: 0.5, label: '10-19' },
+  { min: 20, max: 29, internet: 225, mobile: 175, voice: 175, video: 150, mrr: 0.55, label: '20-29' },
+  { min: 30, max: 39, internet: 250, mobile: 200, voice: 200, video: 175, mrr: 0.6, label: '30-39' },
+  { min: 40, max: Infinity, internet: 300, mobile: 225, voice: 225, video: 200, mrr: 0.75, label: '40+' },
 ]
 
 const ALACARTE_RATES = {
   wib: 100,
   gig_internet: 100,
   sbc: 50
+}
+
+/**
+ * Get the index of the current tier
+ */
+export function getTierIndex(internetCount = 0) {
+  for (let i = 0; i < REGULAR_RATE_TABLE.length; i++) {
+    const tier = REGULAR_RATE_TABLE[i]
+    if (internetCount >= tier.min && internetCount <= tier.max) {
+      return i
+    }
+  }
+  return 0
+}
+
+/**
+ * Get next tier info - returns null if already at max tier
+ * @param {number} currentInternetCount - Current internet count
+ * @param {Object} currentTotals - Current product totals { internet, mobile, voice, video, mrr, wib, gig, sbc }
+ * @returns {Object|null} Next tier info or null if at max
+ */
+export function getNextTierInfo(currentInternetCount, currentTotals) {
+  const currentTierIndex = getTierIndex(currentInternetCount)
+  
+  // If at max tier, return null
+  if (currentTierIndex >= REGULAR_RATE_TABLE.length - 1) {
+    return null
+  }
+  
+  const currentTier = REGULAR_RATE_TABLE[currentTierIndex]
+  const nextTier = REGULAR_RATE_TABLE[currentTierIndex + 1]
+  
+  // How many more internet needed to reach next tier
+  const internetNeeded = nextTier.min - currentInternetCount
+  
+  // Calculate current earnings with current tier rates
+  const currentRates = currentTier
+  const currentPSU = (
+    (currentTotals.internet || 0) * currentRates.internet +
+    (currentTotals.mobile || 0) * currentRates.mobile +
+    (currentTotals.voice || 0) * currentRates.voice +
+    (currentTotals.video || 0) * currentRates.video
+  )
+  
+  // Get raw MRR (divide current MRR payout by current rate to get raw value)
+  const rawMrr = currentRates.mrr > 0 ? (currentTotals.mrr || 0) / currentRates.mrr : (currentTotals.mrr || 0)
+  const currentMrrPayout = currentRates.mrr > 0 ? rawMrr * currentRates.mrr : 0
+  
+  // A-la-carte stays the same
+  const currentAlacarte = currentTotals.alacarte || 0
+  
+  const currentTotal = currentPSU + currentMrrPayout + currentAlacarte
+  
+  // Calculate projected earnings at next tier
+  // When reaching next tier, assume we add the internetNeeded to our count
+  const projectedInternet = (currentTotals.internet || 0) + internetNeeded
+  const nextRates = nextTier
+  
+  const projectedPSU = (
+    projectedInternet * nextRates.internet +
+    (currentTotals.mobile || 0) * nextRates.mobile +
+    (currentTotals.voice || 0) * nextRates.voice +
+    (currentTotals.video || 0) * nextRates.video
+  )
+  
+  const projectedMrrPayout = rawMrr * nextRates.mrr
+  
+  // A-la-carte stays the same (but now eligible if wasn't before)
+  const projectedAlacarte = nextTier.min > 4 ? currentAlacarte : 0
+  
+  const projectedTotal = projectedPSU + projectedMrrPayout + projectedAlacarte
+  
+  const increase = projectedTotal - currentTotal
+  const percentIncrease = currentTotal > 0 ? ((projectedTotal - currentTotal) / currentTotal) * 100 : 0
+  
+  return {
+    internetNeeded,
+    currentTierLabel: currentTier.label,
+    nextTierLabel: nextTier.label,
+    nextTierMin: nextTier.min,
+    currentTotal: Math.round(currentTotal),
+    projectedTotal: Math.round(projectedTotal),
+    increase: Math.round(increase),
+    percentIncrease: Math.round(percentIncrease),
+    // Breakdown of the increase
+    breakdown: {
+      internetIncrease: projectedInternet * nextRates.internet - (currentTotals.internet || 0) * currentRates.internet,
+      mobileIncrease: (currentTotals.mobile || 0) * (nextRates.mobile - currentRates.mobile),
+      voiceIncrease: (currentTotals.voice || 0) * (nextRates.voice - currentRates.voice),
+      videoIncrease: (currentTotals.video || 0) * (nextRates.video - currentRates.video),
+      mrrIncrease: rawMrr * (nextRates.mrr - currentRates.mrr),
+    }
+  }
 }
 
 /**
