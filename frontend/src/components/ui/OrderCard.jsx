@@ -2,9 +2,9 @@ import { Calendar, MapPin, Phone, Mail, Package, Check, DollarSign } from 'lucid
 import { format } from 'date-fns'
 import { getInstallStatus, isDateToday, isDatePast, formatDate, DATE_FORMATS } from '@sales-order-manager/shared'
 import CustomCheckbox from './CustomCheckbox'
-import { estimateOrderCommission, formatCommission } from '../../utils/commissionUtils'
+import { estimateOrderCommission, formatCommission, getTierLabel } from '../../utils/commissionUtils'
 
-function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
+function OrderCard({ order, onOrderClick, isSelected, onSelectionChange, currentInternetCount = 0 }) {
   const status = getInstallStatus(order.install_date)
   const isPast = isDatePast(order.install_date)
   const isToday = isDateToday(order.install_date)
@@ -12,8 +12,8 @@ function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
   const statusColor = status === 'installed' ? 'green' : status === 'today' ? 'yellow' : 'blue'
   const statusText = status === 'installed' ? 'Installed' : status === 'today' ? 'Today' : 'Pending'
 
-  // Calculate estimated commission for this order
-  const estimatedCommission = estimateOrderCommission(order)
+  // Calculate estimated commission for this order using current tier
+  const estimatedCommission = estimateOrderCommission(order, currentInternetCount)
 
   const products = []
   if (order.has_internet) products.push('Internet')
@@ -136,14 +136,24 @@ function OrderCard({ order, onOrderClick, isSelected, onSelectionChange }) {
         </div>
         
         {/* Commission Estimate Badge */}
-        {estimatedCommission > 0 && (
+        {estimatedCommission > 0 ? (
           <div 
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25"
-            title="Estimated commission (actual may vary based on monthly tier)"
+            title={`Tier ${getTierLabel(currentInternetCount)} (${currentInternetCount} internet)`}
           >
             <DollarSign size={12} className="text-emerald-400" />
             <span className="text-emerald-300 font-semibold" style={{ fontFamily: "'Space Mono', monospace" }}>
               {formatCommission(estimatedCommission)}
+            </span>
+          </div>
+        ) : (
+          <div 
+            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-500/15 border border-gray-500/25"
+            title={currentInternetCount < 5 ? "Need 5+ internet to earn commission" : "No commission"}
+          >
+            <DollarSign size={12} className="text-gray-400" />
+            <span className="text-gray-400 font-semibold" style={{ fontFamily: "'Space Mono', monospace" }}>
+              $0
             </span>
           </div>
         )}

@@ -8,9 +8,9 @@ import {
 import Card from './Card'
 import CustomCheckbox from './CustomCheckbox'
 import OrderCard from './OrderCard'
-import { estimateOrderCommission, formatCommission } from '../../utils/commissionUtils'
+import { estimateOrderCommission, formatCommission, getTierLabel } from '../../utils/commissionUtils'
 
-function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange }) {
+function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange, currentInternetCount = 0 }) {
   const [isMobile, setIsMobile] = useState(false)
   const [sortField, setSortField] = useState('install_date')
   const [sortDirection, setSortDirection] = useState('desc')
@@ -238,6 +238,7 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
               onOrderClick={onOrderClick}
               isSelected={selectedOrders.includes(order.orderid)}
               onSelectionChange={handleSelectOrder}
+              currentInternetCount={currentInternetCount}
             />
           ))}
         </div>
@@ -419,7 +420,12 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                 <th className="text-left p-4 text-gray-400 font-semibold last:rounded-tr-lg">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4" />
-                    Est. Commission
+                    <span>Est. Commission</span>
+                    {currentInternetCount > 0 && (
+                      <span className="text-xs text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                        Tier {getTierLabel(currentInternetCount)}
+                      </span>
+                    )}
                   </div>
                 </th>
               )}
@@ -532,11 +538,11 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                   {visibleColumns.commission && (
                     <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
                       {(() => {
-                        const commission = estimateOrderCommission(order)
+                        const commission = estimateOrderCommission(order, currentInternetCount)
                         return commission > 0 ? (
                           <div 
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25"
-                            title="Estimated commission (actual may vary based on monthly tier)"
+                            title={`Estimated commission at Tier ${getTierLabel(currentInternetCount)} (${currentInternetCount} internet)`}
                           >
                             <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
                             <span 
@@ -547,7 +553,7 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                             </span>
                           </div>
                         ) : (
-                          <span className="text-gray-500 text-sm">-</span>
+                          <span className="text-gray-500 text-sm">$0</span>
                         )
                       })()}
                     </td>

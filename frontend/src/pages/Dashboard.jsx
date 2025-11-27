@@ -9,6 +9,7 @@ import BulkActionsToolbar from '../components/ui/BulkActionsToolbar'
 import PullToRefresh from '../components/ui/PullToRefresh'
 import EarningsCard from '../components/EarningsCard'
 import { useOrders, useOrderStats } from '../hooks/useOrders'
+import { useEarnings } from '../hooks/useCommission'
 import { orderService } from '../services/orderService'
 
 // Lazy load heavy components for better performance
@@ -29,6 +30,7 @@ function Dashboard() {
   const { orders: allOrders, refetch: refetchAllOrders } = useOrders({})
   const [statsRefreshTrigger, setStatsRefreshTrigger] = useState(0)
   const { stats, loading: statsLoading, error: statsError } = useOrderStats(statsRefreshTrigger)
+  const { currentInternetCount, refetch: refetchEarnings } = useEarnings()
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -62,8 +64,8 @@ function Dashboard() {
       setIsOrderModalOpen(false)
       setSubmitSuccess(true)
 
-      // Refetch orders and stats - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders()])
+      // Refetch orders, stats, and earnings - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
       
       // Trigger stats refresh
       setStatsRefreshTrigger(t => t + 1)
@@ -90,8 +92,8 @@ function Dashboard() {
       await orderService.updateOrder(orderId, orderData)
       console.log('Dashboard: Order updated successfully')
 
-      // Refetch orders and stats - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders()])
+      // Refetch orders, stats, and earnings - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
       
       // Trigger stats refresh
       setStatsRefreshTrigger(t => t + 1)
@@ -122,8 +124,8 @@ function Dashboard() {
       await orderService.deleteOrder(orderId)
       console.log('Dashboard: Order deleted successfully')
 
-      // Refetch orders and stats - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders()])
+      // Refetch orders, stats, and earnings - await all to ensure data is fresh
+      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
       
       // Trigger stats refresh
       setStatsRefreshTrigger(t => t + 1)
@@ -243,7 +245,7 @@ function Dashboard() {
 
   // Pull to refresh handler
   const handleRefresh = async () => {
-    await Promise.all([refetch(), refetchAllOrders()])
+    await Promise.all([refetch(), refetchAllOrders(), refetchEarnings()])
     setStatsRefreshTrigger(t => t + 1)
   }
 
@@ -519,6 +521,7 @@ function Dashboard() {
                           onOrderClick={handleOrderClick}
                           selectedOrders={selectedOrders}
                           onSelectionChange={setSelectedOrders}
+                          currentInternetCount={currentInternetCount}
                         />
                       ) : (
                         <Suspense fallback={
