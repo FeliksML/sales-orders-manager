@@ -78,6 +78,109 @@ ALACARTE_RATES = {
 # HELPER FUNCTIONS
 # ============================================================================
 
+def get_fiscal_month_boundaries(reference_date: date) -> tuple:
+    """Get fiscal month boundaries for a given date.
+    
+    Fiscal month runs from 28th 6pm of previous month to 28th 6pm of current month.
+    For example, "November" fiscal month: Oct 28 6pm → Nov 28 6pm
+    
+    Returns (start_datetime, end_datetime, label) for the fiscal month that 
+    encompasses the reference_date.
+    """
+    # First, determine which fiscal month the reference_date falls into
+    # If we're past the 28th, we're in the next fiscal month
+    reference_datetime = datetime.combine(reference_date, datetime.min.time())
+    
+    # The 28th 6pm cutoff of this calendar month
+    this_month_cutoff = datetime(reference_date.year, reference_date.month, 28, 18, 0, 0)
+    
+    if reference_datetime >= this_month_cutoff:
+        # We're in the NEXT fiscal month (current month 28th 6pm → next month 28th 6pm)
+        start_dt = this_month_cutoff
+        if reference_date.month == 12:
+            end_dt = datetime(reference_date.year + 1, 1, 28, 18, 0, 0)
+            label = f"January {reference_date.year + 1}"
+        else:
+            end_dt = datetime(reference_date.year, reference_date.month + 1, 28, 18, 0, 0)
+            # Label is the end month
+            end_month = reference_date.month + 1
+            label = datetime(reference_date.year, end_month, 1).strftime("%B %Y")
+    else:
+        # We're in the CURRENT fiscal month (prev month 28th 6pm → this month 28th 6pm)
+        end_dt = this_month_cutoff
+        if reference_date.month == 1:
+            start_dt = datetime(reference_date.year - 1, 12, 28, 18, 0, 0)
+        else:
+            start_dt = datetime(reference_date.year, reference_date.month - 1, 28, 18, 0, 0)
+        label = reference_date.strftime("%B %Y")
+    
+    return start_dt, end_dt, label
+
+
+def get_previous_fiscal_month(start_dt: datetime, end_dt: datetime) -> tuple:
+    """Get the previous fiscal month boundaries given current fiscal month."""
+    # Previous fiscal month ends where current one starts
+    prev_end_dt = start_dt
+    
+    # Previous fiscal month starts one month before that
+    if prev_end_dt.month == 1:
+        prev_start_dt = datetime(prev_end_dt.year - 1, 12, 28, 18, 0, 0)
+    else:
+        prev_start_dt = datetime(prev_end_dt.year, prev_end_dt.month - 1, 28, 18, 0, 0)
+    
+    # Label for previous fiscal month
+    if prev_end_dt.month == 1:
+        label = f"January {prev_end_dt.year}"
+    else:
+        label = datetime(prev_end_dt.year, prev_end_dt.month, 1).strftime("%B %Y")
+    
+    return prev_start_dt, prev_end_dt, label
+
+
+def get_install_datetime(order) -> datetime:
+    """Convert order install date and time to a datetime object.
+    
+    Returns the datetime at the START of the install time slot.
+    """
+    if not order.install_date:
+        return None
+    
+    install_time = order.install_time or ""
+    
+    # Default to midnight if no time specified
+    hour = 0
+    
+    # Parse install time (format: "X:00 AM - Y:00 AM")
+    try:
+        match = re.match(r'(\d{1,2}):00\s*(AM|PM)', install_time.upper())
+        if match:
+            hour = int(match.group(1))
+            period = match.group(2)
+            
+            if period == 'AM':
+                if hour == 12:
+                    hour = 0
+            else:  # PM
+                if hour != 12:
+                    hour = hour + 12
+    except Exception:
+        pass
+    
+    return datetime.combine(order.install_date, datetime.min.time().replace(hour=hour))
+
+
+def is_order_in_fiscal_month(order, start_dt: datetime, end_dt: datetime) -> bool:
+    """Check if order's install datetime falls within the fiscal month boundaries.
+    
+    Order is eligible if: start_dt <= install_datetime < end_dt
+    """
+    install_dt = get_install_datetime(order)
+    if not install_dt:
+        return False
+    
+    return start_dt <= install_dt < end_dt
+
+
 def get_rate_tier(internet_count: int, is_new_hire: bool) -> dict:
     """Get the rate tier based on internet count and new hire status"""
     rate_table = NEW_HIRE_RATE_TABLE if is_new_hire else REGULAR_RATE_TABLE
@@ -106,64 +209,6 @@ def get_effective_rates(internet_count: int, is_new_hire: bool) -> dict:
         "video": tier["video"] if internet_count > 4 else 0,
         "mrr": tier["mrr"],
     }
-
-
-def is_install_before_6pm(install_time: str) -> bool:
-    """Check if install time starts before 6pm (18:00)
-    
-    Install time format examples: "8:00 AM - 9:00 AM", "5:00 PM - 6:00 PM"
-    Returns True if the START time is before 6pm
-    """
-    if not install_time:
-        return False
-    
-    try:
-        # Extract the start time from the time slot
-        # Format: "X:00 AM - Y:00 AM" or "X:00 PM - Y:00 PM"
-        match = re.match(r'(\d{1,2}):00\s*(AM|PM)', install_time.upper())
-        if not match:
-            return False
-        
-        hour = int(match.group(1))
-        period = match.group(2)
-        
-        # Convert to 24-hour format
-        if period == 'AM':
-            if hour == 12:
-                hour_24 = 0
-            else:
-                hour_24 = hour
-        else:  # PM
-            if hour == 12:
-                hour_24 = 12
-            else:
-                hour_24 = hour + 12
-        
-        # 6pm = 18:00
-        return hour_24 < 18
-    except Exception:
-        return False
-
-
-def is_order_eligible_for_fiscal_month(order: Order, cutoff_day: int = 28) -> bool:
-    """Check if order is eligible for fiscal month commission.
-    
-    Rules:
-    - Install date before the 28th: eligible
-    - Install date on the 28th AND install time before 6pm: eligible
-    - Install date on or after 28th with install time at 6pm or later: NOT eligible
-    """
-    if not order.install_date:
-        return False
-    
-    install_day = order.install_date.day
-    
-    if install_day < cutoff_day:
-        return True
-    elif install_day == cutoff_day:
-        return is_install_before_6pm(order.install_time or '')
-    else:
-        return False
 
 
 def calculate_order_commission(order: Order, rates: dict, alacarte_eligible: bool) -> dict:
@@ -332,28 +377,23 @@ def get_auto_totals(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get auto-aggregated product counts from orders for current month.
+    """Get auto-aggregated product counts from orders for current fiscal month.
     
-    Eligibility: install date before 28th, OR on 28th before 6pm.
+    Fiscal month: 28th 6pm of prev month → 28th 6pm of current month
     """
     settings = get_or_create_settings(db, current_user.userid)
     
-    # Get current month boundaries
+    # Get current fiscal month boundaries
     today = date.today()
-    cutoff_date = date(today.year, today.month, 28)
+    start_dt, end_dt, label = get_fiscal_month_boundaries(today)
     
-    # Query for orders created this month with install_date <= 28th (then filter in Python for time)
-    candidate_orders = db.query(Order).filter(
-        and_(
-            Order.userid == current_user.userid,
-            extract('month', Order.created_at) == today.month,
-            extract('year', Order.created_at) == today.year,
-            Order.install_date <= cutoff_date
-        )
+    # Query all orders for this user (we'll filter by fiscal month in Python)
+    all_orders = db.query(Order).filter(
+        Order.userid == current_user.userid
     ).all()
     
-    # Filter eligible orders (before 28th OR on 28th before 6pm)
-    eligible_orders = [o for o in candidate_orders if is_order_eligible_for_fiscal_month(o)]
+    # Filter orders that fall within the fiscal month
+    eligible_orders = [o for o in all_orders if is_order_in_fiscal_month(o, start_dt, end_dt)]
     
     # Auto-calculate totals
     auto_internet = sum(1 for o in eligible_orders if o.has_internet)
@@ -453,44 +493,27 @@ def get_earnings(
 ):
     """Calculate monthly commission earnings with breakdown.
     
-    Eligibility: install date before 28th, OR on 28th before 6pm.
+    Fiscal month: 28th 6pm of prev month → 28th 6pm of current month
     """
     settings = get_or_create_settings(db, current_user.userid)
     
-    # Get current month boundaries
+    # Get current fiscal month boundaries
     today = date.today()
-    month_start = date(today.year, today.month, 1)
-    cutoff_date = date(today.year, today.month, 28)
+    start_dt, end_dt, period_label = get_fiscal_month_boundaries(today)
     
-    # Get last month for comparison
-    if today.month == 1:
-        last_month_start = date(today.year - 1, 12, 1)
-        last_month_cutoff = date(today.year - 1, 12, 28)
-    else:
-        last_month_start = date(today.year, today.month - 1, 1)
-        last_month_cutoff = date(today.year, today.month - 1, 28)
+    # Get previous fiscal month for comparison
+    prev_start_dt, prev_end_dt, prev_label = get_previous_fiscal_month(start_dt, end_dt)
     
-    # Query candidate orders for this month (install_date <= 28th)
-    candidate_orders = db.query(Order).filter(
-        and_(
-            Order.userid == current_user.userid,
-            extract('month', Order.created_at) == today.month,
-            extract('year', Order.created_at) == today.year,
-            Order.install_date <= cutoff_date
-        )
+    # Query all orders for this user
+    all_orders = db.query(Order).filter(
+        Order.userid == current_user.userid
     ).all()
     
-    # Filter eligible orders (before 28th OR on 28th before 6pm)
-    eligible_orders = [o for o in candidate_orders if is_order_eligible_for_fiscal_month(o)]
+    # Filter orders that fall within the current fiscal month
+    eligible_orders = [o for o in all_orders if is_order_in_fiscal_month(o, start_dt, end_dt)]
     
-    # Total orders created this month (regardless of install date)
-    total_orders_this_month = db.query(func.count(Order.orderid)).filter(
-        and_(
-            Order.userid == current_user.userid,
-            extract('month', Order.created_at) == today.month,
-            extract('year', Order.created_at) == today.year
-        )
-    ).scalar() or 0
+    # Total orders in this fiscal month
+    total_orders_this_month = len(eligible_orders)
     
     # Get auto-totals or use overrides
     overrides = settings.value_overrides or {}
@@ -556,16 +579,8 @@ def get_earnings(
     # Total commission
     total_commission = psu_total + mrr_payout + alacarte_total + ramp_amount + sae_bonus
     
-    # Calculate last month's earnings for comparison
-    lm_candidate_orders = db.query(Order).filter(
-        and_(
-            Order.userid == current_user.userid,
-            extract('month', Order.created_at) == last_month_start.month,
-            extract('year', Order.created_at) == last_month_start.year,
-            Order.install_date <= last_month_cutoff
-        )
-    ).all()
-    last_month_orders = [o for o in lm_candidate_orders if is_order_eligible_for_fiscal_month(o)]
+    # Calculate last fiscal month's earnings for comparison
+    last_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, prev_start_dt, prev_end_dt)]
     
     # Simple calculation for last month (without overrides)
     lm_internet = sum(1 for o in last_month_orders if o.has_internet)
@@ -602,8 +617,8 @@ def get_earnings(
         if sbc > 0:
             breakdown.append(ProductBreakdown(product="SBC Seats", count=sbc, rate=ALACARTE_RATES["addl_sbc_seats"], payout=sbc_payout))
     
-    # Period string
-    period = today.strftime("%B %Y")
+    # Period string (fiscal month label)
+    period = period_label
     
     # Calculate tax breakdown
     tax_breakdown = calculate_tax_breakdown(total_commission, settings)
@@ -613,8 +628,8 @@ def get_earnings(
     
     return EarningsResponse(
         period=period,
-        period_start=month_start,
-        period_end=cutoff_date,
+        period_start=start_dt.date(),
+        period_end=end_dt.date(),
         total_commission=total_commission,
         psu_total=psu_total,
         mrr_payout=mrr_payout,
@@ -657,18 +672,15 @@ def get_order_commission_estimate(
     # Get user's settings
     settings = get_or_create_settings(db, current_user.userid)
     
-    # Get auto-totals to determine current tier
+    # Get current fiscal month to determine tier
     today = date.today()
-    cutoff_date = date(today.year, today.month, 28)
+    start_dt, end_dt, _ = get_fiscal_month_boundaries(today)
     
-    eligible_orders = db.query(Order).filter(
-        and_(
-            Order.userid == current_user.userid,
-            extract('month', Order.created_at) == today.month,
-            extract('year', Order.created_at) == today.year,
-            Order.install_date < cutoff_date
-        )
+    all_orders = db.query(Order).filter(
+        Order.userid == current_user.userid
     ).all()
+    
+    eligible_orders = [o for o in all_orders if is_order_in_fiscal_month(o, start_dt, end_dt)]
     
     overrides = settings.value_overrides or {}
     auto_internet = sum(1 for o in eligible_orders if o.has_internet)
