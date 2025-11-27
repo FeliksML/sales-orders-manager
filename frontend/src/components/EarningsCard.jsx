@@ -72,6 +72,27 @@ function EarningsCard() {
     return colors[product] || 'from-gray-500 to-gray-400'
   }
 
+  // Calculate next tier motivation info - MUST be before conditional returns (React hooks rule)
+  const nextTierInfo = useMemo(() => {
+    if (!earnings?.breakdown) return null
+    
+    // Extract current totals from breakdown
+    const getCount = (product) => earnings.breakdown.find(b => b.product === product)?.count || 0
+    const getPayout = (product) => earnings.breakdown.find(b => b.product === product)?.payout || 0
+    
+    const currentTotals = {
+      internet: getCount('Internet'),
+      mobile: getCount('Mobile'),
+      voice: getCount('Voice'),
+      video: getCount('Video'),
+      mrr: getPayout('MRR'),
+      alacarte: earnings.alacarte_total || 0,
+    }
+    
+    const internetCount = currentTotals.internet
+    return getNextTierInfo(internetCount, currentTotals)
+  }, [earnings])
+
   if (loading) {
     return (
       <div 
@@ -109,27 +130,6 @@ function EarningsCard() {
   }
 
   const isPositiveChange = earnings.month_over_month_change >= 0
-
-  // Calculate next tier motivation info
-  const nextTierInfo = useMemo(() => {
-    if (!earnings?.breakdown) return null
-    
-    // Extract current totals from breakdown
-    const getCount = (product) => earnings.breakdown.find(b => b.product === product)?.count || 0
-    const getPayout = (product) => earnings.breakdown.find(b => b.product === product)?.payout || 0
-    
-    const currentTotals = {
-      internet: getCount('Internet'),
-      mobile: getCount('Mobile'),
-      voice: getCount('Voice'),
-      video: getCount('Video'),
-      mrr: getPayout('MRR'),
-      alacarte: earnings.alacarte_total || 0,
-    }
-    
-    const internetCount = currentTotals.internet
-    return getNextTierInfo(internetCount, currentTotals)
-  }, [earnings])
 
   return (
     <div 
