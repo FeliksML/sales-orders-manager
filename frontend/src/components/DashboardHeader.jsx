@@ -55,7 +55,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
           {/* Primary Actions: Reports & Export */}
           <button
             onClick={onReportsClick}
-            className="flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -70,7 +70,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
 
           <button
             onClick={onExportClick}
-            className="flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -85,7 +85,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
 
           <button
             onClick={() => navigate('/import')}
-            className="flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(5, 150, 105, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -104,7 +104,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
               setIsNotificationCenterOpen(true)
               loadUnreadCount()
             }}
-            className="relative flex items-center justify-center h-10 w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 relative flex items-center justify-center h-10 min-w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -122,10 +122,10 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
           </button>
 
           {/* User Menu */}
-          <div className="relative">
+          <div className="flex-1 relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+                className="w-full flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
                 style={{
                   backgroundColor: 'rgba(0, 15, 33, 0.3)',
                   backdropFilter: 'blur(20px)',
