@@ -53,7 +53,7 @@ export function estimateOrderCommission(order) {
   }
   
   // Gig Internet bonus
-  if (order.internet_tier && order.internet_tier.toLowerCase().includes('gig')) {
+  if (order.has_gig) {
     total += BASE_RATES.gig_internet
   }
   

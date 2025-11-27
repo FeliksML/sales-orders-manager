@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract
+from sqlalchemy import func, and_, extract, or_
 from typing import Optional
+import re
 from datetime import datetime, date, timedelta
 from .database import get_db
 from .models import CommissionSettings, Order, User
@@ -107,6 +108,64 @@ def get_effective_rates(internet_count: int, is_new_hire: bool) -> dict:
     }
 
 
+def is_install_before_6pm(install_time: str) -> bool:
+    """Check if install time starts before 6pm (18:00)
+    
+    Install time format examples: "8:00 AM - 9:00 AM", "5:00 PM - 6:00 PM"
+    Returns True if the START time is before 6pm
+    """
+    if not install_time:
+        return False
+    
+    try:
+        # Extract the start time from the time slot
+        # Format: "X:00 AM - Y:00 AM" or "X:00 PM - Y:00 PM"
+        match = re.match(r'(\d{1,2}):00\s*(AM|PM)', install_time.upper())
+        if not match:
+            return False
+        
+        hour = int(match.group(1))
+        period = match.group(2)
+        
+        # Convert to 24-hour format
+        if period == 'AM':
+            if hour == 12:
+                hour_24 = 0
+            else:
+                hour_24 = hour
+        else:  # PM
+            if hour == 12:
+                hour_24 = 12
+            else:
+                hour_24 = hour + 12
+        
+        # 6pm = 18:00
+        return hour_24 < 18
+    except Exception:
+        return False
+
+
+def is_order_eligible_for_fiscal_month(order: Order, cutoff_day: int = 28) -> bool:
+    """Check if order is eligible for fiscal month commission.
+    
+    Rules:
+    - Install date before the 28th: eligible
+    - Install date on the 28th AND install time before 6pm: eligible
+    - Install date on or after 28th with install time at 6pm or later: NOT eligible
+    """
+    if not order.install_date:
+        return False
+    
+    install_day = order.install_date.day
+    
+    if install_day < cutoff_day:
+        return True
+    elif install_day == cutoff_day:
+        return is_install_before_6pm(order.install_time or '')
+    else:
+        return False
+
+
 def calculate_order_commission(order: Order, rates: dict, alacarte_eligible: bool) -> dict:
     """Calculate commission for a single order"""
     # PSU payouts
@@ -121,9 +180,8 @@ def calculate_order_commission(order: Order, rates: dict, alacarte_eligible: boo
     # A-la-carte payouts (only if eligible - internet > 4)
     wib_payout = ALACARTE_RATES["wib"] if alacarte_eligible and order.has_wib else 0
     
-    # Gig internet bonus (check if internet_tier contains "Gig")
-    is_gig = order.internet_tier and "gig" in order.internet_tier.lower() if order.internet_tier else False
-    gig_bonus = ALACARTE_RATES["gig_internet"] if alacarte_eligible and is_gig else 0
+    # Gig internet bonus (uses has_gig field)
+    gig_bonus = ALACARTE_RATES["gig_internet"] if alacarte_eligible and order.has_gig else 0
     
     # SBC seats (a-la-carte)
     sbc_payout = (order.has_sbc or 0) * ALACARTE_RATES["addl_sbc_seats"] if alacarte_eligible else 0
@@ -274,23 +332,28 @@ def get_auto_totals(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get auto-aggregated product counts from orders for current month with install_date < 28th"""
+    """Get auto-aggregated product counts from orders for current month.
+    
+    Eligibility: install date before 28th, OR on 28th before 6pm.
+    """
     settings = get_or_create_settings(db, current_user.userid)
     
     # Get current month boundaries
     today = date.today()
-    month_start = date(today.year, today.month, 1)
     cutoff_date = date(today.year, today.month, 28)
     
-    # Query for eligible orders: created this month AND install_date < 28th
-    eligible_orders = db.query(Order).filter(
+    # Query for orders created this month with install_date <= 28th (then filter in Python for time)
+    candidate_orders = db.query(Order).filter(
         and_(
             Order.userid == current_user.userid,
             extract('month', Order.created_at) == today.month,
             extract('year', Order.created_at) == today.year,
-            Order.install_date < cutoff_date
+            Order.install_date <= cutoff_date
         )
     ).all()
+    
+    # Filter eligible orders (before 28th OR on 28th before 6pm)
+    eligible_orders = [o for o in candidate_orders if is_order_eligible_for_fiscal_month(o)]
     
     # Auto-calculate totals
     auto_internet = sum(1 for o in eligible_orders if o.has_internet)
@@ -299,10 +362,7 @@ def get_auto_totals(
     auto_video = sum(1 for o in eligible_orders if o.has_tv)
     auto_mrr = sum(o.monthly_total or 0 for o in eligible_orders)
     auto_wib = sum(1 for o in eligible_orders if o.has_wib)
-    auto_gig_internet = sum(
-        1 for o in eligible_orders 
-        if o.internet_tier and "gig" in o.internet_tier.lower()
-    )
+    auto_gig_internet = sum(1 for o in eligible_orders if o.has_gig)
     auto_sbc = sum(o.has_sbc or 0 for o in eligible_orders)
     
     # Get overrides
@@ -391,7 +451,10 @@ def get_earnings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Calculate monthly commission earnings with breakdown"""
+    """Calculate monthly commission earnings with breakdown.
+    
+    Eligibility: install date before 28th, OR on 28th before 6pm.
+    """
     settings = get_or_create_settings(db, current_user.userid)
     
     # Get current month boundaries
@@ -407,15 +470,18 @@ def get_earnings(
         last_month_start = date(today.year, today.month - 1, 1)
         last_month_cutoff = date(today.year, today.month - 1, 28)
     
-    # Query eligible orders for this month
-    eligible_orders = db.query(Order).filter(
+    # Query candidate orders for this month (install_date <= 28th)
+    candidate_orders = db.query(Order).filter(
         and_(
             Order.userid == current_user.userid,
             extract('month', Order.created_at) == today.month,
             extract('year', Order.created_at) == today.year,
-            Order.install_date < cutoff_date
+            Order.install_date <= cutoff_date
         )
     ).all()
+    
+    # Filter eligible orders (before 28th OR on 28th before 6pm)
+    eligible_orders = [o for o in candidate_orders if is_order_eligible_for_fiscal_month(o)]
     
     # Total orders created this month (regardless of install date)
     total_orders_this_month = db.query(func.count(Order.orderid)).filter(
@@ -448,7 +514,7 @@ def get_earnings(
     auto_wib = sum(1 for o in eligible_orders if o.has_wib)
     wib = overrides.get("wib", auto_wib)
     
-    auto_gig = sum(1 for o in eligible_orders if o.internet_tier and "gig" in o.internet_tier.lower())
+    auto_gig = sum(1 for o in eligible_orders if o.has_gig)
     gig_internet = overrides.get("gig_internet", auto_gig)
     
     auto_sbc = sum(o.has_sbc or 0 for o in eligible_orders)
@@ -491,14 +557,15 @@ def get_earnings(
     total_commission = psu_total + mrr_payout + alacarte_total + ramp_amount + sae_bonus
     
     # Calculate last month's earnings for comparison
-    last_month_orders = db.query(Order).filter(
+    lm_candidate_orders = db.query(Order).filter(
         and_(
             Order.userid == current_user.userid,
             extract('month', Order.created_at) == last_month_start.month,
             extract('year', Order.created_at) == last_month_start.year,
-            Order.install_date < last_month_cutoff
+            Order.install_date <= last_month_cutoff
         )
     ).all()
+    last_month_orders = [o for o in lm_candidate_orders if is_order_eligible_for_fiscal_month(o)]
     
     # Simple calculation for last month (without overrides)
     lm_internet = sum(1 for o in last_month_orders if o.has_internet)

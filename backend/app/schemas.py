@@ -57,6 +57,7 @@ class OrderBase(BaseModel):
     has_mobile: int = 0
     mobile_activated: int = 0
     has_wib: bool = False
+    has_gig: bool = False
     internet_tier: Optional[str] = None
     monthly_total: Optional[float] = None
     initial_payment: Optional[float] = None
@@ -84,6 +85,7 @@ class OrderUpdate(BaseModel):
     has_mobile: Optional[int] = None
     mobile_activated: Optional[int] = None
     has_wib: Optional[bool] = None
+    has_gig: Optional[bool] = None
     internet_tier: Optional[str] = None
     monthly_total: Optional[float] = None
     initial_payment: Optional[float] = None

@@ -58,6 +58,7 @@ class Order(Base):
     has_mobile = Column(Integer, default=0)
     mobile_activated = Column(Integer, default=0)
     has_wib = Column(Boolean, default=False)
+    has_gig = Column(Boolean, default=False)  # Gig Internet bonus eligible
 
     # PDF extracted fields
     internet_tier = Column(String(100), nullable=True)

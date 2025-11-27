@@ -72,6 +72,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     has_mobile: 0,
     mobile_activated: 0,
     has_wib: false,
+    has_gig: false,
     internet_tier: '',
     monthly_total: '',
     initial_payment: '',
@@ -270,6 +271,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
         has_mobile: 0,
         mobile_activated: 0,
         has_wib: false,
+        has_gig: false,
         internet_tier: '',
         monthly_total: '',
         initial_payment: '',
@@ -306,7 +308,8 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     formData.has_voice +
     formData.has_mobile +
     formData.has_sbc +
-    (formData.has_wib ? 1 : 0)
+    (formData.has_wib ? 1 : 0) +
+    (formData.has_gig ? 1 : 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
@@ -729,6 +732,34 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                         }`}
                       >
                         {formData.has_wib && (
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Gig Internet */}
+                  <div
+                    onClick={() => handleChange('has_gig', !formData.has_gig)}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      formData.has_gig
+                        ? 'bg-emerald-500/20 border-emerald-500'
+                        : 'bg-white/5 border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-white font-semibold">Gig Internet</h4>
+                        <p className="text-gray-400 text-sm">1 Gbps+ speed bonus</p>
+                      </div>
+                      <div
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                          formData.has_gig
+                            ? 'bg-emerald-500 border-emerald-500'
+                            : 'border-white/30'
+                        }`}
+                      >
+                        {formData.has_gig && (
                           <CheckCircle className="w-4 h-4 text-white" />
                         )}
                       </div>

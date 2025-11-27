@@ -56,6 +56,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
         has_mobile: order.has_mobile || 0,
         mobile_activated: order.mobile_activated || 0,
         has_wib: order.has_wib || false,
+        has_gig: order.has_gig || false,
         internet_tier: order.internet_tier || '',
         monthly_total: order.monthly_total || '',
         initial_payment: order.initial_payment || '',
@@ -248,7 +249,8 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     formData.has_voice +
     formData.has_mobile +
     formData.has_sbc +
-    (formData.has_wib ? 1 : 0)
+    (formData.has_wib ? 1 : 0) +
+    (formData.has_gig ? 1 : 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
@@ -792,6 +794,13 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                         onChange={(v) => handleChange('has_wib', v)}
                         color="green"
                       />
+                      <ProductToggleEdit
+                        icon={Wifi}
+                        label="Gig Internet"
+                        checked={formData.has_gig}
+                        onChange={(v) => handleChange('has_gig', v)}
+                        color="emerald"
+                      />
                       <ProductCounterEdit
                         icon={PhoneCall}
                         label="Voice Lines"
@@ -823,6 +832,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                       {formData.has_internet && <ProductBadge icon={Wifi} label="Internet" color="blue" />}
                       {formData.has_tv && <ProductBadge icon={Tv} label="TV Service" color="purple" />}
                       {formData.has_wib && <ProductBadge icon={Radio} label="WIB" color="green" />}
+                      {formData.has_gig && <ProductBadge icon={Wifi} label="Gig Internet" color="emerald" />}
                       {formData.has_voice > 0 && <ProductBadge icon={PhoneCall} label="Voice Lines" count={formData.has_voice} color="orange" />}
                       {formData.has_mobile > 0 && <ProductBadge icon={Smartphone} label="Mobile Lines" count={formData.has_mobile} color="indigo" />}
                       {formData.has_sbc > 0 && <ProductBadge icon={Package} label="SBC" count={formData.has_sbc} color="pink" />}
