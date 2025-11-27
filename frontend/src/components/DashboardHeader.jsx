@@ -55,7 +55,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
           {/* Primary Actions: Reports & Export */}
           <button
             onClick={onReportsClick}
-            className="flex items-center justify-center gap-2 h-10 px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 sm:px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -65,13 +65,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Reports"
           >
             <Clock size={16} />
-            {/* Leftmost: Shows text only when all buttons can fit with text (620px+) */}
-            <span className="hidden min-[620px]:inline text-sm">Reports</span>
+            <span className="hidden min-[480px]:inline text-sm">Reports</span>
           </button>
 
           <button
             onClick={onExportClick}
-            className="flex items-center justify-center gap-2 h-10 px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 sm:px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -81,13 +80,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Export"
           >
             <FileBarChart size={16} />
-            {/* Shows text when Export + User can fit with text (500px+) */}
-            <span className="hidden min-[500px]:inline text-sm">Export</span>
+            <span className="hidden min-[400px]:inline text-sm">Export</span>
           </button>
 
           <button
             onClick={() => navigate('/import')}
-            className="flex items-center justify-center gap-2 h-10 px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 sm:px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(5, 150, 105, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -97,7 +95,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Import PDF"
           >
             <FileUp size={16} />
-            <span className="hidden min-[700px]:inline text-sm">Import PDF</span>
+            <span className="hidden min-[520px]:inline text-sm">Import</span>
           </button>
 
           {/* Notification Bell */}
@@ -106,7 +104,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
               setIsNotificationCenterOpen(true)
               loadUnreadCount()
             }}
-            className="relative flex items-center justify-center h-10 w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="flex-1 relative flex items-center justify-center h-10 min-w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -124,10 +122,10 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
           </button>
 
           {/* User Menu */}
-          <div className="relative">
+          <div className="flex-1 relative">
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="flex items-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+                className="w-full flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
                 style={{
                   backgroundColor: 'rgba(0, 15, 33, 0.3)',
                   backdropFilter: 'blur(20px)',
@@ -136,7 +134,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
                 }}
               >
                 <User size={18} className="text-blue-400" />
-                <span className="hidden min-[380px]:inline text-sm font-medium">{user?.name}</span>
+                <span className="hidden min-[340px]:inline text-sm font-medium">{user?.name}</span>
                 <ChevronDown size={16} className={`transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
