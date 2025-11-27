@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react'
 import { 
   TrendingUp, TrendingDown, Minus, Trophy, Flame, Zap, 
   Package, Wifi, Smartphone, Layers, DollarSign, Tv, Phone, 
-  ChevronRight, Lightbulb, Calendar, BarChart3, Award
+  ChevronRight, Lightbulb, Calendar, BarChart3, Award, Sparkles, Loader2
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { usePerformanceInsights } from '../hooks/usePerformanceInsights'
+import { orderService } from '../services/orderService'
 import Card from './ui/Card'
 import LoadingSpinner from './ui/LoadingSpinner'
 
@@ -241,6 +242,33 @@ function PerformanceInsights() {
   const [viewMode, setViewMode] = useState('monthly') // 'monthly' or 'weekly'
   const [selectedMetric, setSelectedMetric] = useState('orders')
   
+  // AI Insights state
+  const [aiInsights, setAiInsights] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiRemaining, setAiRemaining] = useState(3)
+  const [aiError, setAiError] = useState(null)
+  
+  // Generate AI insights handler
+  const handleGenerateAI = async () => {
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const result = await orderService.generateAIInsights()
+      setAiInsights(result.insights)
+      setAiRemaining(result.remaining_today)
+    } catch (err) {
+      console.error('Failed to generate AI insights:', err)
+      if (err.response?.status === 429) {
+        setAiError('Daily limit reached (3/day). Try again tomorrow!')
+        setAiRemaining(0)
+      } else {
+        setAiError('Failed to generate insights. Try again.')
+      }
+    } finally {
+      setAiLoading(false)
+    }
+  }
+  
   // Get display data based on view mode
   const trendData = useMemo(() => {
     if (!insights) return []
@@ -415,21 +443,93 @@ function PerformanceInsights() {
           </Card>
         )}
         
-        {/* Smart Insights */}
-        {textInsights && textInsights.length > 0 && (
-          <Card>
-            <h3 className="text-white font-semibold flex items-center gap-2 mb-4">
+        {/* Smart Insights with AI Generation */}
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white font-semibold flex items-center gap-2">
               <Lightbulb className="w-4 h-4 text-indigo-400" />
               Insights
             </h3>
             
+            {/* AI Generate Button */}
+            <button
+              onClick={handleGenerateAI}
+              disabled={aiLoading || aiRemaining === 0}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                aiLoading || aiRemaining === 0
+                  ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
+              }`}
+              title={aiRemaining === 0 ? 'Daily limit reached' : `Generate AI insights (${aiRemaining}/3 remaining today)`}
+            >
+              {aiLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {aiLoading ? 'Generating...' : `AI Insights`}
+              </span>
+              <span className="text-xs opacity-70">({aiRemaining}/3)</span>
+            </button>
+          </div>
+          
+          {/* AI Error */}
+          {aiError && (
+            <div className="mb-3 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
+              <p className="text-sm text-rose-400">{aiError}</p>
+            </div>
+          )}
+          
+          {/* AI Generated Insights */}
+          {aiInsights && aiInsights.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="w-3 h-3 text-violet-400" />
+                <span className="text-xs font-medium text-violet-400 uppercase tracking-wider">AI Generated</span>
+              </div>
+              <div className="space-y-2">
+                {aiInsights.map((insight, idx) => (
+                  <div 
+                    key={idx}
+                    className="flex items-start gap-3 p-3 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(236, 72, 153, 0.1) 100%)',
+                      border: '1px solid rgba(139, 92, 246, 0.3)'
+                    }}
+                  >
+                    <div className="p-1.5 rounded-lg bg-violet-500/20 flex-shrink-0">
+                      <Sparkles className="w-4 h-4 text-violet-400" />
+                    </div>
+                    <p className="text-sm text-gray-200 leading-relaxed">{insight}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Regular Insights */}
+          {textInsights && textInsights.length > 0 && (
             <div className="space-y-3">
-              {textInsights.slice(0, 4).map((insight, idx) => (
+              {!aiInsights && (
+                <div className="flex items-center gap-2 mb-2">
+                  <Lightbulb className="w-3 h-3 text-indigo-400" />
+                  <span className="text-xs font-medium text-indigo-400/70 uppercase tracking-wider">Quick Stats</span>
+                </div>
+              )}
+              {textInsights.slice(0, aiInsights ? 2 : 4).map((insight, idx) => (
                 <InsightBubble key={idx} insight={insight} index={idx} />
               ))}
             </div>
-          </Card>
-        )}
+          )}
+          
+          {/* Empty state */}
+          {(!textInsights || textInsights.length === 0) && !aiInsights && (
+            <div className="text-center py-4">
+              <p className="text-gray-500 text-sm mb-3">No insights yet. Try generating AI insights!</p>
+            </div>
+          )}
+        </Card>
       </div>
       
       {/* Week Comparison - Secondary */}

@@ -137,5 +137,11 @@ export const orderService = {
   getPerformanceInsights: async () => {
     const response = await apiClient.get('/api/orders/performance-insights')
     return response.data
+  },
+
+  // Generate AI-powered insights (max 3/day)
+  generateAIInsights: async () => {
+    const response = await apiClient.post('/api/orders/performance-insights/generate-ai')
+    return response.data
   }
 }

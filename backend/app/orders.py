@@ -711,6 +711,148 @@ def get_performance_insights(
     )
 
 
+class AIInsightsResponse(BaseModel):
+    insights: List[str]
+    remaining_today: int
+    ai_enabled: bool
+
+
+@router.post("/performance-insights/generate-ai", response_model=AIInsightsResponse)
+async def generate_ai_insights_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate AI-powered performance insights using Groq's Llama model.
+    Rate limited to 3 requests per day per user.
+    """
+    from .ai_insights import generate_performance_insights, is_ai_configured
+    
+    # Check if AI is configured
+    if not is_ai_configured():
+        return AIInsightsResponse(
+            insights=["AI insights not configured. Contact administrator."],
+            remaining_today=0,
+            ai_enabled=False
+        )
+    
+    today = date.today()
+    
+    # Reset count if it's a new day
+    if current_user.ai_insights_reset_date != today:
+        current_user.ai_insights_count = 0
+        current_user.ai_insights_reset_date = today
+        db.commit()
+    
+    # Check rate limit (3 per day)
+    if current_user.ai_insights_count >= 3:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Daily AI insights limit reached (3/day). Try again tomorrow."
+        )
+    
+    # Get performance metrics for the AI
+    user_id = current_user.userid
+    
+    # Current fiscal month
+    curr_start, curr_end, curr_label = get_fiscal_month_boundaries(today)
+    all_orders = db.query(Order).filter(Order.userid == user_id).all()
+    curr_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, curr_start, curr_end)]
+    
+    # Previous fiscal month
+    prev_start, prev_end, prev_label = get_previous_fiscal_month(curr_start, curr_end)
+    prev_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, prev_start, prev_end)]
+    
+    # Calculate current metrics
+    curr_orders = len(curr_month_orders)
+    curr_revenue = sum(o.monthly_total or 0 for o in curr_month_orders)
+    curr_psu = sum(calculate_psu_from_order(o) for o in curr_month_orders)
+    curr_internet = sum(1 for o in curr_month_orders if o.has_internet)
+    curr_mobile = sum(1 for o in curr_month_orders if o.has_mobile and o.has_mobile > 0)
+    
+    # Calculate previous metrics
+    prev_orders = len(prev_month_orders)
+    prev_revenue = sum(o.monthly_total or 0 for o in prev_month_orders)
+    prev_internet = sum(1 for o in prev_month_orders if o.has_internet)
+    prev_mobile = sum(1 for o in prev_month_orders if o.has_mobile and o.has_mobile > 0)
+    
+    # Calculate changes
+    order_change = ((curr_orders - prev_orders) / prev_orders * 100) if prev_orders > 0 else (100 if curr_orders > 0 else 0)
+    revenue_change = ((curr_revenue - prev_revenue) / prev_revenue * 100) if prev_revenue > 0 else (100 if curr_revenue > 0 else 0)
+    internet_change = ((curr_internet - prev_internet) / prev_internet * 100) if prev_internet > 0 else (100 if curr_internet > 0 else 0)
+    mobile_change = ((curr_mobile - prev_mobile) / prev_mobile * 100) if prev_mobile > 0 else (100 if curr_mobile > 0 else 0)
+    
+    # Find best month
+    best_orders = 0
+    best_period = "N/A"
+    temp_start, temp_end = curr_start, curr_end
+    for i in range(12):
+        if i > 0:
+            temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
+        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
+        if len(month_orders) > best_orders:
+            best_orders = len(month_orders)
+            best_period = temp_end.strftime("%B %Y")
+    
+    # Detect streak
+    streak = 0
+    streak_type = "none"
+    temp_start, temp_end = curr_start, curr_end
+    prev_count = curr_orders
+    for i in range(1, 6):
+        temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
+        month_count = len([o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)])
+        if i == 1:
+            if curr_orders > month_count:
+                streak = 1
+                streak_type = "growth"
+            elif curr_orders < month_count:
+                streak = 1
+                streak_type = "decline"
+        else:
+            if streak_type == "growth" and prev_count > month_count:
+                streak += 1
+            elif streak_type == "decline" and prev_count < month_count:
+                streak += 1
+            else:
+                break
+        prev_count = month_count
+    
+    # Build metrics dict for AI
+    metrics = {
+        "current_orders": curr_orders,
+        "current_revenue": curr_revenue,
+        "current_psu": curr_psu,
+        "previous_orders": prev_orders,
+        "previous_revenue": prev_revenue,
+        "order_change": order_change,
+        "revenue_change": revenue_change,
+        "streak": streak,
+        "streak_type": streak_type,
+        "best_orders": best_orders,
+        "best_period": best_period,
+        "current_internet": curr_internet,
+        "internet_change": internet_change,
+        "current_mobile": curr_mobile,
+        "mobile_change": mobile_change,
+    }
+    
+    # Generate AI insights
+    insights = await generate_performance_insights(metrics)
+    
+    # Update usage count
+    current_user.ai_insights_count += 1
+    db.commit()
+    
+    remaining = 3 - current_user.ai_insights_count
+    
+    return AIInsightsResponse(
+        insights=insights,
+        remaining_today=remaining,
+        ai_enabled=True
+    )
+
+
 @router.get("/export/columns")
 def get_available_columns(
     current_user: User = Depends(get_current_user)

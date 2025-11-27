@@ -27,6 +27,10 @@ class User(Base):
     # Admin role
     is_admin = Column(Boolean, default=False, nullable=False)
 
+    # AI Insights rate limiting (max 3 per day)
+    ai_insights_count = Column(Integer, default=0, nullable=False)
+    ai_insights_reset_date = Column(Date, nullable=True)
+
 class Order(Base):
     __tablename__ = 'orders'
 
