@@ -51,7 +51,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
         </Link>
 
         {/* Right: Actions + Account Controls */}
-        <div className="flex items-center gap-3 flex-wrap ml-auto">
+        <div className="flex items-center gap-3 flex-wrap justify-end ml-auto">
           {/* Primary Actions: Reports & Export */}
           <button
             onClick={onReportsClick}
