@@ -4,8 +4,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import GoogleMapsLoader from './components/GoogleMapsLoader'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoadingSpinner from './components/ui/LoadingSpinner'
-import PWAInstallPrompt from './components/PWAInstallPrompt'
-import SyncStatus from './components/SyncStatus'
 import ErrorBoundary from './components/ErrorBoundary'
 
 // Kill old service workers and clear caches
@@ -126,8 +124,6 @@ function App() {
                 />
               </Routes>
             </Suspense>
-            <PWAInstallPrompt />
-            <SyncStatus />
           </Router>
         </AuthProvider>
       </GoogleMapsLoader>

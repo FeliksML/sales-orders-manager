@@ -4,10 +4,6 @@ import tailwindcss from '@tailwindcss/vite'
 import { writeFileSync } from 'fs'
 import { resolve } from 'path'
 
-// VitePWA TEMPORARILY DISABLED - Service Worker was causing Mixed Content errors
-// by caching HTTP URLs. Will re-enable once the issue is resolved.
-// The full PWA config is saved in vite.config.pwa-backup.js
-
 // Plugin to generate version.json with build timestamp
 function versionPlugin() {
   return {
