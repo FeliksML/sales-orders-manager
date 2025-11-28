@@ -80,7 +80,8 @@ class TestOrderCRUD:
     def test_create_order_unauthorized(self, client, sample_order_data):
         """Test order creation without authentication fails"""
         response = client.post("/api/orders/", json=sample_order_data)
-        assert response.status_code == 403  # No auth header
+        # 401 Unauthorized is correct for missing credentials (not 403 Forbidden)
+        assert response.status_code == 401
     
     def test_get_orders_empty(self, client, authenticated_user):
         """Test getting orders when none exist"""
