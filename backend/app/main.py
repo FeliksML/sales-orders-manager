@@ -1,14 +1,9 @@
-print("DEBUG: Starting main.py import...", flush=True)
-
 from fastapi import FastAPI, Request, status
-print("DEBUG: FastAPI imported", flush=True)
-
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-print("DEBUG: FastAPI exceptions imported", flush=True)
+from sqlalchemy import text
 
 from .auth import router as auth_router
-print("DEBUG: Auth router imported", flush=True)
 from .orders import router as orders_router
 from .scheduled_reports import router as scheduled_reports_router
 from .notifications import router as notifications_router
@@ -40,13 +35,12 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown events."""
     # Startup
-    print("🚀 Application starting (scheduler disabled for debugging)...")
-    # start_scheduler()  # Temporarily disabled for debugging
+    # start_scheduler()  # Enable when scheduler is needed
     yield
     # Shutdown
-    print("🛑 Application shutting down...")
-    # shutdown_scheduler()  # Temporarily disabled for debugging
+    # shutdown_scheduler()  # Enable when scheduler is needed
 
 app = FastAPI(
     lifespan=lifespan,
@@ -73,7 +67,8 @@ async def error_logging_middleware(request: Request, call_next):
                 payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
                 user_id = int(payload.get("sub"))
                 # We'd need to query DB for email, but let's skip for performance
-        except:
+        except (jwt.JWTError, ValueError, AttributeError, IndexError):
+            # Token parsing failed - user_id remains None
             pass
 
         # Get client IP
@@ -82,7 +77,7 @@ async def error_logging_middleware(request: Request, call_next):
         # Get user agent
         user_agent = request.headers.get("User-Agent", "")
 
-        # Log the error
+        # Log the error to database
         try:
             with SessionLocal() as db:
                 error_log = ErrorLog(
@@ -99,23 +94,17 @@ async def error_logging_middleware(request: Request, call_next):
                 )
                 db.add(error_log)
                 db.commit()
-                print(f"🔴 Error logged to database: {str(exc)[:100]}")
-        except Exception as log_error:
-            print(f"❌ Failed to log error to database: {str(log_error)}")
+        except Exception:
+            # If we can't log to DB, silently continue - the exception will still be raised
+            pass
 
         # Re-raise the exception for FastAPI to handle
         raise exc
 
-# Add custom validation error handler for debugging
+# Add custom validation error handler
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    print("=" * 80)
-    print("❌ VALIDATION ERROR:")
-    print(f"Path: {request.url.path}")
-    print(f"Method: {request.method}")
-    print(f"Errors: {exc.errors()}")
-    print(f"Body: {exc.body}")
-    print("=" * 80)
+    """Handle validation errors with detailed response."""
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors()},
@@ -176,7 +165,7 @@ def readiness_check():
     try:
         # Test database connection
         with SessionLocal() as db:
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
 
         return {
             "status": "ready",

@@ -26,6 +26,93 @@ router = APIRouter()
 MAX_PDF_SIZE = 10 * 1024 * 1024
 
 
+def build_filtered_orders_query(
+    db: Session,
+    user_id: int,
+    search: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    product_types: Optional[str] = None,
+    install_status: Optional[str] = None
+):
+    """
+    Build a filtered query for orders based on common filter parameters.
+    
+    This helper function is used by get_orders, export endpoints, and email_export
+    to avoid duplicating filter logic.
+    
+    Args:
+        db: Database session
+        user_id: The user ID to filter orders by
+        search: Search term for customer name, account number, spectrum reference, or business name
+        date_from: Filter orders with install_date >= date_from
+        date_to: Filter orders with install_date <= date_to
+        product_types: Comma-separated product types (internet, tv, mobile, voice, wib, sbc)
+        install_status: Comma-separated install statuses (installed, pending, today)
+    
+    Returns:
+        SQLAlchemy query object with applied filters
+    """
+    query = db.query(Order).filter(Order.userid == user_id)
+
+    # Search filter
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Order.customer_name.ilike(search_term),
+                Order.customer_account_number.ilike(search_term),
+                Order.spectrum_reference.ilike(search_term),
+                Order.business_name.ilike(search_term)
+            )
+        )
+
+    # Date range filter
+    if date_from:
+        query = query.filter(Order.install_date >= date_from)
+    if date_to:
+        query = query.filter(Order.install_date <= date_to)
+
+    # Product type filter
+    if product_types:
+        product_list = [p.strip().lower() for p in product_types.split(',')]
+        product_conditions = []
+
+        if 'internet' in product_list:
+            product_conditions.append(Order.has_internet == True)
+        if 'tv' in product_list:
+            product_conditions.append(Order.has_tv == True)
+        if 'mobile' in product_list:
+            product_conditions.append(Order.has_mobile > 0)
+        if 'voice' in product_list:
+            product_conditions.append(Order.has_voice > 0)
+        if 'wib' in product_list:
+            product_conditions.append(Order.has_wib == True)
+        if 'sbc' in product_list:
+            product_conditions.append(Order.has_sbc > 0)
+
+        if product_conditions:
+            query = query.filter(or_(*product_conditions))
+
+    # Install status filter
+    if install_status:
+        today = date.today()
+        status_list = [s.strip().lower() for s in install_status.split(',')]
+        status_conditions = []
+
+        if 'installed' in status_list:
+            status_conditions.append(Order.install_date < today)
+        if 'today' in status_list:
+            status_conditions.append(Order.install_date == today)
+        if 'pending' in status_list:
+            status_conditions.append(Order.install_date > today)
+
+        if status_conditions:
+            query = query.filter(or_(*status_conditions))
+
+    return query
+
+
 @router.post("/extract-pdf")
 async def extract_pdf(
     file: UploadFile = File(...),
@@ -139,64 +226,17 @@ def get_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all orders for the current user with optional search and filters, including pagination metadata"""
-    # Base query - filter by user
-    query = db.query(Order).filter(Order.userid == current_user.userid)
-
-    # Search filter - search across customer name, account number, and spectrum reference
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Order.customer_name.ilike(search_term),
-                Order.customer_account_number.ilike(search_term),
-                Order.spectrum_reference.ilike(search_term),
-                Order.business_name.ilike(search_term)
-            )
-        )
-
-    # Date range filter
-    if date_from:
-        query = query.filter(Order.install_date >= date_from)
-    if date_to:
-        query = query.filter(Order.install_date <= date_to)
-
-    # Product type filter
-    if product_types:
-        product_list = [p.strip().lower() for p in product_types.split(',')]
-        product_conditions = []
-
-        if 'internet' in product_list:
-            product_conditions.append(Order.has_internet == True)
-        if 'tv' in product_list:
-            product_conditions.append(Order.has_tv == True)
-        if 'mobile' in product_list:
-            product_conditions.append(Order.has_mobile > 0)
-        if 'voice' in product_list:
-            product_conditions.append(Order.has_voice > 0)
-        if 'wib' in product_list:
-            product_conditions.append(Order.has_wib == True)
-        if 'sbc' in product_list:
-            product_conditions.append(Order.has_sbc > 0)
-
-        if product_conditions:
-            query = query.filter(or_(*product_conditions))
-
-    # Install status filter
-    if install_status:
-        today = date.today()
-        status_list = [s.strip().lower() for s in install_status.split(',')]
-        status_conditions = []
-
-        if 'installed' in status_list:
-            status_conditions.append(Order.install_date < today)
-        if 'today' in status_list:
-            status_conditions.append(Order.install_date == today)
-        if 'pending' in status_list:
-            status_conditions.append(Order.install_date > today)
-
-        if status_conditions:
-            query = query.filter(or_(*status_conditions))
+    """Get all orders for the current user with optional search and filters, including pagination metadata."""
+    # Build filtered query using helper function
+    query = build_filtered_orders_query(
+        db=db,
+        user_id=current_user.userid,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        product_types=product_types,
+        install_status=install_status
+    )
 
     # Get total count before pagination
     total = query.count()
@@ -992,61 +1032,17 @@ def export_orders_excel(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Export orders to Excel with optional column selection and filters"""
-    # Build query with same filtering logic as get_orders
-    query = db.query(Order).filter(Order.userid == current_user.userid)
-
-    # Apply filters
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Order.customer_name.ilike(search_term),
-                Order.customer_account_number.ilike(search_term),
-                Order.spectrum_reference.ilike(search_term),
-                Order.business_name.ilike(search_term)
-            )
-        )
-
-    if date_from:
-        query = query.filter(Order.install_date >= date_from)
-    if date_to:
-        query = query.filter(Order.install_date <= date_to)
-
-    if product_types:
-        product_list = [p.strip().lower() for p in product_types.split(',')]
-        product_conditions = []
-
-        if 'internet' in product_list:
-            product_conditions.append(Order.has_internet == True)
-        if 'tv' in product_list:
-            product_conditions.append(Order.has_tv == True)
-        if 'mobile' in product_list:
-            product_conditions.append(Order.has_mobile > 0)
-        if 'voice' in product_list:
-            product_conditions.append(Order.has_voice > 0)
-        if 'wib' in product_list:
-            product_conditions.append(Order.has_wib == True)
-        if 'sbc' in product_list:
-            product_conditions.append(Order.has_sbc > 0)
-
-        if product_conditions:
-            query = query.filter(or_(*product_conditions))
-
-    if install_status:
-        today = date.today()
-        status_list = [s.strip().lower() for s in install_status.split(',')]
-        status_conditions = []
-
-        if 'installed' in status_list:
-            status_conditions.append(Order.install_date < today)
-        if 'today' in status_list:
-            status_conditions.append(Order.install_date == today)
-        if 'pending' in status_list:
-            status_conditions.append(Order.install_date > today)
-
-        if status_conditions:
-            query = query.filter(or_(*status_conditions))
+    """Export orders to Excel with optional column selection and filters."""
+    # Build filtered query using helper function
+    query = build_filtered_orders_query(
+        db=db,
+        user_id=current_user.userid,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        product_types=product_types,
+        install_status=install_status
+    )
 
     # Get all matching orders
     orders = query.all()
@@ -1082,61 +1078,17 @@ def export_orders_csv(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Export orders to CSV with optional column selection and filters"""
-    # Build query with same filtering logic as get_orders
-    query = db.query(Order).filter(Order.userid == current_user.userid)
-
-    # Apply filters
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Order.customer_name.ilike(search_term),
-                Order.customer_account_number.ilike(search_term),
-                Order.spectrum_reference.ilike(search_term),
-                Order.business_name.ilike(search_term)
-            )
-        )
-
-    if date_from:
-        query = query.filter(Order.install_date >= date_from)
-    if date_to:
-        query = query.filter(Order.install_date <= date_to)
-
-    if product_types:
-        product_list = [p.strip().lower() for p in product_types.split(',')]
-        product_conditions = []
-
-        if 'internet' in product_list:
-            product_conditions.append(Order.has_internet == True)
-        if 'tv' in product_list:
-            product_conditions.append(Order.has_tv == True)
-        if 'mobile' in product_list:
-            product_conditions.append(Order.has_mobile > 0)
-        if 'voice' in product_list:
-            product_conditions.append(Order.has_voice > 0)
-        if 'wib' in product_list:
-            product_conditions.append(Order.has_wib == True)
-        if 'sbc' in product_list:
-            product_conditions.append(Order.has_sbc > 0)
-
-        if product_conditions:
-            query = query.filter(or_(*product_conditions))
-
-    if install_status:
-        today = date.today()
-        status_list = [s.strip().lower() for s in install_status.split(',')]
-        status_conditions = []
-
-        if 'installed' in status_list:
-            status_conditions.append(Order.install_date < today)
-        if 'today' in status_list:
-            status_conditions.append(Order.install_date == today)
-        if 'pending' in status_list:
-            status_conditions.append(Order.install_date > today)
-
-        if status_conditions:
-            query = query.filter(or_(*status_conditions))
+    """Export orders to CSV with optional column selection and filters."""
+    # Build filtered query using helper function
+    query = build_filtered_orders_query(
+        db=db,
+        user_id=current_user.userid,
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        product_types=product_types,
+        install_status=install_status
+    )
 
     # Get all matching orders
     orders = query.all()
@@ -1249,8 +1201,7 @@ async def email_export(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Email export file to user with CAPTCHA verification"""
-    print(f"📧 Email export request received: {request.model_dump()}")
+    """Email export file to user with CAPTCHA verification."""
 
     # Verify reCAPTCHA
     if not await verify_recaptcha(request.recaptcha_token):
@@ -1267,60 +1218,16 @@ async def email_export(
         )
 
     try:
-        # Build query with filtering logic
-        query = db.query(Order).filter(Order.userid == current_user.userid)
-
-        # Apply filters
-        if request.search:
-            search_term = f"%{request.search}%"
-            query = query.filter(
-                or_(
-                    Order.customer_name.ilike(search_term),
-                    Order.customer_account_number.ilike(search_term),
-                    Order.spectrum_reference.ilike(search_term),
-                    Order.business_name.ilike(search_term)
-                )
-            )
-
-        if request.date_from:
-            query = query.filter(Order.install_date >= request.date_from)
-        if request.date_to:
-            query = query.filter(Order.install_date <= request.date_to)
-
-        if request.product_types:
-            product_list = [p.strip().lower() for p in request.product_types.split(',')]
-            product_conditions = []
-
-            if 'internet' in product_list:
-                product_conditions.append(Order.has_internet == True)
-            if 'tv' in product_list:
-                product_conditions.append(Order.has_tv == True)
-            if 'mobile' in product_list:
-                product_conditions.append(Order.has_mobile > 0)
-            if 'voice' in product_list:
-                product_conditions.append(Order.has_voice > 0)
-            if 'wib' in product_list:
-                product_conditions.append(Order.has_wib == True)
-            if 'sbc' in product_list:
-                product_conditions.append(Order.has_sbc > 0)
-
-            if product_conditions:
-                query = query.filter(or_(*product_conditions))
-
-        if request.install_status:
-            today = date.today()
-            status_list = [s.strip().lower() for s in request.install_status.split(',')]
-            status_conditions = []
-
-            if 'installed' in status_list:
-                status_conditions.append(Order.install_date < today)
-            if 'today' in status_list:
-                status_conditions.append(Order.install_date == today)
-            if 'pending' in status_list:
-                status_conditions.append(Order.install_date > today)
-
-            if status_conditions:
-                query = query.filter(or_(*status_conditions))
+        # Build filtered query using helper function
+        query = build_filtered_orders_query(
+            db=db,
+            user_id=current_user.userid,
+            search=request.search,
+            date_from=request.date_from,
+            date_to=request.date_to,
+            product_types=request.product_types,
+            install_status=request.install_status
+        )
 
         # Get all matching orders
         orders = query.all()

@@ -1,25 +1,42 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Dict, Any, List, Generic, TypeVar
 from datetime import date, datetime
+import re
 
 # Generic type for paginated responses
 T = TypeVar('T')
 
+# Regex patterns for validation
+PHONE_PATTERN = re.compile(r'^[\d\s\-\(\)\+\.]{7,20}$')
+SALESID_PATTERN = re.compile(r'^\d{5}$')
+
+
 class UserSignup(BaseModel):
-    email : str
-    password : str
-    salesid : int
-    name : str
-    recaptcha_token : Optional[str] = None
+    """Schema for user registration with validation."""
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=128)
+    salesid: int = Field(..., ge=10000, le=99999)  # Must be 5 digits
+    name: str = Field(..., min_length=1, max_length=255)
+    recaptcha_token: Optional[str] = None
+
+    @field_validator('name')
+    @classmethod
+    def name_must_not_be_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError('Name cannot be empty')
+        return v.strip()
+
 
 class UserLogin(BaseModel):
-    email : str
-    password : str
-    recaptcha_token : Optional[str] = None
+    """Schema for user login."""
+    email: EmailStr
+    password: str = Field(..., min_length=1)
+    recaptcha_token: Optional[str] = None
 
 class UserResponse(BaseModel):
+    """Schema for user response data."""
     userid: int
-    email: str
+    email: EmailStr
     salesid: int
     name: str
     email_verified: bool
@@ -28,68 +45,90 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 class ForgotPasswordRequest(BaseModel):
-    email: str
+    """Schema for password reset request."""
+    email: EmailStr
     recaptcha_token: Optional[str] = None
 
+
 class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
+    """Schema for password reset with new password."""
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
     recaptcha_token: Optional[str] = None
 
 # Order Schemas
 class OrderBase(BaseModel):
-    spectrum_reference: str
-    customer_account_number: str
-    customer_security_code: Optional[str] = None
-    job_number: Optional[str] = None
-    business_name: str
-    customer_name: str
-    customer_email: str
-    customer_address: Optional[str] = None
-    customer_phone: str
+    """Base schema for order data with validation."""
+    spectrum_reference: str = Field(..., min_length=1, max_length=255)
+    customer_account_number: str = Field(..., min_length=1, max_length=255)
+    customer_security_code: Optional[str] = Field(None, max_length=255)
+    job_number: Optional[str] = Field(None, max_length=255)
+    business_name: str = Field(..., min_length=1, max_length=255)
+    customer_name: str = Field(..., min_length=1, max_length=255)
+    customer_email: EmailStr
+    customer_address: Optional[str] = Field(None, max_length=500)
+    customer_phone: str = Field(..., min_length=7, max_length=20)
     install_date: date
-    install_time: str
+    install_time: str = Field(..., min_length=1, max_length=100)
     has_internet: bool = False
-    has_voice: int = 0
+    has_voice: int = Field(default=0, ge=0)
     has_tv: bool = False
-    has_sbc: int = 0
-    has_mobile: int = 0
-    mobile_activated: int = 0
+    has_sbc: int = Field(default=0, ge=0)
+    has_mobile: int = Field(default=0, ge=0)
+    mobile_activated: int = Field(default=0, ge=0)
     has_wib: bool = False
     has_gig: bool = False
-    internet_tier: Optional[str] = None
-    monthly_total: Optional[float] = None
-    initial_payment: Optional[float] = None
-    notes: Optional[str] = None
+    internet_tier: Optional[str] = Field(None, max_length=100)
+    monthly_total: Optional[float] = Field(None, ge=0)
+    initial_payment: Optional[float] = Field(None, ge=0)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator('customer_phone')
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        """Validate phone number format."""
+        if not PHONE_PATTERN.match(v):
+            raise ValueError('Invalid phone number format')
+        return v
 
 class OrderCreate(OrderBase):
     pass
 
 class OrderUpdate(BaseModel):
-    spectrum_reference: Optional[str] = None
-    customer_account_number: Optional[str] = None
-    customer_security_code: Optional[str] = None
-    job_number: Optional[str] = None
-    business_name: Optional[str] = None
-    customer_name: Optional[str] = None
-    customer_email: Optional[str] = None
-    customer_address: Optional[str] = None
-    customer_phone: Optional[str] = None
+    """Schema for updating order data - all fields optional."""
+    spectrum_reference: Optional[str] = Field(None, min_length=1, max_length=255)
+    customer_account_number: Optional[str] = Field(None, min_length=1, max_length=255)
+    customer_security_code: Optional[str] = Field(None, max_length=255)
+    job_number: Optional[str] = Field(None, max_length=255)
+    business_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    customer_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    customer_email: Optional[EmailStr] = None
+    customer_address: Optional[str] = Field(None, max_length=500)
+    customer_phone: Optional[str] = Field(None, min_length=7, max_length=20)
     install_date: Optional[date] = None
-    install_time: Optional[str] = None
+    install_time: Optional[str] = Field(None, min_length=1, max_length=100)
     has_internet: Optional[bool] = None
-    has_voice: Optional[int] = None
+    has_voice: Optional[int] = Field(None, ge=0)
     has_tv: Optional[bool] = None
-    has_sbc: Optional[int] = None
-    has_mobile: Optional[int] = None
-    mobile_activated: Optional[int] = None
+    has_sbc: Optional[int] = Field(None, ge=0)
+    has_mobile: Optional[int] = Field(None, ge=0)
+    mobile_activated: Optional[int] = Field(None, ge=0)
     has_wib: Optional[bool] = None
     has_gig: Optional[bool] = None
-    internet_tier: Optional[str] = None
-    monthly_total: Optional[float] = None
-    initial_payment: Optional[float] = None
-    notes: Optional[str] = None
+    internet_tier: Optional[str] = Field(None, max_length=100)
+    monthly_total: Optional[float] = Field(None, ge=0)
+    initial_payment: Optional[float] = Field(None, ge=0)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator('customer_phone')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Validate phone number format if provided."""
+        if v is not None and not PHONE_PATTERN.match(v):
+            raise ValueError('Invalid phone number format')
+        return v
 
 class OrderResponse(OrderBase):
     orderid: int
@@ -236,27 +275,29 @@ class PaginatedUserResponse(BaseModel):
 
 # Commission Settings Schemas
 class CommissionSettingsBase(BaseModel):
-    ae_type: str = "Account Executive"  # 'Account Executive' or 'Sr Account Executive'
+    """Base schema for commission settings."""
+    ae_type: str = Field(default="Account Executive", max_length=50)
     is_new_hire: bool = False
-    new_hire_month: Optional[int] = None  # 1-6 for ramp period
+    new_hire_month: Optional[int] = Field(None, ge=1, le=6)  # 1-6 for ramp period
     rate_overrides: Optional[Dict[str, Any]] = None
     value_overrides: Optional[Dict[str, Any]] = None
     # Tax settings
-    federal_bracket: float = 0.22  # 22% default
-    state_code: str = "CA"
-    state_tax_rate: float = 0.093  # CA default 9.3%
+    federal_bracket: float = Field(default=0.22, ge=0, le=1)  # 0-100%
+    state_code: str = Field(default="CA", min_length=2, max_length=2)
+    state_tax_rate: float = Field(default=0.093, ge=0, le=1)  # 0-100%
 
 
 class CommissionSettingsUpdate(BaseModel):
-    ae_type: Optional[str] = None
+    """Schema for updating commission settings."""
+    ae_type: Optional[str] = Field(None, max_length=50)
     is_new_hire: Optional[bool] = None
-    new_hire_month: Optional[int] = None
+    new_hire_month: Optional[int] = Field(None, ge=1, le=6)
     rate_overrides: Optional[Dict[str, Any]] = None
     value_overrides: Optional[Dict[str, Any]] = None
     # Tax settings
-    federal_bracket: Optional[float] = None
-    state_code: Optional[str] = None
-    state_tax_rate: Optional[float] = None
+    federal_bracket: Optional[float] = Field(None, ge=0, le=1)
+    state_code: Optional[str] = Field(None, min_length=2, max_length=2)
+    state_tax_rate: Optional[float] = Field(None, ge=0, le=1)
 
 
 class CommissionSettingsResponse(CommissionSettingsBase):
@@ -509,7 +550,7 @@ class FollowUpUpdate(BaseModel):
 
 class FollowUpSnooze(BaseModel):
     """Schema for snoozing a follow-up"""
-    days: int = 1  # Number of days to snooze
+    days: int = Field(default=1, ge=1, le=365)  # Number of days to snooze (1-365)
 
 
 class FollowUpOrderInfo(BaseModel):

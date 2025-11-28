@@ -19,7 +19,11 @@ import httpx
 # JWT Configuration
 SECRET_KEY = get_secret_key()  # No fallback - will fail if not set
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days (TODO: reduce to 60 and implement refresh tokens)
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours - shorter expiration for security
+REFRESH_TOKEN_EXPIRE_DAYS = 7  # Refresh token valid for 7 days
+
+# Password requirements
+MIN_PASSWORD_LENGTH = 8
 
 security = HTTPBearer()
 
@@ -40,9 +44,8 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
-    """Dependency to get current authenticated user"""
+    """Dependency to get current authenticated user from JWT token."""
     token = credentials.credentials
-    print(f"🔐 Validating token: {token[:20]}..." if token else "❌ No token received")
 
     credentials_exception = HTTPException(
         status_code=401,
@@ -53,54 +56,41 @@ async def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str: str = payload.get("sub")
-        print(f"✅ Token decoded successfully, user_id: {user_id_str}")
         if user_id_str is None:
-            print("❌ No user_id in token payload")
             raise credentials_exception
-        user_id = int(user_id_str)  # Convert string back to int
-    except JWTError as e:
-        print(f"❌ JWT decode error: {str(e)}")
+        user_id = int(user_id_str)
+    except JWTError:
         raise credentials_exception
     except ValueError:
-        print("❌ Invalid user_id format in token")
         raise credentials_exception
 
     user = db.query(User).filter(User.userid == user_id).first()
     if user is None:
-        print(f"❌ User {user_id} not found in database")
         raise credentials_exception
 
-    print(f"✅ User authenticated: {user.email}")
     return user
 
+
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Dependency to require admin privileges"""
+    """Dependency to require admin privileges."""
     if not current_user.is_admin:
-        print(f"❌ Access denied: {current_user.email} is not an admin")
         raise HTTPException(
             status_code=403,
             detail="Admin privileges required"
         )
-    print(f"✅ Admin access granted: {current_user.email}")
     return current_user
 
 async def verify_recaptcha(token: str) -> bool:
-    """Verify reCAPTCHA token with Google"""
+    """Verify reCAPTCHA token with Google."""
     if not token:
-        print("❌ No reCAPTCHA token provided")
         return False
 
-    # Check development mode FIRST - bypass CAPTCHA entirely in dev
+    # Check development mode - bypass CAPTCHA in dev environment
     if os.getenv("ENVIRONMENT") == "development":
-        print("⚠️  WARNING: Using development mode - CAPTCHA verification bypassed")
         return True
 
     secret_key = os.getenv("RECAPTCHA_SECRET_KEY")
-    print(f"🔑 Using secret key: {secret_key[:15]}..." if secret_key else "❌ No secret key found in environment")
-
-    # If no secret key is configured in production
     if not secret_key:
-        print("❌ No RECAPTCHA_SECRET_KEY configured")
         return False
 
     try:
@@ -113,15 +103,8 @@ async def verify_recaptcha(token: str) -> bool:
                 }
             )
             result = response.json()
-
-            if result.get("success"):
-                print(f"✓ reCAPTCHA verification successful")
-                return True
-            else:
-                print(f"✗ reCAPTCHA verification failed: {result.get('error-codes', [])}")
-                return False
-    except Exception as e:
-        print(f"✗ reCAPTCHA verification error: {str(e)}")
+            return result.get("success", False)
+    except Exception:
         return False
 
 @router.get("/check-salesid/{salesid}")
@@ -141,41 +124,38 @@ def check_email(email: str):
 @router.post("/signup")
 @limiter.limit("5/hour")  # Strict limit for signup to prevent abuse
 async def signup(request: Request, user_data: UserSignup):
-    print("\n" + "="*60)
-    print("📝 SIGNUP REQUEST RECEIVED")
-    print("="*60)
-    print(f"   Email: {user_data.email}")
-    print(f"   Name: {user_data.name}")
-    print(f"   Sales ID: {user_data.salesid}")
-    print(f"   reCAPTCHA token: {user_data.recaptcha_token[:20]}..." if user_data.recaptcha_token else "   reCAPTCHA token: MISSING")
-    
+    """Create a new user account with email verification."""
     # Verify reCAPTCHA
-    print("\n🔐 Step 1: Verifying reCAPTCHA...")
     if not await verify_recaptcha(user_data.recaptcha_token):
-        print("❌ reCAPTCHA verification FAILED")
         return JSONResponse(
             status_code=400,
             content={"error": "CAPTCHA verification failed. Please try again."}
         )
-    print("✅ reCAPTCHA verification PASSED")
+
+    # Validate password strength
+    if len(user_data.password) < MIN_PASSWORD_LENGTH:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters long."}
+        )
 
     # Check for duplicate email and sales ID
-    print("\n🔍 Step 2: Checking for duplicates...")
     with SessionLocal() as db:
         existing_email = db.query(User).filter(User.email == user_data.email).first()
         if existing_email:
-            print(f"❌ Email {user_data.email} already exists")
-            return {"error": "This email is already registered. Please use a different email or login."}
-        print(f"✅ Email {user_data.email} is available")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "This email is already registered. Please use a different email or login."}
+            )
 
         existing_salesid = db.query(User).filter(User.salesid == user_data.salesid).first()
         if existing_salesid:
-            print(f"❌ Sales ID {user_data.salesid} already exists")
-            return {"error": "This Sales ID is already registered. Please contact your administrator."}
-        print(f"✅ Sales ID {user_data.salesid} is available")
+            return JSONResponse(
+                status_code=400,
+                content={"error": "This Sales ID is already registered. Please contact your administrator."}
+            )
 
         # Generate verification token
-        print("\n🔑 Step 3: Creating user account...")
         verification_token = secrets.token_urlsafe(32)
         token_expiry = datetime.utcnow() + timedelta(hours=24)  # Token valid for 24 hours
 
@@ -195,15 +175,12 @@ async def signup(request: Request, user_data: UserSignup):
 
         db.add(new_user)
         db.commit()
-        print(f"✅ User created with ID: {new_user.userid}")
 
         # Construct verification link
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
         verification_link = f"{frontend_url}/verify-email?token={verification_token}"
-        print(f"🔗 Verification link: {verification_link}")
 
         # Send verification email
-        print("\n📧 Step 4: Sending verification email...")
         try:
             await send_verification_email(
                 email=user_data.email,
@@ -211,18 +188,10 @@ async def signup(request: Request, user_data: UserSignup):
                 verification_link=verification_link
             )
             email_sent = True
-            print(f"✅ Verification email sent successfully to {user_data.email}")
-        except Exception as e:
+        except Exception:
             # Log the error but don't fail the signup
-            print(f"❌ Failed to send verification email!")
-            print(f"   Error type: {type(e).__name__}")
-            print(f"   Error message: {str(e)}")
-            print(f"   Manual verification link: {verification_link}")
+            # In production, this should use proper logging
             email_sent = False
-
-    print("\n" + "="*60)
-    print(f"✅ SIGNUP COMPLETE - Email sent: {email_sent}")
-    print("="*60 + "\n")
 
     return {
         "message": "successful signup",
@@ -233,14 +202,11 @@ async def signup(request: Request, user_data: UserSignup):
 
 @router.get("/verify-email/{token}")
 def verify_email(token: str):
-    """Verify user email with the provided token"""
-    print(f"📧 Verification attempt for token: {token[:10]}...")
-
+    """Verify user email with the provided token."""
     with SessionLocal() as db:
         user = db.query(User).filter(User.verification_token == token).first()
 
         if not user:
-            print(f"❌ Verification failed: Invalid token")
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid verification token"}
@@ -248,7 +214,6 @@ def verify_email(token: str):
 
         # Check if token has expired
         if user.verification_token_expiry < datetime.utcnow():
-            print(f"❌ Verification failed: Token expired for {user.email}")
             return JSONResponse(
                 status_code=400,
                 content={"error": "Verification link has expired. Please request a new one."}
@@ -256,11 +221,10 @@ def verify_email(token: str):
 
         # Mark email as verified
         user.email_verified = True
-        user.verification_token = None  # Clear the token
+        user.verification_token = None
         user.verification_token_expiry = None
         db.commit()
 
-        print(f"✅ Email verified successfully for {user.email}")
         return JSONResponse(
             status_code=200,
             content={"success": True, "message": "Email verified successfully! You can now log in."}
@@ -279,33 +243,42 @@ async def login(request: Request, user_data: UserLogin):
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == user_data.email).first()
 
-    if user == None:
-        return {"message":"Incorrect Login or Password"}
-    else:
-        # Check if email is verified
-        if not user.email_verified:
-            return {"error": "Please verify your email address before logging in. Check your email for the verification link."}
+    if user is None:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Incorrect email or password."}
+        )
+    
+    # Check if email is verified
+    if not user.email_verified:
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Please verify your email address before logging in. Check your email for the verification link."}
+        )
 
-        password_bytes = user_data.password.encode('utf-8')
-        if bcrypt.checkpw(password_bytes, user.password):
-            # Create JWT token (sub must be a string)
-            access_token = create_access_token(data={"sub": str(user.userid)})
+    password_bytes = user_data.password.encode('utf-8')
+    if bcrypt.checkpw(password_bytes, user.password):
+        # Create JWT token (sub must be a string)
+        access_token = create_access_token(data={"sub": str(user.userid)})
 
-            return {
-                "message": "Welcome!",
-                "access_token": access_token,
-                "token_type": "bearer",
-                "user": {
-                    "email": user.email,
-                    "name": user.name,
-                    "salesid": str(user.salesid),
-                    "userid": user.userid,
-                    "email_verified": user.email_verified,
-                    "is_admin": user.is_admin
-                }
+        return {
+            "message": "Welcome!",
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "email": user.email,
+                "name": user.name,
+                "salesid": str(user.salesid),
+                "userid": user.userid,
+                "email_verified": user.email_verified,
+                "is_admin": user.is_admin
             }
-        else:
-            return {"message":"Incorrect Login or Password"}
+        }
+    else:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Incorrect email or password."}
+        )
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
@@ -342,17 +315,16 @@ async def forgot_password(request: Request, reset_request: ForgotPasswordRequest
             frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
             reset_link = f"{frontend_url}/reset-password?token={reset_token}"
 
-            # Send reset email
+            # Send reset email (silently fail if email sending fails)
             try:
                 await send_password_reset_email(
                     email=user.email,
                     name=user.name,
                     reset_link=reset_link
                 )
-                print(f"✓ Password reset email sent to {user.email}")
-            except Exception as e:
-                print(f"✗ Failed to send password reset email: {str(e)}")
-                print(f"Reset link: {reset_link}")
+            except Exception:
+                # Email sending failed - in production, use proper logging
+                pass
 
     return {
         "message": "If an account with that email exists, a password reset link has been sent.",
@@ -381,7 +353,6 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
         user = db.query(User).filter(User.reset_token == reset_request.token).first()
 
         if not user:
-            print(f"❌ Password reset failed: Invalid token")
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid or expired reset token."}
@@ -389,7 +360,6 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
 
         # Check if token has expired
         if user.reset_token_expiry < datetime.utcnow():
-            print(f"❌ Password reset failed: Token expired for {user.email}")
             return JSONResponse(
                 status_code=400,
                 content={"error": "Reset token has expired. Please request a new password reset."}
@@ -405,7 +375,6 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
         user.reset_token_expiry = None
         db.commit()
 
-        print(f"✅ Password reset successfully for {user.email}")
         return JSONResponse(
             status_code=200,
             content={"success": True, "message": "Password reset successfully! You can now log in with your new password."}

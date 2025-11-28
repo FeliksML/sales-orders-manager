@@ -24,9 +24,7 @@ async def get_all_users(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Get all users with pagination and search"""
-    print(f"📊 Admin {admin.email} requesting user list")
-
+    """Get all users with pagination and search."""
     # Build query
     query = db.query(User)
 
@@ -94,9 +92,7 @@ async def get_user_orders(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Get all orders for a specific user"""
-    print(f"📊 Admin {admin.email} requesting orders for user {user_id}")
-
+    """Get all orders for a specific user."""
     # Verify user exists
     user = db.query(User).filter(User.userid == user_id).first()
     if not user:
@@ -121,9 +117,7 @@ async def get_system_analytics(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Get system-wide analytics"""
-    print(f"📊 Admin {admin.email} requesting system analytics")
-
+    """Get system-wide analytics."""
     # User stats
     total_users = db.query(func.count(User.userid)).scalar() or 0
     verified_users = db.query(func.count(User.userid)).filter(User.email_verified == True).scalar() or 0
@@ -199,9 +193,7 @@ async def get_error_logs(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Get error logs with pagination and filters"""
-    print(f"📊 Admin {admin.email} requesting error logs")
-
+    """Get error logs with pagination and filters."""
     # Build query
     query = db.query(ErrorLog)
 
@@ -260,8 +252,6 @@ async def create_error_log(
     db.commit()
     db.refresh(error_log)
 
-    print(f"🔴 Error logged: {error_data.error_type} - {error_data.error_message[:100]}")
-
     return ErrorLogResponse.from_orm(error_log)
 
 @router.patch("/error-logs/{error_id}/resolve", response_model=ErrorLogResponse)
@@ -271,9 +261,7 @@ async def resolve_error(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Mark an error as resolved"""
-    print(f"✅ Admin {admin.email} resolving error {error_id}")
-
+    """Mark an error as resolved."""
     error_log = db.query(ErrorLog).filter(ErrorLog.errorid == error_id).first()
     if not error_log:
         raise HTTPException(status_code=404, detail="Error log not found")
@@ -298,9 +286,7 @@ async def get_system_audit_trail(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Get system-wide audit trail"""
-    print(f"📊 Admin {admin.email} requesting system audit trail")
-
+    """Get system-wide audit trail."""
     # Build query
     query = db.query(AuditLog)
 
@@ -325,9 +311,7 @@ async def manually_verify_user(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Manually verify a user's email"""
-    print(f"✅ Admin {admin.email} manually verifying user {user_id}")
-
+    """Manually verify a user's email."""
     user = db.query(User).filter(User.userid == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -346,9 +330,7 @@ async def toggle_admin_status(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
-    """Toggle admin status for a user"""
-    print(f"🔐 Admin {admin.email} toggling admin status for user {user_id}")
-
+    """Toggle admin status for a user."""
     # Prevent admins from removing their own admin status
     if user_id == admin.userid:
         raise HTTPException(status_code=400, detail="Cannot modify your own admin status")
