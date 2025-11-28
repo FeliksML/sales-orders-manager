@@ -112,7 +112,7 @@ class TestSignup:
         response = client.post("/auth/signup", json=sample_user_data)
         
         assert response.status_code == 400
-        assert "already registered" in response.json()["error"]
+        assert "already registered" in response.json()["detail"]
     
     def test_signup_duplicate_salesid(self, client, existing_user, sample_user_data):
         """Test signup with existing sales ID fails"""
@@ -122,7 +122,7 @@ class TestSignup:
         response = client.post("/auth/signup", json=sample_user_data)
         
         assert response.status_code == 400
-        assert "Sales ID" in response.json()["error"]
+        assert "Sales ID" in response.json()["detail"]
     
     def test_signup_weak_password(self, client, sample_user_data):
         """Test signup with weak password fails"""
@@ -187,7 +187,7 @@ class TestLogin:
         })
         
         assert response.status_code == 401
-        assert "error" in response.json()
+        assert "detail" in response.json()
     
     def test_login_nonexistent_user(self, client):
         """Test login with non-existent email fails"""
@@ -198,7 +198,7 @@ class TestLogin:
         })
         
         assert response.status_code == 401
-        assert "error" in response.json()
+        assert "detail" in response.json()
     
     def test_login_unverified_user(self, client, unverified_user):
         """Test login with unverified email fails"""
@@ -211,7 +211,7 @@ class TestLogin:
         })
         
         assert response.status_code == 403
-        assert "verify" in response.json()["error"].lower()
+        assert "verify" in response.json()["detail"].lower()
 
 
 class TestEmailVerification:
@@ -237,7 +237,7 @@ class TestEmailVerification:
         response = client.get("/auth/verify-email/invalid-token-12345")
         
         assert response.status_code == 400
-        assert "Invalid" in response.json()["error"]
+        assert "Invalid" in response.json()["detail"]
     
     def test_verify_expired_token(self, client, db):
         """Test email verification with expired token fails"""
@@ -259,7 +259,7 @@ class TestEmailVerification:
         response = client.get(f"/auth/verify-email/{user.verification_token}")
         
         assert response.status_code == 400
-        assert "expired" in response.json()["error"].lower()
+        assert "expired" in response.json()["detail"].lower()
 
 
 class TestCheckEndpoints:
@@ -380,7 +380,7 @@ class TestResetPassword:
         })
         
         assert response.status_code == 400
-        assert "Invalid" in response.json()["error"]
+        assert "Invalid" in response.json()["detail"]
     
     def test_reset_password_weak_password(self, client, db, existing_user):
         """Test password reset with weak password fails"""

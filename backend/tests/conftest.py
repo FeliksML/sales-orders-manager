@@ -6,6 +6,7 @@ is already set to the correct PostgreSQL connection string.
 """
 import pytest
 import os
+import bcrypt
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -21,6 +22,8 @@ os.environ["RECAPTCHA_SECRET_KEY"] = "test-key"
 # Import app modules AFTER setting environment variables
 from app.database import Base, get_db
 from app.main import app
+from app.models import User
+from app.auth import create_access_token
 
 # Use the DATABASE_URL from the container environment directly
 # In production Docker, this is already set to the correct PostgreSQL connection
@@ -83,3 +86,105 @@ def sample_user_data():
         "salesid": "12345",
         "recaptcha_token": "test-token"
     }
+
+
+@pytest.fixture
+def auth_headers(client: TestClient, db) -> dict:
+    """
+    Get authentication headers for a regular (non-admin) user.
+    Creates a verified user and returns JWT auth headers.
+    """
+    password = "testpassword123"
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    
+    user = User(
+        email="testuser@example.com",
+        password=hashed_password,
+        salesid=77777,
+        name="Test User",
+        email_verified=True,
+        is_admin=False
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    token = create_access_token(data={"sub": str(user.userid)})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_auth_headers(client: TestClient, db) -> dict:
+    """
+    Get authentication headers for an admin user.
+    Creates a verified admin user and returns JWT auth headers.
+    """
+    password = "adminpassword123"
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    
+    user = User(
+        email="adminuser@example.com",
+        password=hashed_password,
+        salesid=88888,
+        name="Admin User",
+        email_verified=True,
+        is_admin=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    token = create_access_token(data={"sub": str(user.userid)})
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def test_user_id(db) -> int:
+    """
+    Create a test user and return their ID.
+    """
+    password = "testuserpassword123"
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    
+    user = User(
+        email="targetuser@example.com",
+        password=hashed_password,
+        salesid=66666,
+        name="Target User",
+        email_verified=False,  # Unverified so we can test manual verification
+        is_admin=False
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return user.userid
+
+
+@pytest.fixture
+def admin_user_id(db) -> int:
+    """
+    Get the admin user's ID.
+    Creates the admin if not already created.
+    """
+    # Check if admin already exists
+    existing_admin = db.query(User).filter(User.email == "adminuser@example.com").first()
+    if existing_admin:
+        return existing_admin.userid
+    
+    password = "adminpassword123"
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    
+    user = User(
+        email="adminuser@example.com",
+        password=hashed_password,
+        salesid=88888,
+        name="Admin User",
+        email_verified=True,
+        is_admin=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return user.userid

@@ -138,22 +138,5 @@ class TestAdminUserOrders:
         assert "data" in data
 
 
-# Note: These fixtures would be defined in conftest.py
-@pytest.fixture
-def admin_auth_headers(client: TestClient, db) -> dict:
-    """Get authentication headers for an admin user."""
-    # This would create or authenticate an admin user
-    # Placeholder - actual implementation depends on test setup
-    pass
-
-
-@pytest.fixture
-def test_user_id(db) -> int:
-    """Create a test user and return their ID."""
-    pass
-
-
-@pytest.fixture
-def admin_user_id(db) -> int:
-    """Get the admin user's ID."""
-    pass
+# Note: Fixtures admin_auth_headers, auth_headers, test_user_id, and admin_user_id
+# are defined in conftest.py

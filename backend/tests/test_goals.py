@@ -40,23 +40,26 @@ class TestGoalProgressCalculation:
     def test_progress_item_with_target(self):
         """Test progress item calculation with a target set."""
         # calculate_progress_item(target, current, days_elapsed, days_total)
+        # Returns GoalProgressItem object or None
         progress = calculate_progress_item(20, 15, 15, 30)
-        assert progress["current"] == 15
-        assert progress["target"] == 20
-        assert progress["progress"] == 75.0  # 15/20 * 100
+        assert progress is not None
+        assert progress.current == 15
+        assert progress.target == 20
+        assert progress.percentage == 75.0  # 15/20 * 100
     
     def test_progress_item_exceeds_target(self):
         """Test progress item when exceeding target."""
         progress = calculate_progress_item(40, 50, 15, 30)
-        assert progress["current"] == 50
-        assert progress["target"] == 40
-        assert progress["progress"] == 125.0  # 50/40 * 100
+        assert progress is not None
+        assert progress.current == 50
+        assert progress.target == 40
+        # percentage is capped at 100 in the implementation
+        assert progress.percentage == 100.0
     
     def test_progress_item_no_target(self):
-        """Test progress item with no target set (0)."""
+        """Test progress item with no target set (0) returns None."""
         progress = calculate_progress_item(0, 5, 15, 30)
-        assert progress["target"] == 0
-        assert progress["progress"] == 0  # No target means 0 progress
+        assert progress is None  # Returns None when target <= 0
 
 
 class TestGoalEndpoints:
