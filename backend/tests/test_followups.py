@@ -65,7 +65,9 @@ class TestFollowUpActions:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] == "snoozed"
+        # Snooze resets status to pending and updates due_date
+        assert data["status"] == "pending"
+        assert data["snoozed_until"] is not None
     
     def test_update_followup(self, client: TestClient, auth_headers: dict, test_followup_id: int):
         """Test updating a follow-up."""
