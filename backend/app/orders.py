@@ -715,15 +715,31 @@ class AIInsightsResponse(BaseModel):
     insights: List[str]
     remaining_today: int
     ai_enabled: bool
+    resets_at: str  # ISO timestamp of next reset (midnight local)
+    metrics: Optional[dict] = None  # Metrics used for generation (for tone regeneration)
 
 
 class AIInsightsStatusResponse(BaseModel):
     remaining_today: int
     ai_enabled: bool
+    resets_at: str  # ISO timestamp of next reset (midnight local)
 
 
 class AIInsightsRequest(BaseModel):
     tone: str = "positive"  # "positive", "realistic", or "brutal"
+
+
+class AIRegenerateToneRequest(BaseModel):
+    tone: str = "positive"
+    metrics: dict  # Pre-computed metrics from previous generation
+
+
+def _get_reset_time() -> str:
+    """Get ISO timestamp for next midnight (when AI credits reset)."""
+    from datetime import datetime, timedelta
+    tomorrow = date.today() + timedelta(days=1)
+    midnight = datetime.combine(tomorrow, datetime.min.time())
+    return midnight.isoformat()
 
 
 @router.get("/performance-insights/ai-status", response_model=AIInsightsStatusResponse)
@@ -734,8 +750,10 @@ def get_ai_insights_status(
     """Get current AI insights usage status (remaining requests today)."""
     from .ai_insights import is_ai_configured
     
+    reset_time = _get_reset_time()
+    
     if not is_ai_configured():
-        return AIInsightsStatusResponse(remaining_today=0, ai_enabled=False)
+        return AIInsightsStatusResponse(remaining_today=0, ai_enabled=False, resets_at=reset_time)
     
     today = date.today()
     
@@ -746,7 +764,7 @@ def get_ai_insights_status(
         db.commit()
     
     remaining = 3 - current_user.ai_insights_count
-    return AIInsightsStatusResponse(remaining_today=remaining, ai_enabled=True)
+    return AIInsightsStatusResponse(remaining_today=remaining, ai_enabled=True, resets_at=reset_time)
 
 
 @router.post("/performance-insights/generate-ai", response_model=AIInsightsResponse)
@@ -766,12 +784,15 @@ async def generate_ai_insights_endpoint(
     valid_tones = ["positive", "realistic", "brutal"]
     tone = request.tone if request.tone in valid_tones else "positive"
     
+    reset_time = _get_reset_time()
+    
     # Check if AI is configured
     if not is_ai_configured():
         return AIInsightsResponse(
             insights=["AI insights not configured. Contact administrator."],
             remaining_today=0,
-            ai_enabled=False
+            ai_enabled=False,
+            resets_at=reset_time
         )
     
     today = date.today()
@@ -887,7 +908,63 @@ async def generate_ai_insights_endpoint(
     return AIInsightsResponse(
         insights=insights,
         remaining_today=remaining,
-        ai_enabled=True
+        ai_enabled=True,
+        resets_at=reset_time,
+        metrics=metrics  # Return metrics for free tone regeneration
+    )
+
+
+@router.post("/performance-insights/regenerate-tone", response_model=AIInsightsResponse)
+async def regenerate_ai_tone(
+    request: AIRegenerateToneRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Regenerate AI insights with a different tone using cached metrics.
+    This does NOT count against the daily limit - it's free to change tones.
+    """
+    from .ai_insights import generate_performance_insights, is_ai_configured
+    
+    reset_time = _get_reset_time()
+    
+    if not is_ai_configured():
+        return AIInsightsResponse(
+            insights=["AI insights not configured. Contact administrator."],
+            remaining_today=0,
+            ai_enabled=False,
+            resets_at=reset_time
+        )
+    
+    # Validate tone
+    valid_tones = ["positive", "realistic", "brutal"]
+    tone = request.tone if request.tone in valid_tones else "positive"
+    
+    # Validate metrics
+    if not request.metrics:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Metrics required for tone regeneration. Generate new insights first."
+        )
+    
+    # Generate with new tone using provided metrics (FREE - no credit used)
+    insights = await generate_performance_insights(request.metrics, tone)
+    
+    # Get current remaining count (don't decrement)
+    today = date.today()
+    if current_user.ai_insights_reset_date != today:
+        current_user.ai_insights_count = 0
+        current_user.ai_insights_reset_date = today
+        db.commit()
+    
+    remaining = 3 - current_user.ai_insights_count
+    
+    return AIInsightsResponse(
+        insights=insights,
+        remaining_today=remaining,
+        ai_enabled=True,
+        resets_at=reset_time,
+        metrics=request.metrics  # Return same metrics
     )
 
 

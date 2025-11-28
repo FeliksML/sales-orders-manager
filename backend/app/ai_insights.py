@@ -2,6 +2,7 @@
 AI-powered performance insights using Groq API (Llama 3.1)
 """
 import os
+import re
 import httpx
 from typing import Optional
 
@@ -10,20 +11,55 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.1-8b-instant"
 
+# Phrases that indicate intro/preamble lines (to filter out)
+INTRO_PATTERNS = [
+    r"^here('s| is| are)",
+    r"^let me",
+    r"^i (just |really )?love",
+    r"^i('ll| will)",
+    r"^based on",
+    r"^looking at",
+    r"^analyzing",
+    r"^alright",
+    r"^okay",
+    r"^great",
+    r"^listen up,? (because|here)",
+    r"three (insights|things|points)",
+    r"your (performance|data|numbers)",
+    r"^now,",
+]
+
 # Tone configurations
 TONE_PROMPTS = {
-    "positive": """You are an enthusiastic, supportive sales coach who always finds the silver lining.
-Be encouraging and uplifting! Focus on achievements, growth opportunities, and motivation.
-Use positive language and celebrate wins, no matter how small.""",
+    "positive": """You are an enthusiastic sales coach. Be encouraging and celebrate wins.""",
     
-    "realistic": """You are a balanced, pragmatic sales analyst who gives honest assessments.
-Be direct and factual. Acknowledge both strengths and areas for improvement.
-Give actionable advice without sugar-coating, but remain professional.""",
+    "realistic": """You are a pragmatic analyst. Be direct and factual about both strengths and weaknesses.""",
     
-    "brutal": """You are a brutally honest sales drill sergeant who doesn't tolerate excuses.
-Be harsh, direct, and unforgiving. Call out poor performance bluntly.
-No hand-holding - if numbers are bad, say so. Push them to do better. Be savage but fair."""
+    "brutal": """You are a harsh drill sergeant. Be savage, blunt, and unforgiving about poor numbers."""
 }
+
+
+def _is_intro_line(line: str) -> bool:
+    """Check if a line looks like an intro/preamble rather than an insight."""
+    lower = line.lower().strip()
+    for pattern in INTRO_PATTERNS:
+        if re.search(pattern, lower):
+            return True
+    return False
+
+
+def _clean_insight(line: str) -> str:
+    """Clean up an insight line by removing prefixes and formatting."""
+    line = line.strip()
+    # Remove leading bullets, numbers, dashes
+    if line.startswith(("-", "•", "*", "–", "—")):
+        line = line[1:].strip()
+    # Remove leading numbers like "1.", "1)", "1:"
+    if len(line) > 2 and line[0].isdigit() and line[1] in ".):":
+        line = line[2:].strip()
+    if len(line) > 3 and line[0].isdigit() and line[1].isdigit() and line[2] in ".):":
+        line = line[3:].strip()
+    return line
 
 
 async def generate_performance_insights(metrics: dict, tone: str = "positive") -> list[str]:
@@ -43,27 +79,33 @@ async def generate_performance_insights(metrics: dict, tone: str = "positive") -
     # Get tone-specific instructions
     tone_instruction = TONE_PROMPTS.get(tone, TONE_PROMPTS["positive"])
     
-    # Build the prompt with performance data
-    prompt = f"""{tone_instruction}
+    # Build the prompt with performance data - STRICT format instructions
+    prompt = f"""ROLE: {tone_instruction}
 
-Analyze this salesperson's monthly performance and provide exactly 3 short, specific insights (max 20 words each).
-
-PERFORMANCE DATA:
+DATA:
 - This month: {metrics.get('current_orders', 0)} orders, ${metrics.get('current_revenue', 0):,.0f} revenue, {metrics.get('current_psu', 0)} PSU
 - Last month: {metrics.get('previous_orders', 0)} orders, ${metrics.get('previous_revenue', 0):,.0f} revenue
 - Change: {metrics.get('order_change', 0):+.1f}% orders, {metrics.get('revenue_change', 0):+.1f}% revenue
 - Streak: {metrics.get('streak', 0)} month {"growth" if metrics.get('streak_type') == 'growth' else "decline" if metrics.get('streak_type') == 'decline' else "no"} streak
-- Personal best: {metrics.get('best_orders', 0)} orders in {metrics.get('best_period', 'N/A')}
+- Best ever: {metrics.get('best_orders', 0)} orders ({metrics.get('best_period', 'N/A')})
 - Internet: {metrics.get('current_internet', 0)} ({metrics.get('internet_change', 0):+.1f}%)
 - Mobile: {metrics.get('current_mobile', 0)} ({metrics.get('mobile_change', 0):+.1f}%)
 
-RULES:
-- Match the tone specified above
-- Reference specific metrics when relevant
-- Use maximum one emoji per insight (use 🔥💪✨ for positive, 📊📈 for realistic, 😤💀🚨 for brutal)
-- Each insight must be on its own line
-- Do NOT use bullet points, numbers, or dashes
-- Keep each insight under 20 words"""
+OUTPUT EXACTLY 3 LINES. Each line is one insight about this performance.
+
+CRITICAL RULES:
+- NO introductions ("Here are...", "Let me...", "I love...")
+- NO conclusions or sign-offs
+- NO bullet points, numbers, or dashes
+- Each line must BE an insight, not lead into one
+- Max 18 words per line
+- One emoji max per line (🔥💪✨ positive, 📊📈 realistic, 💀🚨😤 brutal)
+- Reference specific numbers from the data
+
+Example output format (3 lines only):
+Your 67% order increase shows serious momentum this month 🔥
+Internet sales at 10 units outpaced mobile by 40%
+Revenue dropped 18% despite order growth - check your product mix 📊"""
 
     try:
         async with httpx.AsyncClient() as client:
@@ -92,18 +134,18 @@ RULES:
             # Parse the response - split by newlines and clean up
             insights = []
             for line in content.strip().split("\n"):
-                line = line.strip()
-                # Remove any leading bullets, numbers, or dashes
-                if line.startswith(("-", "•", "*")):
-                    line = line[1:].strip()
-                if line and len(line) > 5:  # Skip empty or too short lines
-                    # Remove leading numbers like "1." or "1)"
-                    if len(line) > 2 and line[0].isdigit() and line[1] in ".):":
-                        line = line[2:].strip()
-                    insights.append(line)
+                line = _clean_insight(line)
+                
+                # Skip empty, too short, or intro lines
+                if not line or len(line) < 10:
+                    continue
+                if _is_intro_line(line):
+                    continue
+                    
+                insights.append(line)
             
-            # Return up to 3 insights
-            return insights[:3] if insights else ["Great job staying focused on your sales goals!"]
+            # Return up to 3 valid insights
+            return insights[:3] if insights else ["Keep pushing forward with your sales goals! 💪"]
             
     except httpx.TimeoutException:
         print("Groq API timeout")

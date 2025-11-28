@@ -149,5 +149,11 @@ export const orderService = {
   generateAIInsights: async (tone = 'positive') => {
     const response = await apiClient.post('/api/orders/performance-insights/generate-ai', { tone })
     return response.data
+  },
+
+  // Regenerate AI insights with different tone (FREE - no credit used)
+  regenerateAITone: async (tone, metrics) => {
+    const response = await apiClient.post('/api/orders/performance-insights/regenerate-tone', { tone, metrics })
+    return response.data
   }
 }

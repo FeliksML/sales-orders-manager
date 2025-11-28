@@ -257,6 +257,45 @@ function PerformanceInsights() {
   const [aiEnabled, setAiEnabled] = useState(true)
   const [aiError, setAiError] = useState(null)
   const [aiTone, setAiTone] = useState('positive')
+  const [aiResetsAt, setAiResetsAt] = useState(null)
+  const [aiMetrics, setAiMetrics] = useState(null) // Cached metrics for free tone changes
+  
+  // LocalStorage key for persisting AI insights
+  const AI_STORAGE_KEY = 'sales_ai_insights'
+  
+  // Format reset time as "X hours" or "Tomorrow at midnight"
+  const formatResetTime = (isoString) => {
+    if (!isoString) return 'tomorrow'
+    const resetDate = new Date(isoString)
+    const now = new Date()
+    const hoursUntil = Math.ceil((resetDate - now) / (1000 * 60 * 60))
+    if (hoursUntil <= 1) return 'in about an hour'
+    if (hoursUntil <= 12) return `in ${hoursUntil} hours`
+    return 'at midnight'
+  }
+  
+  // Load persisted AI insights from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(AI_STORAGE_KEY)
+      if (stored) {
+        const { insights, tone, timestamp, metrics } = JSON.parse(stored)
+        // Only restore if from today (same day)
+        const storedDate = new Date(timestamp).toDateString()
+        const todayDate = new Date().toDateString()
+        if (storedDate === todayDate && insights?.length > 0) {
+          setAiInsights(insights)
+          setAiTone(tone || 'positive')
+          if (metrics) setAiMetrics(metrics)
+        } else {
+          // Clear old data
+          localStorage.removeItem(AI_STORAGE_KEY)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load persisted AI insights:', err)
+    }
+  }, [])
   
   // Fetch AI status on mount
   useEffect(() => {
@@ -265,6 +304,7 @@ function PerformanceInsights() {
         const status = await orderService.getAIInsightsStatus()
         setAiRemaining(status.remaining_today)
         setAiEnabled(status.ai_enabled)
+        setAiResetsAt(status.resets_at)
       } catch (err) {
         console.error('Failed to fetch AI status:', err)
         setAiRemaining(3) // Default fallback
@@ -282,16 +322,57 @@ function PerformanceInsights() {
       setAiInsights(result.insights)
       setAiRemaining(result.remaining_today)
       setAiEnabled(result.ai_enabled)
+      setAiResetsAt(result.resets_at)
+      if (result.metrics) setAiMetrics(result.metrics)
+      
+      // Persist to localStorage (including metrics for free tone changes)
+      localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
+        insights: result.insights,
+        tone: aiTone,
+        timestamp: new Date().toISOString(),
+        metrics: result.metrics
+      }))
     } catch (err) {
       console.error('Failed to generate AI insights:', err)
       if (err.response?.status === 429) {
-        setAiError('Daily limit reached (3/day). Try again tomorrow!')
+        setAiError(`Daily limit reached. Resets ${formatResetTime(aiResetsAt)}`)
         setAiRemaining(0)
       } else {
         setAiError('Failed to generate insights. Try again.')
       }
     } finally {
       setAiLoading(false)
+    }
+  }
+  
+  // Handle tone change - use free regeneration if metrics are cached
+  const handleToneChange = async (newTone) => {
+    if (newTone === aiTone) return
+    setAiTone(newTone)
+    
+    // If we have cached metrics and insights, regenerate for free
+    if (aiMetrics && aiInsights) {
+      setAiLoading(true)
+      setAiError(null)
+      try {
+        const result = await orderService.regenerateAITone(newTone, aiMetrics)
+        setAiInsights(result.insights)
+        setAiResetsAt(result.resets_at)
+        // Note: remaining_today doesn't change (free regeneration)
+        
+        // Update localStorage with new tone
+        localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
+          insights: result.insights,
+          tone: newTone,
+          timestamp: new Date().toISOString(),
+          metrics: aiMetrics
+        }))
+      } catch (err) {
+        console.error('Failed to regenerate with new tone:', err)
+        setAiError('Failed to change tone. Try again.')
+      } finally {
+        setAiLoading(false)
+      }
     }
   }
   
@@ -487,7 +568,7 @@ function PerformanceInsights() {
                     ? 'bg-white/5 text-gray-500 cursor-not-allowed'
                     : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
                 }`}
-                title={!aiEnabled ? 'AI not configured' : aiRemaining === 0 ? 'Daily limit reached' : `Generate AI insights (${aiRemaining}/3 remaining today)`}
+                title={!aiEnabled ? 'AI not configured' : aiRemaining === 0 ? `Daily limit reached. Resets ${formatResetTime(aiResetsAt)}` : `Generate AI insights (${aiRemaining}/3 remaining today)`}
               >
                 {aiLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -495,7 +576,7 @@ function PerformanceInsights() {
                   <Sparkles className="w-4 h-4" />
                 )}
                 <span className="hidden sm:inline">
-                  {aiLoading ? 'Generating...' : `AI Insights`}
+                  {aiLoading ? 'Generating...' : aiRemaining === 0 ? `Resets ${formatResetTime(aiResetsAt)}` : 'AI Insights'}
                 </span>
                 <span className="text-xs opacity-70">({aiRemaining !== null ? aiRemaining : '?'}/3)</span>
               </button>
@@ -511,13 +592,14 @@ function PerformanceInsights() {
                     return (
                       <button
                         key={tone}
-                        onClick={() => setAiTone(tone)}
+                        onClick={() => handleToneChange(tone)}
+                        disabled={aiLoading}
                         className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
                           aiTone === tone
                             ? `${config.bg} ${config.color}`
                             : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                        title={config.label}
+                        } ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={aiMetrics && aiInsights ? `Switch to ${config.label} (free)` : config.label}
                       >
                         <Icon className="w-3 h-3" />
                         <span className="hidden sm:inline">{config.label}</span>
@@ -525,6 +607,9 @@ function PerformanceInsights() {
                     )
                   })}
                 </div>
+                {aiMetrics && aiInsights && (
+                  <span className="text-xs text-emerald-400/70">✨ Free tone switch</span>
+                )}
               </div>
             )}
           </div>
@@ -563,16 +648,14 @@ function PerformanceInsights() {
             </div>
           )}
           
-          {/* Regular Insights */}
-          {textInsights && textInsights.length > 0 && (
+          {/* Regular Insights - Only shown when no AI insights */}
+          {!aiInsights && textInsights && textInsights.length > 0 && (
             <div className="space-y-3">
-              {!aiInsights && (
-                <div className="flex items-center gap-2 mb-2">
-                  <Lightbulb className="w-3 h-3 text-indigo-400" />
-                  <span className="text-xs font-medium text-indigo-400/70 uppercase tracking-wider">Quick Stats</span>
-                </div>
-              )}
-              {textInsights.slice(0, aiInsights ? 2 : 4).map((insight, idx) => (
+              <div className="flex items-center gap-2 mb-2">
+                <Lightbulb className="w-3 h-3 text-indigo-400" />
+                <span className="text-xs font-medium text-indigo-400/70 uppercase tracking-wider">Quick Stats</span>
+              </div>
+              {textInsights.slice(0, 4).map((insight, idx) => (
                 <InsightBubble key={idx} insight={insight} index={idx} />
               ))}
             </div>
