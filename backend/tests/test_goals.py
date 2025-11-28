@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models import User, SalesGoal, Order
-from app.goals import get_fiscal_month_info, calculate_goal_progress_item
+from app.goals import get_fiscal_month_info, calculate_progress_item
 
 
 class TestFiscalMonthInfo:
@@ -35,31 +35,28 @@ class TestFiscalMonthInfo:
 
 
 class TestGoalProgressCalculation:
-    """Test goal progress calculations."""
+    """Test goal progress calculations using calculate_progress_item."""
     
     def test_progress_item_with_target(self):
         """Test progress item calculation with a target set."""
-        progress = calculate_goal_progress_item("PSU", 15, 20)
-        assert progress.metric == "PSU"
-        assert progress.current == 15
-        assert progress.target == 20
-        assert progress.progress == 75.0  # 15/20 * 100
-        assert progress.on_track is False  # Below target
+        # calculate_progress_item(target, current, days_elapsed, days_total)
+        progress = calculate_progress_item(20, 15, 15, 30)
+        assert progress["current"] == 15
+        assert progress["target"] == 20
+        assert progress["progress"] == 75.0  # 15/20 * 100
     
     def test_progress_item_exceeds_target(self):
         """Test progress item when exceeding target."""
-        progress = calculate_goal_progress_item("Revenue", 5000, 4000)
-        assert progress.current == 5000
-        assert progress.target == 4000
-        assert progress.progress == 125.0  # 5000/4000 * 100
-        assert progress.on_track is True
+        progress = calculate_progress_item(40, 50, 15, 30)
+        assert progress["current"] == 50
+        assert progress["target"] == 40
+        assert progress["progress"] == 125.0  # 50/40 * 100
     
     def test_progress_item_no_target(self):
-        """Test progress item with no target set (None)."""
-        progress = calculate_goal_progress_item("TV", 5, None)
-        assert progress.target is None
-        assert progress.progress is None
-        assert progress.on_track is None
+        """Test progress item with no target set (0)."""
+        progress = calculate_progress_item(0, 5, 15, 30)
+        assert progress["target"] == 0
+        assert progress["progress"] == 0  # No target means 0 progress
 
 
 class TestGoalEndpoints:
