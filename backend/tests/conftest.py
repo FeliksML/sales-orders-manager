@@ -10,19 +10,22 @@ from app.database import Base, get_db
 from app.main import app
 
 # Set test environment variables
-# Use 'database' for Docker prod, 'db' for dev, fallback to 'localhost' for local
-DB_HOST = os.getenv("DB_HOST", "database")  # 'database' is the prod Docker service name
-DB_USER = os.getenv("POSTGRES_USER", "sales_order_user")
-DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
-DB_NAME = os.getenv("POSTGRES_DB", "sales_order_db")
-os.environ["DATABASE_URL"] = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
-os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars"
+# Use existing DATABASE_URL from container if available, otherwise construct one
+if not os.getenv("DATABASE_URL"):
+    DB_HOST = os.getenv("DB_HOST", "database")
+    DB_USER = os.getenv("POSTGRES_USER", "sales_order_user")
+    DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
+    DB_NAME = os.getenv("POSTGRES_DB", "sales_order_db")
+    os.environ["DATABASE_URL"] = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
+
+if not os.getenv("SECRET_KEY"):
+    os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars"
 os.environ["ENVIRONMENT"] = "development"
-os.environ["FRONTEND_URL"] = "http://localhost:5173"
+os.environ["FRONTEND_URL"] = os.getenv("FRONTEND_URL", "http://localhost:5173")
 os.environ["RECAPTCHA_SECRET_KEY"] = "test-key"
 
 
-# Create test database engine - use the production database for integration tests
+# Create test database engine - use the DATABASE_URL from environment
 TEST_DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
