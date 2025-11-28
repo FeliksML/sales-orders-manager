@@ -1,36 +1,33 @@
 """
-Pytest configuration and fixtures for testing
+Pytest configuration and fixtures for testing.
+
+This conftest.py is designed to work in Docker containers where DATABASE_URL
+is already set to the correct PostgreSQL connection string.
 """
 import pytest
 import os
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.database import Base, get_db
-from app.main import app
 
-# Set test environment variables
-# Fix DATABASE_URL to use docker service name instead of localhost
-existing_url = os.getenv("DATABASE_URL", "")
-if "localhost" in existing_url:
-    # Replace localhost with docker service name
-    os.environ["DATABASE_URL"] = existing_url.replace("localhost", "database")
-elif not existing_url:
-    DB_HOST = os.getenv("DB_HOST", "database")
-    DB_USER = os.getenv("POSTGRES_USER", "sales_order_user")
-    DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
-    DB_NAME = os.getenv("POSTGRES_DB", "sales_order_db")
-    os.environ["DATABASE_URL"] = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
-
+# Set minimal test environment variables (don't override DATABASE_URL - use container's value)
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars"
 os.environ["ENVIRONMENT"] = "development"
-os.environ["FRONTEND_URL"] = os.getenv("FRONTEND_URL", "http://localhost:5173")
+if not os.getenv("FRONTEND_URL"):
+    os.environ["FRONTEND_URL"] = "http://localhost:5173"
 os.environ["RECAPTCHA_SECRET_KEY"] = "test-key"
 
+# Import app modules AFTER setting environment variables
+from app.database import Base, get_db
+from app.main import app
 
-# Create test database engine
+# Use the DATABASE_URL from the container environment directly
+# In production Docker, this is already set to the correct PostgreSQL connection
 TEST_DATABASE_URL = os.getenv("DATABASE_URL")
+if not TEST_DATABASE_URL:
+    raise RuntimeError("DATABASE_URL environment variable is required for tests")
+
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
