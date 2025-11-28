@@ -10,9 +10,12 @@ from app.database import Base, get_db
 from app.main import app
 
 # Set test environment variables
-# Use 'db' for Docker, fallback to 'localhost' for local development
-DB_HOST = os.getenv("DB_HOST", "db")  # 'db' is the Docker service name
-os.environ["DATABASE_URL"] = f"postgresql://postgres:postgres@{DB_HOST}:5432/sales_orders"
+# Use 'database' for Docker prod, 'db' for dev, fallback to 'localhost' for local
+DB_HOST = os.getenv("DB_HOST", "database")  # 'database' is the prod Docker service name
+DB_USER = os.getenv("POSTGRES_USER", "sales_order_user")
+DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
+DB_NAME = os.getenv("POSTGRES_DB", "sales_order_db")
+os.environ["DATABASE_URL"] = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:5432/{DB_NAME}"
 os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars"
 os.environ["ENVIRONMENT"] = "development"
 os.environ["FRONTEND_URL"] = "http://localhost:5173"
