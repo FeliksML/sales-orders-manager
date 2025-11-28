@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Optional, Dict, Any, List, Generic, TypeVar
 from datetime import date, datetime
 import re
@@ -35,15 +35,14 @@ class UserLogin(BaseModel):
 
 class UserResponse(BaseModel):
     """Schema for user response data."""
+    model_config = ConfigDict(from_attributes=True)
+    
     userid: int
     email: EmailStr
     salesid: int
     name: str
     email_verified: bool
     is_admin: bool = False
-
-    class Config:
-        from_attributes = True
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -131,14 +130,13 @@ class OrderUpdate(BaseModel):
         return v
 
 class OrderResponse(OrderBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     orderid: int
     userid: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     created_by: Optional[int] = None
-
-    class Config:
-        from_attributes = True
 
 class OrderStats(BaseModel):
     total_orders: int
@@ -163,6 +161,8 @@ class PaginatedOrderResponse(BaseModel):
 
 # Audit Trail Schemas
 class AuditLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     auditid: int
     entity_type: str
     entity_id: int
@@ -176,9 +176,6 @@ class AuditLogResponse(BaseModel):
     change_reason: Optional[str] = None
     ip_address: Optional[str] = None
     timestamp: datetime
-
-    class Config:
-        from_attributes = True
 
 class AuditHistoryResponse(BaseModel):
     order_id: int
@@ -200,6 +197,8 @@ class UserActivitySummary(BaseModel):
 
 # Error Log Schemas
 class ErrorLogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     errorid: int
     error_type: str
     error_message: str
@@ -217,9 +216,6 @@ class ErrorLogResponse(BaseModel):
     resolved_by: Optional[int] = None
     resolution_notes: Optional[str] = None
     timestamp: datetime
-
-    class Config:
-        from_attributes = True
 
 class ErrorLogCreate(BaseModel):
     error_type: str
@@ -301,13 +297,12 @@ class CommissionSettingsUpdate(BaseModel):
 
 
 class CommissionSettingsResponse(CommissionSettingsBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     user_id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class AutoTotalsResponse(BaseModel):
@@ -449,15 +444,14 @@ class SalesGoalUpdate(SalesGoalBase):
 
 class SalesGoalResponse(SalesGoalBase):
     """Schema for sales goal response"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     user_id: int
     year: int
     month: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
 
 
 class GoalProgressItem(BaseModel):
@@ -555,18 +549,19 @@ class FollowUpSnooze(BaseModel):
 
 class FollowUpOrderInfo(BaseModel):
     """Embedded order info for follow-up response"""
+    model_config = ConfigDict(from_attributes=True)
+    
     orderid: int
     customer_name: str
     business_name: str
     customer_phone: str
     install_date: date
 
-    class Config:
-        from_attributes = True
-
 
 class FollowUpResponse(BaseModel):
     """Schema for follow-up response with order details"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     order_id: int
     user_id: int
@@ -580,9 +575,6 @@ class FollowUpResponse(BaseModel):
     updated_at: datetime
     # Embedded order info
     order: Optional[FollowUpOrderInfo] = None
-
-    class Config:
-        from_attributes = True
 
 
 class TodaysFollowUpsResponse(BaseModel):

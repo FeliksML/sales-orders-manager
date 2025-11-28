@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from typing import List, Optional
 from datetime import datetime, date, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from .database import get_db
 from .models import User, Notification, Order
 from .auth import get_current_user
@@ -24,6 +24,8 @@ class NotificationPreferences(BaseModel):
 
 
 class NotificationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     notificationid: int
     notification_type: str
     title: str
@@ -35,9 +37,6 @@ class NotificationResponse(BaseModel):
     created_at: datetime
     read_at: Optional[datetime]
     orderid: Optional[int]
-
-    class Config:
-        from_attributes = True
 
 
 class NotificationUpdate(BaseModel):

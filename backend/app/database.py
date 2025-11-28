@@ -2,8 +2,7 @@ import os
 from dotenv import load_dotenv
 import psycopg2
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import QueuePool
 from .config import get_database_url, is_production
 
