@@ -7,8 +7,24 @@ import re
 T = TypeVar('T')
 
 # Regex patterns for validation
+# Phone pattern: Allows common phone formats, validated more strictly in validator
 PHONE_PATTERN = re.compile(r'^[\d\s\-\(\)\+\.]{7,20}$')
 SALESID_PATTERN = re.compile(r'^\d{5}$')
+
+def validate_phone_has_digits(phone: str) -> bool:
+    """Validate that a phone string contains at least 7 actual digits."""
+    digit_count = sum(1 for c in phone if c.isdigit())
+    return digit_count >= 7
+
+# Valid US state codes for tax settings validation
+VALID_US_STATE_CODES = {
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+    'DC', 'PR', 'VI', 'GU', 'AS', 'MP'  # Include territories
+}
 
 
 class UserSignup(BaseModel):
@@ -87,9 +103,11 @@ class OrderBase(BaseModel):
     @field_validator('customer_phone')
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        """Validate phone number format."""
+        """Validate phone number format and ensure it contains at least 7 digits."""
         if not PHONE_PATTERN.match(v):
             raise ValueError('Invalid phone number format')
+        if not validate_phone_has_digits(v):
+            raise ValueError('Phone number must contain at least 7 digits')
         return v
 
 class OrderCreate(OrderBase):
@@ -124,9 +142,12 @@ class OrderUpdate(BaseModel):
     @field_validator('customer_phone')
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        """Validate phone number format if provided."""
-        if v is not None and not PHONE_PATTERN.match(v):
-            raise ValueError('Invalid phone number format')
+        """Validate phone number format if provided and ensure it contains at least 7 digits."""
+        if v is not None:
+            if not PHONE_PATTERN.match(v):
+                raise ValueError('Invalid phone number format')
+            if not validate_phone_has_digits(v):
+                raise ValueError('Phone number must contain at least 7 digits')
         return v
 
 class OrderResponse(OrderBase):
@@ -282,6 +303,15 @@ class CommissionSettingsBase(BaseModel):
     state_code: str = Field(default="CA", min_length=2, max_length=2)
     state_tax_rate: float = Field(default=0.093, ge=0, le=1)  # 0-100%
 
+    @field_validator('state_code')
+    @classmethod
+    def validate_state_code(cls, v: str) -> str:
+        """Validate that state_code is a valid US state code."""
+        v_upper = v.upper()
+        if v_upper not in VALID_US_STATE_CODES:
+            raise ValueError(f'Invalid US state code: {v}. Must be a valid 2-letter state code.')
+        return v_upper
+
 
 class CommissionSettingsUpdate(BaseModel):
     """Schema for updating commission settings."""
@@ -294,6 +324,17 @@ class CommissionSettingsUpdate(BaseModel):
     federal_bracket: Optional[float] = Field(None, ge=0, le=1)
     state_code: Optional[str] = Field(None, min_length=2, max_length=2)
     state_tax_rate: Optional[float] = Field(None, ge=0, le=1)
+
+    @field_validator('state_code')
+    @classmethod
+    def validate_state_code(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that state_code is a valid US state code if provided."""
+        if v is not None:
+            v_upper = v.upper()
+            if v_upper not in VALID_US_STATE_CODES:
+                raise ValueError(f'Invalid US state code: {v}. Must be a valid 2-letter state code.')
+            return v_upper
+        return v
 
 
 class CommissionSettingsResponse(CommissionSettingsBase):

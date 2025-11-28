@@ -3,10 +3,12 @@ Audit Trail API Endpoints
 Provides endpoints for viewing audit history and reverting changes
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from .database import get_db
 from .models import User, Order
@@ -14,11 +16,16 @@ from .schemas import AuditLogResponse, AuditHistoryResponse, RevertRequest, User
 from .auth import get_current_user
 from . import audit_service
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter()
 
 
 @router.get("/{order_id}/history", response_model=AuditHistoryResponse)
+@limiter.limit("60/minute")
 def get_order_history(
+    request: Request,
     order_id: int,
     limit: Optional[int] = Query(None, description="Limit number of audit logs returned"),
     db: Session = Depends(get_db),
@@ -48,7 +55,9 @@ def get_order_history(
 
 
 @router.post("/{order_id}/revert", response_model=dict)
+@limiter.limit("10/minute")
 def revert_order(
+    request: Request,
     order_id: int,
     revert_request: RevertRequest,
     db: Session = Depends(get_db),
@@ -90,7 +99,9 @@ def revert_order(
 
 
 @router.get("/{order_id}/snapshot")
+@limiter.limit("60/minute")
 def get_order_snapshot_at_time(
+    request: Request,
     order_id: int,
     timestamp: datetime = Query(..., description="Timestamp to get order snapshot"),
     db: Session = Depends(get_db),
@@ -126,7 +137,9 @@ def get_order_snapshot_at_time(
 
 
 @router.get("/user/activity", response_model=UserActivitySummary)
+@limiter.limit("30/minute")
 def get_user_activity(
+    request: Request,
     days: int = Query(30, description="Number of days to look back"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -137,7 +150,9 @@ def get_user_activity(
 
 
 @router.get("/orders/recent-changes", response_model=List[AuditLogResponse])
+@limiter.limit("30/minute")
 def get_recent_changes(
+    request: Request,
     limit: int = Query(50, description="Number of recent changes to return"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

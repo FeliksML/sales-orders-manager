@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, desc, String
 from datetime import datetime, timedelta
 from typing import Optional, List
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from .auth import require_admin, get_current_user
 from .database import get_db
 from .models import User, Order, ErrorLog, AuditLog
@@ -13,10 +15,15 @@ from .schemas import (
     PaginatedOrderResponse, OrderResponse
 )
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/users", response_model=PaginatedUserResponse)
+@limiter.limit("30/minute")
 async def get_all_users(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
@@ -85,7 +92,9 @@ async def get_all_users(
     )
 
 @router.get("/users/{user_id}/orders", response_model=PaginatedOrderResponse)
+@limiter.limit("30/minute")
 async def get_user_orders(
+    request: Request,
     user_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
@@ -113,7 +122,9 @@ async def get_user_orders(
     )
 
 @router.get("/analytics", response_model=SystemAnalytics)
+@limiter.limit("30/minute")
 async def get_system_analytics(
+    request: Request,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
 ):
@@ -184,7 +195,9 @@ async def get_system_analytics(
     )
 
 @router.get("/error-logs", response_model=PaginatedErrorLogResponse)
+@limiter.limit("30/minute")
 async def get_error_logs(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     error_type: Optional[str] = None,
@@ -224,9 +237,10 @@ async def get_error_logs(
     )
 
 @router.post("/error-logs", response_model=ErrorLogResponse)
+@limiter.limit("20/minute")
 async def create_error_log(
-    error_data: ErrorLogCreate,
     request: Request,
+    error_data: ErrorLogCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -255,7 +269,9 @@ async def create_error_log(
     return ErrorLogResponse.from_orm(error_log)
 
 @router.patch("/error-logs/{error_id}/resolve", response_model=ErrorLogResponse)
+@limiter.limit("30/minute")
 async def resolve_error(
+    request: Request,
     error_id: int,
     resolve_data: ResolveErrorRequest,
     admin: User = Depends(require_admin),
@@ -277,7 +293,9 @@ async def resolve_error(
     return ErrorLogResponse.from_orm(error_log)
 
 @router.get("/audit/system", response_model=List[AuditLogResponse])
+@limiter.limit("30/minute")
 async def get_system_audit_trail(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     user_id: Optional[int] = None,
@@ -306,7 +324,9 @@ async def get_system_audit_trail(
     return [AuditLogResponse.from_orm(log) for log in audit_logs]
 
 @router.post("/users/{user_id}/verify")
+@limiter.limit("10/minute")
 async def manually_verify_user(
+    request: Request,
     user_id: int,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -325,7 +345,9 @@ async def manually_verify_user(
     return {"success": True, "message": f"User {user.email} has been verified"}
 
 @router.patch("/users/{user_id}/admin")
+@limiter.limit("10/minute")
 async def toggle_admin_status(
+    request: Request,
     user_id: int,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -339,7 +361,25 @@ async def toggle_admin_status(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    old_status = user.is_admin
     user.is_admin = not user.is_admin
+    new_status = user.is_admin
+    
+    # Log this security-sensitive action to audit trail
+    client_ip = request.client.host if request.client else None
+    audit_log = AuditLog(
+        entity_type='user',
+        entity_id=user_id,
+        user_id=admin.userid,
+        user_name=admin.name,
+        action='admin_privilege_change',
+        field_name='is_admin',
+        old_value=str(old_status),
+        new_value=str(new_status),
+        change_reason=f"Admin privileges {'granted to' if new_status else 'revoked from'} {user.email}",
+        ip_address=client_ip
+    )
+    db.add(audit_log)
     db.commit()
 
     status = "granted" if user.is_admin else "revoked"

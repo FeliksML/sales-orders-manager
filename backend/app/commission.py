@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, or_
 from typing import Optional
 import re
 from datetime import datetime, date, timedelta
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from .database import get_db
 from .models import CommissionSettings, Order, User
 from .schemas import (
@@ -12,6 +14,9 @@ from .schemas import (
     RateTableResponse, RateTier, OrderCommissionEstimate, TaxBreakdown
 )
 from .auth import get_current_user
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -83,6 +88,12 @@ def get_fiscal_month_boundaries(reference_date: date) -> tuple:
     
     Fiscal month runs from 28th 6pm of previous month to 28th 6pm of current month.
     For example, "November" fiscal month: Oct 28 6pm → Nov 28 6pm
+    
+    Timezone Note:
+    - This function uses naive datetime objects (server local time)
+    - All comparisons should be done consistently using server local time
+    - For multi-timezone deployments, consider migrating to timezone-aware datetimes
+      by replacing datetime() calls with datetime(..., tzinfo=timezone.utc)
     
     Returns (start_datetime, end_datetime, label) for the fiscal month that 
     encompasses the reference_date.
@@ -306,7 +317,9 @@ def calculate_tax_breakdown(gross_commission: float, settings: CommissionSetting
 # ============================================================================
 
 @router.get("/settings", response_model=CommissionSettingsResponse)
+@limiter.limit("60/minute")
 def get_commission_settings(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -316,7 +329,9 @@ def get_commission_settings(
 
 
 @router.put("/settings", response_model=CommissionSettingsResponse)
+@limiter.limit("30/minute")
 def update_commission_settings(
+    request: Request,
     settings_update: CommissionSettingsUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -334,7 +349,9 @@ def update_commission_settings(
 
 
 @router.get("/rates", response_model=RateTableResponse)
+@limiter.limit("60/minute")
 def get_rate_tables(
+    request: Request,
     current_user: User = Depends(get_current_user)
 ):
     """Get commission rate tables"""
@@ -373,7 +390,9 @@ def get_rate_tables(
 
 
 @router.get("/auto-totals", response_model=AutoTotalsResponse)
+@limiter.limit("60/minute")
 def get_auto_totals(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -448,7 +467,9 @@ def get_auto_totals(
 
 
 @router.put("/overrides")
+@limiter.limit("30/minute")
 def update_value_overrides(
+    request: Request,
     overrides: dict,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -473,7 +494,9 @@ def update_value_overrides(
 
 
 @router.delete("/overrides")
+@limiter.limit("30/minute")
 def clear_value_overrides(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -486,7 +509,9 @@ def clear_value_overrides(
 
 
 @router.get("/earnings", response_model=EarningsResponse)
+@limiter.limit("60/minute")
 def get_earnings(
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -649,7 +674,9 @@ def get_earnings(
 
 
 @router.get("/order/{order_id}/estimate", response_model=OrderCommissionEstimate)
+@limiter.limit("60/minute")
 def get_order_commission_estimate(
+    request: Request,
     order_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

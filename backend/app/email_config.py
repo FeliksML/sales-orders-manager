@@ -21,7 +21,8 @@ MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
 # Log email configuration at module load (without sensitive data)
 print(f"\n🔧 EMAIL_CONFIG MODULE LOADING (SendGrid HTTP API)...")
 print(f"   MAIL_FROM: {MAIL_FROM}")
-print(f"   SENDGRID_API_KEY: {'SET (' + str(len(SENDGRID_API_KEY)) + ' chars, starts with ' + SENDGRID_API_KEY[:10] + '...)' if SENDGRID_API_KEY else 'NOT SET'}")
+# Security: Only log whether API key is set, never log any part of the key itself
+print(f"   SENDGRID_API_KEY: {'SET (' + str(len(SENDGRID_API_KEY)) + ' chars)' if SENDGRID_API_KEY else 'NOT SET'}")
 
 # Initialize SendGrid client
 sg = None

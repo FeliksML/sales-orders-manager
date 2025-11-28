@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, or_
 from typing import List, Optional
 from datetime import datetime, timedelta, date
 import io
 from .database import get_db
-from .models import Order, User, Notification
+from .models import Order, User, Notification, DeletedOrder, IdempotencyKey
 from .schemas import (
     OrderCreate, OrderUpdate, OrderResponse, OrderStats, PaginatedOrderResponse, PaginationMeta,
     PerformanceInsightsResponse, PerformanceComparison, PeriodMetrics, TrendDataPoint, PersonalRecord
@@ -18,12 +18,55 @@ from .notification_service import send_order_details_email
 from . import audit_service
 from .pdf_extractor import extract_order_from_pdf, validate_pdf
 from .commission import get_fiscal_month_boundaries, get_previous_fiscal_month, is_order_in_fiscal_month
+from .utils import calculate_psu_from_order
 from pydantic import BaseModel
 
 router = APIRouter()
 
 # Maximum file size for PDF upload (10MB)
 MAX_PDF_SIZE = 10 * 1024 * 1024
+
+
+def check_idempotency_key(db: Session, key: str, user_id: int, operation: str) -> Optional[dict]:
+    """Check if an idempotency key has been used before.
+    
+    Returns the cached response if the key was used, None otherwise.
+    Keys expire after 24 hours.
+    """
+    if not key:
+        return None
+    
+    # Look up the key (only for this user and operation)
+    existing = db.query(IdempotencyKey).filter(
+        IdempotencyKey.key == key,
+        IdempotencyKey.user_id == user_id,
+        IdempotencyKey.operation == operation,
+        IdempotencyKey.created_at > datetime.utcnow() - timedelta(hours=24)  # Key still valid
+    ).first()
+    
+    if existing:
+        return {
+            "status_code": existing.response_status,
+            "response": existing.response_body,
+            "idempotent_response": True
+        }
+    return None
+
+
+def save_idempotency_key(db: Session, key: str, user_id: int, operation: str, status_code: int, response: dict):
+    """Save an idempotency key with its response for future lookups."""
+    if not key:
+        return
+    
+    idempotency_record = IdempotencyKey(
+        key=key,
+        user_id=user_id,
+        operation=operation,
+        response_status=status_code,
+        response_body=response
+    )
+    db.add(idempotency_record)
+    # Don't commit here - let the caller's transaction handle it
 
 
 def build_filtered_orders_query(
@@ -156,9 +199,15 @@ async def extract_pdf(
             "data": extracted_data
         }
     except Exception as e:
+        # Log detailed error server-side for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"PDF extraction failed for user {current_user.userid}: {str(e)}", exc_info=True)
+        
+        # Return generic error message to client (don't expose internal details)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to extract PDF data: {str(e)}"
+            detail="Failed to extract data from PDF. Please ensure the file is a valid Spectrum Business order confirmation."
         )
 
 
@@ -174,13 +223,16 @@ class EmailExportRequest(BaseModel):
 
 class BulkMarkInstalledRequest(BaseModel):
     order_ids: List[int]
+    idempotency_key: Optional[str] = None  # Client-generated key to prevent duplicate operations
 
 class BulkRescheduleRequest(BaseModel):
     order_ids: List[int]
     new_date: date
+    idempotency_key: Optional[str] = None  # Client-generated key to prevent duplicate operations
 
 class BulkDeleteRequest(BaseModel):
     order_ids: List[int]
+    idempotency_key: Optional[str] = None  # Client-generated key to prevent duplicate operations
 
 class DeltaSyncResponse(BaseModel):
     updated_orders: List[OrderResponse]
@@ -351,9 +403,14 @@ def get_delta_sync(
         )
     ).all()
 
-    # Note: Deleted orders tracking would require a separate deleted_orders table
-    # For now, returning empty list - can be enhanced later
-    deleted_order_ids = []
+    # Get orders deleted since last sync from the deleted_orders table
+    deleted_records = db.query(DeletedOrder).filter(
+        and_(
+            DeletedOrder.user_id == user_id,
+            DeletedOrder.deleted_at > last_sync
+        )
+    ).all()
+    deleted_order_ids = [record.order_id for record in deleted_records]
 
     # Current server timestamp for client to use in next sync
     current_timestamp = datetime.utcnow()
@@ -373,21 +430,7 @@ def get_delta_sync(
 # PERFORMANCE INSIGHTS HELPERS
 # ============================================================================
 
-def calculate_psu_from_order(order) -> int:
-    """Calculate PSU (Primary Service Units) from a single order."""
-    psu = 0
-    if order.has_internet:
-        psu += 1
-    if order.has_voice and order.has_voice > 0:
-        psu += 1
-    if order.has_mobile and order.has_mobile > 0:
-        psu += 1
-    if order.has_tv:
-        psu += 1
-    if order.has_sbc and order.has_sbc > 0:
-        psu += 1
-    return psu
-
+# calculate_psu_from_order is imported from utils.py
 
 def calculate_metrics_from_orders(orders: list) -> PeriodMetrics:
     """Calculate all metrics from a list of orders."""
@@ -1273,6 +1316,12 @@ def bulk_mark_installed(
     current_user: User = Depends(get_current_user)
 ):
     """Mark multiple orders as installed (set install_date to yesterday or keep if already past)"""
+    # Check idempotency key
+    if request.idempotency_key:
+        cached = check_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_mark_installed')
+        if cached:
+            return JSONResponse(status_code=cached["status_code"], content=cached["response"])
+    
     if not request.order_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1302,8 +1351,6 @@ def bulk_mark_installed(
             order.install_date = yesterday
         # If already in the past, keep the original date
 
-    db.commit()
-
     # Log bulk operation
     audit_service.log_bulk_operation(
         db=db,
@@ -1316,10 +1363,16 @@ def bulk_mark_installed(
         reason="Bulk mark as installed"
     )
 
-    return {
+    response = {
         "message": f"Successfully marked {len(orders)} orders as installed",
         "updated_count": len(orders)
     }
+    
+    # Save idempotency key
+    save_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_mark_installed', 200, response)
+    
+    db.commit()
+    return response
 
 @router.post("/bulk/reschedule", status_code=status.HTTP_200_OK)
 def bulk_reschedule(
@@ -1328,6 +1381,12 @@ def bulk_reschedule(
     current_user: User = Depends(get_current_user)
 ):
     """Reschedule multiple orders to a new date"""
+    # Check idempotency key
+    if request.idempotency_key:
+        cached = check_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_reschedule')
+        if cached:
+            return JSONResponse(status_code=cached["status_code"], content=cached["response"])
+    
     if not request.order_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1352,8 +1411,6 @@ def bulk_reschedule(
     for order in orders:
         order.install_date = request.new_date
 
-    db.commit()
-
     # Log bulk operation
     audit_service.log_bulk_operation(
         db=db,
@@ -1366,11 +1423,17 @@ def bulk_reschedule(
         reason=f"Bulk rescheduled to {request.new_date}"
     )
 
-    return {
+    response = {
         "message": f"Successfully rescheduled {len(orders)} orders to {request.new_date}",
         "updated_count": len(orders),
-        "new_date": request.new_date
+        "new_date": str(request.new_date)
     }
+    
+    # Save idempotency key
+    save_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_reschedule', 200, response)
+    
+    db.commit()
+    return response
 
 @router.delete("/bulk/delete", status_code=status.HTTP_200_OK)
 def bulk_delete(
@@ -1379,6 +1442,12 @@ def bulk_delete(
     current_user: User = Depends(get_current_user)
 ):
     """Delete multiple orders"""
+    # Check idempotency key
+    if request.idempotency_key:
+        cached = check_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_delete')
+        if cached:
+            return JSONResponse(status_code=cached["status_code"], content=cached["response"])
+    
     if not request.order_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1411,6 +1480,14 @@ def bulk_delete(
         reason="Bulk delete"
     )
 
+    # Record deletions for delta sync
+    for order_id in request.order_ids:
+        deleted_record = DeletedOrder(
+            order_id=order_id,
+            user_id=current_user.userid
+        )
+        db.add(deleted_record)
+
     # Delete related notifications first (to avoid foreign key constraint violation)
     db.query(Notification).filter(
         Notification.orderid.in_(request.order_ids)
@@ -1421,12 +1498,16 @@ def bulk_delete(
     for order in orders:
         db.delete(order)
 
-    db.commit()
-
-    return {
+    response = {
         "message": f"Successfully deleted {deleted_count} orders",
         "deleted_count": deleted_count
     }
+    
+    # Save idempotency key
+    save_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_delete', 200, response)
+
+    db.commit()
+    return response
 
 @router.get("/bulk/export")
 def bulk_export_orders(
@@ -1598,6 +1679,13 @@ def delete_order(
         ip_address=None,
         reason="Order deleted"
     )
+
+    # Record deletion for delta sync
+    deleted_record = DeletedOrder(
+        order_id=order_id,
+        user_id=current_user.userid
+    )
+    db.add(deleted_record)
 
     # Delete related notifications first (to avoid foreign key constraint violation)
     db.query(Notification).filter(

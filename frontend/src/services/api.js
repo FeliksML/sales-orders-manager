@@ -15,13 +15,67 @@ export class ApiError extends Error {
 }
 
 /**
+ * Retry configuration for exponential backoff
+ */
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000, // 1 second
+  maxDelay: 10000, // 10 seconds
+  // Only retry on these status codes (5xx server errors)
+  retryableStatuses: [500, 502, 503, 504],
+  // Also retry on network errors
+  retryOnNetworkError: true,
+}
+
+/**
+ * Calculate delay with exponential backoff and jitter
+ */
+const calculateBackoffDelay = (retryCount) => {
+  const exponentialDelay = RETRY_CONFIG.baseDelay * Math.pow(2, retryCount)
+  // Add jitter (±25% randomization) to prevent thundering herd
+  const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1)
+  return Math.min(exponentialDelay + jitter, RETRY_CONFIG.maxDelay)
+}
+
+/**
+ * Sleep for specified milliseconds
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * Determine if a request should be retried
+ */
+const shouldRetry = (error) => {
+  // Don't retry if max retries exceeded
+  const retryCount = error.config?.__retryCount || 0
+  if (retryCount >= RETRY_CONFIG.maxRetries) return false
+  
+  // Retry on network errors (no response)
+  if (!error.response && RETRY_CONFIG.retryOnNetworkError) {
+    // But not on timeout - that's handled differently
+    if (error.code === 'ECONNABORTED') return false
+    return true
+  }
+  
+  // Retry on specific status codes
+  if (error.response && RETRY_CONFIG.retryableStatuses.includes(error.response.status)) {
+    return true
+  }
+  
+  return false
+}
+
+/**
  * Check if a JWT token is expired (client-side check)
+ * Uses a 10-second buffer to account for network latency
+ * (reduced from 60s to minimize premature logouts with minor clock skew)
  */
 const isTokenExpired = (token) => {
   if (!token) return true
   try {
     const payload = JSON.parse(atob(token.split('.')[1]))
-    return payload.exp * 1000 < Date.now() + 60000
+    // 10 second buffer to account for network latency while minimizing premature logout
+    return payload.exp * 1000 < Date.now() + 10000
   } catch {
     return true
   }
@@ -60,10 +114,31 @@ apiClient.interceptors.request.use(
   }
 )
 
-// Response interceptor - Handle errors globally with user-friendly messages
+// Response interceptor - Handle errors globally with user-friendly messages and retry logic
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    // Check if we should retry this request
+    if (shouldRetry(error)) {
+      const config = error.config
+      config.__retryCount = (config.__retryCount || 0) + 1
+      
+      // Calculate backoff delay
+      const delay = calculateBackoffDelay(config.__retryCount - 1)
+      
+      // Log retry attempt (useful for debugging)
+      console.warn(
+        `Request to ${config.url} failed. Retrying in ${Math.round(delay)}ms... ` +
+        `(Attempt ${config.__retryCount}/${RETRY_CONFIG.maxRetries})`
+      )
+      
+      // Wait before retrying
+      await sleep(delay)
+      
+      // Retry the request
+      return apiClient(config)
+    }
+    
     // Handle network errors (no response)
     if (!error.response) {
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
@@ -123,6 +198,7 @@ apiClient.interceptors.response.use(
       case 500:
       case 502:
       case 503:
+      case 504:
         return Promise.reject(new ApiError(
           'Server error. Please try again later.',
           status,

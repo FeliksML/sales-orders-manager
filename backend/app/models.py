@@ -247,3 +247,46 @@ class FollowUp(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DeletedOrder(Base):
+    """Track deleted orders for delta sync functionality.
+    
+    When an order is deleted, we record its ID here so that delta sync
+    can return deleted_order_ids to clients for proper cache invalidation.
+    """
+    __tablename__ = 'deleted_orders'
+
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, nullable=False, index=True)  # The ID of the deleted order
+    user_id = Column(Integer, ForeignKey('users.userid'), nullable=False, index=True)
+    
+    # When the order was deleted
+    deleted_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # Keep deleted order records for 30 days, then can be cleaned up
+    # Clients should sync at least once every 30 days to not miss deletions
+
+
+class IdempotencyKey(Base):
+    """Track idempotency keys to prevent duplicate bulk operations.
+    
+    When a bulk operation is performed with an idempotency key, we store the key
+    and the response. If the same key is used again, we return the cached response.
+    """
+    __tablename__ = 'idempotency_keys'
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(64), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.userid'), nullable=False)
+    operation = Column(String(50), nullable=False)  # bulk_install, bulk_reschedule, bulk_delete
+    
+    # Cached response
+    response_status = Column(Integer, nullable=False)  # HTTP status code
+    response_body = Column(JSON, nullable=True)  # JSON response body
+    
+    # When the key was used
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    
+    # Keys expire after 24 hours
+    # Clients should generate new keys for new operations

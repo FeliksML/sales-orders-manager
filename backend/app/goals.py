@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime, date
 from calendar import monthrange
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from .database import get_db
 from .models import SalesGoal, Order, User
 from .schemas import (
@@ -11,7 +13,11 @@ from .schemas import (
     GoalHistoryResponse, GoalHistoryItem
 )
 from .auth import get_current_user
-from .commission import get_fiscal_month_boundaries, is_order_in_fiscal_month
+from .commission import get_fiscal_month_boundaries, is_order_in_fiscal_month, get_previous_fiscal_month
+from .utils import calculate_psu_from_order
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -100,30 +106,7 @@ def get_orders_in_fiscal_month(db: Session, user_id: int, start_dt: datetime, en
     return [o for o in all_orders if is_order_in_fiscal_month(o, start_dt, end_dt)]
 
 
-def calculate_psu_from_order(order) -> int:
-    """Calculate PSU (Primary Service Units) from a single order.
-    
-    PSU = 1 per product category (not per unit quantity):
-    - Internet = 1 PSU (if has_internet is True)
-    - Voice = 1 PSU (if has_voice > 0, regardless of line count)
-    - Mobile = 1 PSU (if has_mobile > 0, regardless of line count)
-    - TV = 1 PSU (if has_tv is True)
-    - SBC = 1 PSU (if has_sbc > 0, regardless of seat count)
-    
-    WIB does NOT count as PSU (a-la-carte bonus only)
-    """
-    psu = 0
-    if order.has_internet:
-        psu += 1
-    if order.has_voice and order.has_voice > 0:
-        psu += 1
-    if order.has_mobile and order.has_mobile > 0:
-        psu += 1
-    if order.has_tv:
-        psu += 1
-    if order.has_sbc and order.has_sbc > 0:
-        psu += 1
-    return psu
+# calculate_psu_from_order is imported from utils.py
 
 
 def calculate_order_metrics(orders: list) -> dict:
@@ -148,7 +131,9 @@ def calculate_order_metrics(orders: list) -> dict:
 # ============================================================================
 
 @router.get("", response_model=SalesGoalResponse)
+@limiter.limit("60/minute")
 def get_current_goal(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -160,7 +145,9 @@ def get_current_goal(
 
 
 @router.put("", response_model=SalesGoalResponse)
+@limiter.limit("30/minute")
 def update_goal(
+    request: Request,
     goal_update: SalesGoalUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -181,7 +168,9 @@ def update_goal(
 
 
 @router.get("/progress", response_model=GoalProgressResponse)
+@limiter.limit("60/minute")
 def get_goal_progress(
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -329,7 +318,9 @@ def get_goal_progress(
 
 
 @router.get("/history", response_model=GoalHistoryResponse)
+@limiter.limit("30/minute")
 def get_goal_history(
+    request: Request,
     months: int = 6,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -340,22 +331,20 @@ def get_goal_history(
     goals_achieved = 0
     months_with_goals = 0
     
-    # Get current fiscal month info
-    current_year, current_month, _ = get_fiscal_month_info(today)
+    # Get current fiscal month boundaries
+    curr_start, curr_end, _ = get_fiscal_month_boundaries(today)
     
-    # Iterate through past months
+    # Use get_previous_fiscal_month for robust iteration through past months
+    # This correctly handles year boundaries and fiscal month edge cases
+    start_dt, end_dt = curr_start, curr_end
+    
     for i in range(1, months + 1):
-        # Calculate the target month (going backwards)
-        target_month = current_month - i
-        target_year = current_year
+        # Get previous fiscal month boundaries (correctly handles year boundaries)
+        start_dt, end_dt, period_label = get_previous_fiscal_month(start_dt, end_dt)
         
-        while target_month <= 0:
-            target_month += 12
-            target_year -= 1
-        
-        # Create a reference date for that fiscal month
-        ref_date = date(target_year, target_month, 15)  # Middle of month
-        start_dt, end_dt, period_label = get_fiscal_month_boundaries(ref_date)
+        # Extract year and month from the end date (fiscal months are named by end month)
+        target_year = end_dt.year
+        target_month = end_dt.month
         
         # Get goal for this month
         goal = db.query(SalesGoal).filter(
@@ -450,7 +439,9 @@ def get_goal_history(
 
 
 @router.delete("")
+@limiter.limit("30/minute")
 def clear_goal(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

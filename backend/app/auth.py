@@ -44,7 +44,13 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
-    """Dependency to get current authenticated user from JWT token."""
+    """Dependency to get current authenticated user from JWT token.
+    
+    Validates:
+    - Token signature and expiration
+    - User exists in database
+    - User email is verified (security: revoked verification should block access)
+    """
     token = credentials.credentials
 
     credentials_exception = HTTPException(
@@ -67,6 +73,15 @@ async def get_current_user(
     user = db.query(User).filter(User.userid == user_id).first()
     if user is None:
         raise credentials_exception
+
+    # Security: Verify user's email is still verified
+    # This ensures access is revoked if verification status changes after token issuance
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Email verification required. Please verify your email to continue.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return user
 
@@ -108,15 +123,21 @@ async def verify_recaptcha(token: str) -> bool:
         return False
 
 @router.get("/check-salesid/{salesid}")
-def check_salesid(salesid: str = Path(..., min_length=5, max_length=5, pattern=r"^\d{5}$")):
+@limiter.limit("10/minute")  # Rate limit to prevent enumeration attacks
+def check_salesid(request: Request, salesid: str = Path(..., min_length=5, max_length=5, pattern=r"^\d{5}$")):
     """Check if a Sales ID already exists in the database"""
     with SessionLocal() as db:
         existing_user = db.query(User).filter(User.salesid == salesid).first()
         return {"exists": existing_user is not None}
 
 @router.get("/check-email/{email}")
-def check_email(email: str):
-    """Check if an email already exists in the database"""
+@limiter.limit("5/minute")  # Strict rate limit to prevent email enumeration attacks
+def check_email(request: Request, email: str):
+    """Check if an email already exists in the database.
+    
+    Note: This endpoint is rate-limited to prevent email enumeration attacks.
+    For security, consider using this only during signup flow with CAPTCHA.
+    """
     with SessionLocal() as db:
         existing_user = db.query(User).filter(User.email == email).first()
         return {"exists": existing_user is not None}
@@ -127,32 +148,32 @@ async def signup(request: Request, user_data: UserSignup):
     """Create a new user account with email verification."""
     # Verify reCAPTCHA
     if not await verify_recaptcha(user_data.recaptcha_token):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"error": "CAPTCHA verification failed. Please try again."}
+            detail="CAPTCHA verification failed. Please try again."
         )
 
     # Validate password strength
     if len(user_data.password) < MIN_PASSWORD_LENGTH:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters long."}
+            detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters long."
         )
 
     # Check for duplicate email and sales ID
     with SessionLocal() as db:
         existing_email = db.query(User).filter(User.email == user_data.email).first()
         if existing_email:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=400,
-                content={"error": "This email is already registered. Please use a different email or login."}
+                detail="This email is already registered. Please use a different email or login."
             )
 
         existing_salesid = db.query(User).filter(User.salesid == user_data.salesid).first()
         if existing_salesid:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=400,
-                content={"error": "This Sales ID is already registered. Please contact your administrator."}
+                detail="This Sales ID is already registered. Please contact your administrator."
             )
 
         # Generate verification token
@@ -207,16 +228,16 @@ def verify_email(token: str):
         user = db.query(User).filter(User.verification_token == token).first()
 
         if not user:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=400,
-                content={"error": "Invalid verification token"}
+                detail="Invalid verification token"
             )
 
         # Check if token has expired
         if user.verification_token_expiry < datetime.utcnow():
-            return JSONResponse(
+            raise HTTPException(
                 status_code=400,
-                content={"error": "Verification link has expired. Please request a new one."}
+                detail="Verification link has expired. Please request a new one."
             )
 
         # Mark email as verified
@@ -230,30 +251,91 @@ def verify_email(token: str):
             content={"success": True, "message": "Email verified successfully! You can now log in."}
         )
 
+
+@router.post("/resend-verification")
+@limiter.limit("3/hour")  # Strict limit to prevent abuse
+async def resend_verification(request: Request, email_request: ForgotPasswordRequest):
+    """Resend verification email for users who haven't verified their email yet.
+    
+    This endpoint is rate-limited to prevent abuse.
+    Uses the same schema as forgot-password for simplicity (email + recaptcha_token).
+    """
+    # Verify reCAPTCHA
+    if not await verify_recaptcha(email_request.recaptcha_token):
+        raise HTTPException(
+            status_code=400,
+            detail="CAPTCHA verification failed. Please try again."
+        )
+
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == email_request.email).first()
+
+        # Always return success to prevent email enumeration
+        if not user:
+            return {
+                "message": "If an unverified account with that email exists, a verification link has been sent.",
+                "success": True
+            }
+
+        # Only resend if user exists and is NOT already verified
+        if user.email_verified:
+            return {
+                "message": "If an unverified account with that email exists, a verification link has been sent.",
+                "success": True
+            }
+
+        # Generate new verification token
+        verification_token = secrets.token_urlsafe(32)
+        token_expiry = datetime.utcnow() + timedelta(hours=24)
+
+        user.verification_token = verification_token
+        user.verification_token_expiry = token_expiry
+        db.commit()
+
+        # Construct verification link
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+        verification_link = f"{frontend_url}/verify-email?token={verification_token}"
+
+        # Send verification email
+        try:
+            await send_verification_email(
+                email=user.email,
+                name=user.name,
+                verification_link=verification_link
+            )
+        except Exception:
+            # Email sending failed - in production, use proper logging
+            pass
+
+    return {
+        "message": "If an unverified account with that email exists, a verification link has been sent.",
+        "success": True
+    }
+
 @router.post("/login")
 @limiter.limit("10/15minutes")  # Prevent brute force attacks
 async def login(request: Request, user_data: UserLogin):
     # Verify reCAPTCHA
     if not await verify_recaptcha(user_data.recaptcha_token):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"error": "CAPTCHA verification failed. Please try again."}
+            detail="CAPTCHA verification failed. Please try again."
         )
 
     with SessionLocal() as db:
         user = db.query(User).filter(User.email == user_data.email).first()
 
     if user is None:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={"error": "Incorrect email or password."}
+            detail="Incorrect email or password."
         )
     
     # Check if email is verified
     if not user.email_verified:
-        return JSONResponse(
+        raise HTTPException(
             status_code=403,
-            content={"error": "Please verify your email address before logging in. Check your email for the verification link."}
+            detail="Please verify your email address before logging in. Check your email for the verification link."
         )
 
     password_bytes = user_data.password.encode('utf-8')
@@ -275,9 +357,9 @@ async def login(request: Request, user_data: UserLogin):
             }
         }
     else:
-        return JSONResponse(
+        raise HTTPException(
             status_code=401,
-            content={"error": "Incorrect email or password."}
+            detail="Incorrect email or password."
         )
 
 @router.get("/me", response_model=UserResponse)
@@ -291,9 +373,9 @@ async def forgot_password(request: Request, reset_request: ForgotPasswordRequest
     """Send password reset email to user"""
     # Verify reCAPTCHA
     if not await verify_recaptcha(reset_request.recaptcha_token):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"error": "CAPTCHA verification failed. Please try again."}
+            detail="CAPTCHA verification failed. Please try again."
         )
 
     with SessionLocal() as db:
@@ -337,32 +419,32 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
     """Reset user password with token"""
     # Verify reCAPTCHA
     if not await verify_recaptcha(reset_request.recaptcha_token):
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"error": "CAPTCHA verification failed. Please try again."}
+            detail="CAPTCHA verification failed. Please try again."
         )
 
     # Validate password length
     if len(reset_request.new_password) < 8:
-        return JSONResponse(
+        raise HTTPException(
             status_code=400,
-            content={"error": "Password must be at least 8 characters long."}
+            detail="Password must be at least 8 characters long."
         )
 
     with SessionLocal() as db:
         user = db.query(User).filter(User.reset_token == reset_request.token).first()
 
         if not user:
-            return JSONResponse(
+            raise HTTPException(
                 status_code=400,
-                content={"error": "Invalid or expired reset token."}
+                detail="Invalid or expired reset token."
             )
 
         # Check if token has expired
         if user.reset_token_expiry < datetime.utcnow():
-            return JSONResponse(
+            raise HTTPException(
                 status_code=400,
-                content={"error": "Reset token has expired. Please request a new password reset."}
+                detail="Reset token has expired. Please request a new password reset."
             )
 
         # Hash new password
@@ -375,7 +457,7 @@ async def reset_password(request: Request, reset_request: ResetPasswordRequest):
         user.reset_token_expiry = None
         db.commit()
 
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Password reset successfully! You can now log in with your new password."}
-        )
+        return {
+            "success": True,
+            "message": "Password reset successfully! You can now log in with your new password."
+        }

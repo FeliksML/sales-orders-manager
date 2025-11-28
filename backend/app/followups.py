@@ -2,12 +2,14 @@
 Follow-up reminders API router.
 Allows sales reps to schedule and manage post-installation follow-ups.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 from typing import Optional
 from datetime import datetime, timedelta
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from .database import get_db
 from .models import User, Order, FollowUp
@@ -19,6 +21,9 @@ from .schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -53,7 +58,9 @@ def get_followup_with_order(followup: FollowUp, db: Session) -> FollowUpResponse
 
 
 @router.post("", response_model=FollowUpResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 def create_followup(
+    request: Request,
     followup_data: FollowUpCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -93,7 +100,9 @@ def create_followup(
 
 
 @router.get("", response_model=PaginatedFollowUpResponse)
+@limiter.limit("60/minute")
 def list_followups(
+    request: Request,
     skip: int = 0,
     limit: int = 50,
     status_filter: Optional[str] = None,  # pending, completed, snoozed
@@ -133,7 +142,9 @@ def list_followups(
 
 
 @router.get("/today", response_model=TodaysFollowUpsResponse)
+@limiter.limit("60/minute")
 def get_todays_followups(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -166,7 +177,9 @@ def get_todays_followups(
 
 
 @router.get("/{followup_id}", response_model=FollowUpResponse)
+@limiter.limit("60/minute")
 def get_followup(
+    request: Request,
     followup_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -190,7 +203,9 @@ def get_followup(
 
 
 @router.put("/{followup_id}", response_model=FollowUpResponse)
+@limiter.limit("30/minute")
 def update_followup(
+    request: Request,
     followup_id: int,
     update_data: FollowUpUpdate,
     current_user: User = Depends(get_current_user),
@@ -240,7 +255,9 @@ def update_followup(
 
 
 @router.post("/{followup_id}/complete", response_model=FollowUpResponse)
+@limiter.limit("30/minute")
 def complete_followup(
+    request: Request,
     followup_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -273,7 +290,9 @@ def complete_followup(
 
 
 @router.post("/{followup_id}/snooze", response_model=FollowUpResponse)
+@limiter.limit("30/minute")
 def snooze_followup(
+    request: Request,
     followup_id: int,
     snooze_data: FollowUpSnooze,
     current_user: User = Depends(get_current_user),
@@ -312,7 +331,9 @@ def snooze_followup(
 
 
 @router.delete("/{followup_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 def delete_followup(
+    request: Request,
     followup_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -341,7 +362,9 @@ def delete_followup(
 
 
 @router.get("/order/{order_id}", response_model=list[FollowUpResponse])
+@limiter.limit("60/minute")
 def get_followups_for_order(
+    request: Request,
     order_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

@@ -42,22 +42,36 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             )
 
         # Content Security Policy
-        # Note: This is a moderate CSP. Adjust based on your needs.
-        # Current policy allows:
-        # - Same-origin resources by default
-        # - Inline styles and scripts (needed for modern frameworks)
-        # - External scripts from trusted CDNs (if needed)
-        csp_directives = [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # Needed for React dev
-            "style-src 'self' 'unsafe-inline'",  # Needed for styled-components
-            "img-src 'self' data: https:",
-            "font-src 'self' data:",
-            "connect-src 'self'",
-            "frame-ancestors 'none'",  # Same as X-Frame-Options: DENY
-            "base-uri 'self'",
-            "form-action 'self'",
-        ]
+        # Security hardened CSP with minimal unsafe directives
+        # Note: 'unsafe-inline' for styles is required for React/styled-components
+        # 'unsafe-eval' removed - not needed for production React builds
+        if is_production():
+            csp_directives = [
+                "default-src 'self'",
+                "script-src 'self'",  # Production: no unsafe-inline or unsafe-eval
+                "style-src 'self' 'unsafe-inline'",  # Required for styled-components/inline styles
+                "img-src 'self' data: https:",
+                "font-src 'self' data: https:",
+                "connect-src 'self'",
+                "frame-ancestors 'none'",  # Prevent clickjacking
+                "base-uri 'self'",
+                "form-action 'self'",
+                "upgrade-insecure-requests",  # Auto-upgrade HTTP to HTTPS
+                "block-all-mixed-content",  # Block HTTP content on HTTPS pages
+            ]
+        else:
+            # Development: Allow eval for hot reload and dev tools
+            csp_directives = [
+                "default-src 'self'",
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # Dev tools need eval
+                "style-src 'self' 'unsafe-inline'",
+                "img-src 'self' data: https:",
+                "font-src 'self' data: https:",
+                "connect-src 'self' ws: wss:",  # WebSocket for hot reload
+                "frame-ancestors 'none'",
+                "base-uri 'self'",
+                "form-action 'self'",
+            ]
         response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
 
         # Control referrer information
