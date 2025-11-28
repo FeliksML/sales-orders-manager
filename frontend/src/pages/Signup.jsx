@@ -77,7 +77,7 @@ function Signup() {
 
     setCheckingSalesId(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/check-salesid/${salesId}`);
+      const response = await fetch(`${API_BASE_URL}/auth/check-salesid/${salesId}`);
       const data = await response.json();
 
       if (data.exists) {
@@ -99,7 +99,7 @@ function Signup() {
 
     setCheckingEmail(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/check-email/${encodeURIComponent(emailValue)}`);
+      const response = await fetch(`${API_BASE_URL}/auth/check-email/${encodeURIComponent(emailValue)}`);
       const data = await response.json();
 
       if (data.exists) {
