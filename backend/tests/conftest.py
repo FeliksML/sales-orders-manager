@@ -10,8 +10,12 @@ from app.database import Base, get_db
 from app.main import app
 
 # Set test environment variables
-# Use existing DATABASE_URL from container if available, otherwise construct one
-if not os.getenv("DATABASE_URL"):
+# Fix DATABASE_URL to use docker service name instead of localhost
+existing_url = os.getenv("DATABASE_URL", "")
+if "localhost" in existing_url:
+    # Replace localhost with docker service name
+    os.environ["DATABASE_URL"] = existing_url.replace("localhost", "database")
+elif not existing_url:
     DB_HOST = os.getenv("DB_HOST", "database")
     DB_USER = os.getenv("POSTGRES_USER", "sales_order_user")
     DB_PASS = os.getenv("POSTGRES_PASSWORD", "postgres")
@@ -25,7 +29,7 @@ os.environ["FRONTEND_URL"] = os.getenv("FRONTEND_URL", "http://localhost:5173")
 os.environ["RECAPTCHA_SECRET_KEY"] = "test-key"
 
 
-# Create test database engine - use the DATABASE_URL from environment
+# Create test database engine
 TEST_DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
