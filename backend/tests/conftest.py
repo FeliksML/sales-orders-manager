@@ -10,15 +10,17 @@ from app.database import Base, get_db
 from app.main import app
 
 # Set test environment variables
-os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test_db"
-os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
+# Use 'db' for Docker, fallback to 'localhost' for local development
+DB_HOST = os.getenv("DB_HOST", "db")  # 'db' is the Docker service name
+os.environ["DATABASE_URL"] = f"postgresql://postgres:postgres@{DB_HOST}:5432/sales_orders"
+os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars"
 os.environ["ENVIRONMENT"] = "development"
 os.environ["FRONTEND_URL"] = "http://localhost:5173"
 os.environ["RECAPTCHA_SECRET_KEY"] = "test-key"
 
 
-# Create test database engine
-TEST_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://test:test@localhost:5432/test_db")
+# Create test database engine - use the production database for integration tests
+TEST_DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(TEST_DATABASE_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
