@@ -117,7 +117,8 @@ class TestBulkDelete:
         request_data = {
             "order_ids": disposable_order_ids
         }
-        response = client.delete(
+        response = client.request(
+            "DELETE",
             "/api/orders/bulk/delete",
             json=request_data,
             headers=auth_headers
@@ -136,7 +137,8 @@ class TestBulkDelete:
             "idempotency_key": idempotency_key
         }
         
-        response1 = client.delete(
+        response1 = client.request(
+            "DELETE",
             "/api/orders/bulk/delete",
             json=request_data,
             headers=auth_headers
@@ -144,7 +146,8 @@ class TestBulkDelete:
         assert response1.status_code == 200
         
         # Second request should return cached response even though orders are deleted
-        response2 = client.delete(
+        response2 = client.request(
+            "DELETE",
             "/api/orders/bulk/delete",
             json=request_data,
             headers=auth_headers
@@ -156,7 +159,8 @@ class TestBulkDelete:
         request_data = {
             "order_ids": [999999, 999998]
         }
-        response = client.delete(
+        response = client.request(
+            "DELETE",
             "/api/orders/bulk/delete",
             json=request_data,
             headers=auth_headers
@@ -195,10 +199,14 @@ def test_order_ids(client: TestClient, auth_headers: dict) -> list:
     order_ids = []
     for i in range(3):
         order_data = {
-            "customer_name": f"Bulk Test Customer {i}",
-            "customer_phone": f"555-000-000{i}",
+            "spectrum_reference": f"SPEC-BULK-{i}",
             "customer_account_number": f"BULK{i:05d}",
+            "business_name": f"Bulk Test Business {i}",
+            "customer_name": f"Bulk Test Customer {i}",
+            "customer_email": f"bulk{i}@test.com",
+            "customer_phone": f"555-000-000{i}",
             "install_date": str(date.today() + timedelta(days=i)),
+            "install_time": "9:00 AM - 11:00 AM",
             "has_internet": True,
             "has_tv": False,
             "has_mobile": 0,
@@ -216,10 +224,14 @@ def disposable_order_ids(client: TestClient, auth_headers: dict) -> list:
     order_ids = []
     for i in range(2):
         order_data = {
-            "customer_name": f"Delete Test {i}",
-            "customer_phone": f"555-999-000{i}",
+            "spectrum_reference": f"SPEC-DEL-{i}",
             "customer_account_number": f"DEL{i:05d}",
+            "business_name": f"Delete Test Business {i}",
+            "customer_name": f"Delete Test {i}",
+            "customer_email": f"delete{i}@test.com",
+            "customer_phone": f"555-999-000{i}",
             "install_date": str(date.today()),
+            "install_time": "9:00 AM - 11:00 AM",
             "has_internet": True,
             "has_tv": False,
             "has_mobile": 0,

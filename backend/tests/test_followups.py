@@ -122,10 +122,14 @@ class TestFollowUpValidation:
 def test_order_id(client: TestClient, auth_headers: dict, db) -> int:
     """Create a test order and return its ID."""
     order_data = {
-        "customer_name": "Test Customer",
-        "customer_phone": "555-123-4567",
+        "spectrum_reference": "SPEC-FOLLOWUP-TEST",
         "customer_account_number": "ACC123456",
+        "business_name": "Followup Test Business",
+        "customer_name": "Test Customer",
+        "customer_email": "followup@test.com",
+        "customer_phone": "555-123-4567",
         "install_date": str(date.today()),
+        "install_time": "9:00 AM - 11:00 AM",
         "has_internet": True,
         "has_tv": False,
         "has_mobile": 0,

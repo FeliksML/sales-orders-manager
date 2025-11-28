@@ -93,8 +93,12 @@ class TestGoalEndpoints:
         response = client.get("/api/goals/progress", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
-        assert "overall_status" in data
+        # Check for actual GoalProgressResponse structure
+        assert "period" in data
+        assert "has_goal" in data
+        assert "days_elapsed" in data
+        assert "days_remaining" in data
+        assert "days_total" in data
     
     def test_get_goal_history(self, client: TestClient, auth_headers: dict):
         """Test getting goal history."""
