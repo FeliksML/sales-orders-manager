@@ -139,9 +139,15 @@ export const orderService = {
     return response.data
   },
 
+  // Get AI insights usage status
+  getAIInsightsStatus: async () => {
+    const response = await apiClient.get('/api/orders/performance-insights/ai-status')
+    return response.data
+  },
+
   // Generate AI-powered insights (max 3/day)
-  generateAIInsights: async () => {
-    const response = await apiClient.post('/api/orders/performance-insights/generate-ai')
+  generateAIInsights: async (tone = 'positive') => {
+    const response = await apiClient.post('/api/orders/performance-insights/generate-ai', { tone })
     return response.data
   }
 }

@@ -1,14 +1,22 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { 
   TrendingUp, TrendingDown, Minus, Trophy, Flame, Zap, 
   Package, Wifi, Smartphone, Layers, DollarSign, Tv, Phone, 
-  ChevronRight, Lightbulb, Calendar, BarChart3, Award, Sparkles, Loader2
+  ChevronRight, Lightbulb, Calendar, BarChart3, Award, Sparkles, Loader2,
+  Smile, Scale, Skull
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { usePerformanceInsights } from '../hooks/usePerformanceInsights'
 import { orderService } from '../services/orderService'
 import Card from './ui/Card'
 import LoadingSpinner from './ui/LoadingSpinner'
+
+// Tone configurations
+const TONE_CONFIG = {
+  positive: { label: 'Positive', icon: Smile, color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  realistic: { label: 'Realistic', icon: Scale, color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  brutal: { label: 'Brutal', icon: Skull, color: 'text-rose-400', bg: 'bg-rose-500/20' }
+}
 
 // Metric configurations
 const METRIC_CONFIG = {
@@ -245,17 +253,35 @@ function PerformanceInsights() {
   // AI Insights state
   const [aiInsights, setAiInsights] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiRemaining, setAiRemaining] = useState(3)
+  const [aiRemaining, setAiRemaining] = useState(null) // null = not loaded yet
+  const [aiEnabled, setAiEnabled] = useState(true)
   const [aiError, setAiError] = useState(null)
+  const [aiTone, setAiTone] = useState('positive')
+  
+  // Fetch AI status on mount
+  useEffect(() => {
+    const fetchAIStatus = async () => {
+      try {
+        const status = await orderService.getAIInsightsStatus()
+        setAiRemaining(status.remaining_today)
+        setAiEnabled(status.ai_enabled)
+      } catch (err) {
+        console.error('Failed to fetch AI status:', err)
+        setAiRemaining(3) // Default fallback
+      }
+    }
+    fetchAIStatus()
+  }, [])
   
   // Generate AI insights handler
   const handleGenerateAI = async () => {
     setAiLoading(true)
     setAiError(null)
     try {
-      const result = await orderService.generateAIInsights()
+      const result = await orderService.generateAIInsights(aiTone)
       setAiInsights(result.insights)
       setAiRemaining(result.remaining_today)
+      setAiEnabled(result.ai_enabled)
     } catch (err) {
       console.error('Failed to generate AI insights:', err)
       if (err.response?.status === 429) {
@@ -445,33 +471,62 @@ function PerformanceInsights() {
         
         {/* Smart Insights with AI Generation */}
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-semibold flex items-center gap-2">
-              <Lightbulb className="w-4 h-4 text-indigo-400" />
-              Insights
-            </h3>
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-indigo-400" />
+                Insights
+              </h3>
+              
+              {/* AI Generate Button */}
+              <button
+                onClick={handleGenerateAI}
+                disabled={aiLoading || aiRemaining === 0 || !aiEnabled}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  aiLoading || aiRemaining === 0 || !aiEnabled
+                    ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
+                }`}
+                title={!aiEnabled ? 'AI not configured' : aiRemaining === 0 ? 'Daily limit reached' : `Generate AI insights (${aiRemaining}/3 remaining today)`}
+              >
+                {aiLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {aiLoading ? 'Generating...' : `AI Insights`}
+                </span>
+                <span className="text-xs opacity-70">({aiRemaining !== null ? aiRemaining : '?'}/3)</span>
+              </button>
+            </div>
             
-            {/* AI Generate Button */}
-            <button
-              onClick={handleGenerateAI}
-              disabled={aiLoading || aiRemaining === 0}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                aiLoading || aiRemaining === 0
-                  ? 'bg-white/5 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
-              }`}
-              title={aiRemaining === 0 ? 'Daily limit reached' : `Generate AI insights (${aiRemaining}/3 remaining today)`}
-            >
-              {aiLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">
-                {aiLoading ? 'Generating...' : `AI Insights`}
-              </span>
-              <span className="text-xs opacity-70">({aiRemaining}/3)</span>
-            </button>
+            {/* Tone Selector */}
+            {aiEnabled && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">Tone:</span>
+                <div className="flex items-center gap-1 rounded-lg p-0.5 bg-white/5">
+                  {Object.entries(TONE_CONFIG).map(([tone, config]) => {
+                    const Icon = config.icon
+                    return (
+                      <button
+                        key={tone}
+                        onClick={() => setAiTone(tone)}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                          aiTone === tone
+                            ? `${config.bg} ${config.color}`
+                            : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                        title={config.label}
+                      >
+                        <Icon className="w-3 h-3" />
+                        <span className="hidden sm:inline">{config.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* AI Error */}

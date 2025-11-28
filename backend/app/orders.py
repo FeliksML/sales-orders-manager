@@ -717,16 +717,54 @@ class AIInsightsResponse(BaseModel):
     ai_enabled: bool
 
 
+class AIInsightsStatusResponse(BaseModel):
+    remaining_today: int
+    ai_enabled: bool
+
+
+class AIInsightsRequest(BaseModel):
+    tone: str = "positive"  # "positive", "realistic", or "brutal"
+
+
+@router.get("/performance-insights/ai-status", response_model=AIInsightsStatusResponse)
+def get_ai_insights_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get current AI insights usage status (remaining requests today)."""
+    from .ai_insights import is_ai_configured
+    
+    if not is_ai_configured():
+        return AIInsightsStatusResponse(remaining_today=0, ai_enabled=False)
+    
+    today = date.today()
+    
+    # Reset count if it's a new day
+    if current_user.ai_insights_reset_date != today:
+        current_user.ai_insights_count = 0
+        current_user.ai_insights_reset_date = today
+        db.commit()
+    
+    remaining = 3 - current_user.ai_insights_count
+    return AIInsightsStatusResponse(remaining_today=remaining, ai_enabled=True)
+
+
 @router.post("/performance-insights/generate-ai", response_model=AIInsightsResponse)
 async def generate_ai_insights_endpoint(
+    request: AIInsightsRequest = AIInsightsRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Generate AI-powered performance insights using Groq's Llama model.
     Rate limited to 3 requests per day per user.
+    Tone options: "positive" (encouraging), "realistic" (balanced), "brutal" (harsh truth)
     """
     from .ai_insights import generate_performance_insights, is_ai_configured
+    
+    # Validate tone
+    valid_tones = ["positive", "realistic", "brutal"]
+    tone = request.tone if request.tone in valid_tones else "positive"
     
     # Check if AI is configured
     if not is_ai_configured():
@@ -837,8 +875,8 @@ async def generate_ai_insights_endpoint(
         "mobile_change": mobile_change,
     }
     
-    # Generate AI insights
-    insights = await generate_performance_insights(metrics)
+    # Generate AI insights with selected tone
+    insights = await generate_performance_insights(metrics, tone)
     
     # Update usage count
     current_user.ai_insights_count += 1
