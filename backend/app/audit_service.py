@@ -236,17 +236,30 @@ def revert_order_to_timestamp(
     user: User,
     ip_address: Optional[str] = None
 ) -> Optional[Order]:
-    """Revert an order to its state at a specific timestamp"""
+    """Revert an order to its state at a specific timestamp.
+    
+    Security: This function verifies that the requesting user owns the order
+    before allowing any modifications.
+    
+    Returns None if:
+    - Order doesn't exist
+    - User doesn't own the order (authorization check)
+    - No audit history exists for the order at that timestamp
+    """
+    # Get the current order first - we need to verify ownership
+    order = db.query(Order).filter(Order.orderid == order_id).first()
+
+    if not order:
+        return None
+
+    # SECURITY: Verify the user owns this order before allowing revert
+    if order.userid != user.userid:
+        return None
+
     # Get the order's state at the target timestamp
     target_state = get_order_at_timestamp(db, order_id, timestamp)
 
     if not target_state:
-        return None
-
-    # Get the current order
-    order = db.query(Order).filter(Order.orderid == order_id).first()
-
-    if not order:
         return None
 
     # Store old values for audit logging

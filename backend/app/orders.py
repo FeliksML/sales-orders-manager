@@ -6,7 +6,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta, date
 import io
 from .database import get_db
-from .models import Order, User, Notification, DeletedOrder, IdempotencyKey
+from .models import Order, User, Notification, DeletedOrder, IdempotencyKey, FollowUp
 from .schemas import (
     OrderCreate, OrderUpdate, OrderResponse, OrderStats, PaginatedOrderResponse, PaginationMeta,
     PerformanceInsightsResponse, PerformanceComparison, PeriodMetrics, TrendDataPoint, PersonalRecord
@@ -1488,7 +1488,12 @@ def bulk_delete(
         )
         db.add(deleted_record)
 
-    # Delete related notifications first (to avoid foreign key constraint violation)
+    # Delete related follow-ups first (to avoid foreign key constraint violation)
+    db.query(FollowUp).filter(
+        FollowUp.order_id.in_(request.order_ids)
+    ).delete(synchronize_session=False)
+
+    # Delete related notifications (to avoid foreign key constraint violation)
     db.query(Notification).filter(
         Notification.orderid.in_(request.order_ids)
     ).delete(synchronize_session=False)
@@ -1687,7 +1692,12 @@ def delete_order(
     )
     db.add(deleted_record)
 
-    # Delete related notifications first (to avoid foreign key constraint violation)
+    # Delete related follow-ups first (to avoid foreign key constraint violation)
+    db.query(FollowUp).filter(
+        FollowUp.order_id == order_id
+    ).delete(synchronize_session=False)
+
+    # Delete related notifications (to avoid foreign key constraint violation)
     db.query(Notification).filter(
         Notification.orderid == order_id
     ).delete(synchronize_session=False)
