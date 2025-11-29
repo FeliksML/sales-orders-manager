@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 # Resend configuration
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
+MAIL_FROM = os.getenv("MAIL_FROM", "Sales Order Manager <orders@mail.salesordermanager.us>")
+MAIL_REPLY_TO = os.getenv("MAIL_REPLY_TO", "support@salesordermanager.us")
 
 # Initialize Resend client
 if RESEND_API_KEY:
@@ -141,7 +142,7 @@ async def send_email_notification(
             {order_details}
 
             <div class="footer">
-                <p>This is an automated notification from Sales Order Manager.</p>
+                <p>Questions? Reply to this email or contact support@salesordermanager.us</p>
                 <p>To manage your notifications, please log in to your dashboard.</p>
             </div>
         </div>
@@ -153,6 +154,7 @@ async def send_email_notification(
         params: resend.Emails.SendParams = {
             "from": MAIL_FROM,
             "to": [user_email],
+            "reply_to": MAIL_REPLY_TO,
             "subject": subject,
             "html": html_body,
         }
@@ -506,7 +508,7 @@ async def send_order_details_email(
             {f'<div class="section"><h3 class="section-title">Additional Notes</h3><table>{notes_html}</table></div>' if notes_html else ''}
 
             <div class="footer">
-                <p>This email was sent from Sales Order Manager.</p>
+                <p>Questions? Reply to this email or contact support@salesordermanager.us</p>
                 <p>Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
             </div>
         </div>
@@ -518,6 +520,7 @@ async def send_order_details_email(
         params: resend.Emails.SendParams = {
             "from": MAIL_FROM,
             "to": [user.email],
+            "reply_to": MAIL_REPLY_TO,
             "subject": f"Order Details - {order.business_name} (Order #{order.orderid})",
             "html": html_body,
         }

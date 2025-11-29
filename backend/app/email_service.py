@@ -12,7 +12,8 @@ import resend
 
 # Get Resend configuration
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
+MAIL_FROM = os.getenv("MAIL_FROM", "Sales Order Manager <orders@mail.salesordermanager.us>")
+MAIL_REPLY_TO = os.getenv("MAIL_REPLY_TO", "support@salesordermanager.us")
 
 # Initialize Resend client
 if RESEND_API_KEY:
@@ -167,6 +168,7 @@ async def send_scheduled_report_email(
         params: resend.Emails.SendParams = {
             "from": MAIL_FROM,
             "to": [user_email],
+            "reply_to": MAIL_REPLY_TO,
             "subject": f"Your {schedule_type.capitalize()} Sales Report - {datetime.now().strftime('%B %d, %Y')}",
             "html": html_body,
             "attachments": [
@@ -295,6 +297,7 @@ async def send_export_email(
         params: resend.Emails.SendParams = {
             "from": MAIL_FROM,
             "to": [user_email],
+            "reply_to": MAIL_REPLY_TO,
             "subject": f"Your Orders Export - {datetime.now().strftime('%B %d, %Y')}",
             "html": html_body,
             "attachments": [

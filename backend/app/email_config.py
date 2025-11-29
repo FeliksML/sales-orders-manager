@@ -15,7 +15,8 @@ logger.setLevel(logging.INFO)
 
 # Get email configuration from environment
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
+MAIL_FROM = os.getenv("MAIL_FROM", "Sales Order Manager <orders@mail.salesordermanager.us>")
+MAIL_REPLY_TO = os.getenv("MAIL_REPLY_TO", "support@salesordermanager.us")
 
 # Log email configuration at module load (without sensitive data)
 print(f"\n🔧 EMAIL_CONFIG MODULE LOADING (Resend API)...")
@@ -114,7 +115,7 @@ async def send_verification_email(email: str, name: str, verification_link: str)
                                     Sales Order Manager
                                 </p>
                                 <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                                    This is an automated message, please do not reply to this email.
+                                    Questions? Reply to this email or contact support@salesordermanager.us
                                 </p>
                             </td>
                         </tr>
@@ -134,6 +135,7 @@ async def send_verification_email(email: str, name: str, verification_link: str)
         params: resend.Emails.SendParams = {
             "from": MAIL_FROM,
             "to": [email],
+            "reply_to": MAIL_REPLY_TO,
             "subject": "Verify Your Email - Sales Order Manager",
             "html": html_content,
         }
@@ -241,7 +243,7 @@ async def send_password_reset_email(email: str, name: str, reset_link: str):
                                     Sales Order Manager
                                 </p>
                                 <p style="margin: 0; color: #9ca3af; font-size: 12px;">
-                                    This is an automated message, please do not reply to this email.
+                                    Questions? Reply to this email or contact support@salesordermanager.us
                                 </p>
                             </td>
                         </tr>
@@ -261,6 +263,7 @@ async def send_password_reset_email(email: str, name: str, reset_link: str):
         params: resend.Emails.SendParams = {
             "from": MAIL_FROM,
             "to": [email],
+            "reply_to": MAIL_REPLY_TO,
             "subject": "Reset Your Password - Sales Order Manager",
             "html": html_content,
         }
