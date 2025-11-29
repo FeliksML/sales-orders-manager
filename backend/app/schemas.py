@@ -111,7 +111,15 @@ class OrderBase(BaseModel):
         return v
 
 class OrderCreate(OrderBase):
-    pass
+    """Schema for creating a new order - includes past date validation."""
+
+    @field_validator('install_date')
+    @classmethod
+    def validate_install_date_not_past(cls, v: date) -> date:
+        """Ensure install date is not in the past for new orders."""
+        if v < date.today():
+            raise ValueError('Install date cannot be in the past')
+        return v
 
 class OrderUpdate(BaseModel):
     """Schema for updating order data - all fields optional."""

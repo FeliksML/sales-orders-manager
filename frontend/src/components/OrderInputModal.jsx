@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, User, MapPin, Calendar, Package, FileText, CheckCircle, ArrowRight, ArrowLeft, Mail, Phone, Upload, FileUp, Loader2 } from 'lucide-react'
-import { validateEmail, validatePhone, validateName, validateRequired } from '@sales-order-manager/shared'
+import { validateEmail, validatePhone, validateName, validateRequired, validateInstallDate } from '@sales-order-manager/shared'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 
@@ -51,6 +51,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
   const [isDragging, setIsDragging] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [pastDateWarning, setPastDateWarning] = useState(false)
   const fileInputRef = useRef(null)
 
   const [formData, setFormData] = useState({
@@ -149,6 +150,19 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
           initial_payment: extracted.initial_payment || prev.initial_payment,
           notes: extracted.notes || prev.notes
         }))
+
+        // Check if extracted date is in the past and show warning
+        if (extracted.install_date) {
+          const extractedDate = new Date(extracted.install_date + 'T00:00:00')
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          if (extractedDate < today) {
+            setPastDateWarning(true)
+          } else {
+            setPastDateWarning(false)
+          }
+        }
+
         setUploadSuccess(true)
         setTimeout(() => setUploadSuccess(false), 3000)
       }
@@ -216,11 +230,23 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     }
 
     if (step === STEPS.INSTALLATION) {
-      const dateValidation = validateRequired(formData.install_date, 'Install date')
+      // Use validateInstallDate to check for past dates
+      const dateValidation = validateInstallDate(formData.install_date)
       if (!dateValidation.valid) newErrors.install_date = dateValidation.error
 
       const timeValidation = validateRequired(formData.install_time, 'Install time')
       if (!timeValidation.valid) newErrors.install_time = timeValidation.error
+    }
+
+    if (step === STEPS.PRODUCTS) {
+      // At least one service must be selected
+      const hasAnyService = formData.has_internet || formData.has_tv ||
+        formData.has_voice > 0 || formData.has_mobile > 0 ||
+        formData.has_sbc > 0 || formData.has_wib
+
+      if (!hasAnyService) {
+        newErrors.services = 'At least one service must be selected'
+      }
     }
 
     setErrors(newErrors)
@@ -290,6 +316,10 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }))
+    }
+    // Clear past date warning when date is manually changed
+    if (field === 'install_date' && pastDateWarning) {
+      setPastDateWarning(false)
     }
   }
 
@@ -647,6 +677,22 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                     </p>
                   </div>
                 )}
+
+                {/* Warning banner for past dates extracted from PDF */}
+                {pastDateWarning && (
+                  <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                    <p className="text-amber-300 text-sm">
+                      ⚠️ The date extracted from the PDF is in the past. Please update the install date to a valid future date before submitting.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setPastDateWarning(false)}
+                      className="mt-2 text-xs text-amber-400 hover:text-amber-300 underline"
+                    >
+                      Dismiss warning
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -887,6 +933,13 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
                       ✓ <span className="font-semibold">{totalProducts}</span> product
                       {totalProducts !== 1 ? 's' : ''} selected
                     </p>
+                  </div>
+                )}
+
+                {/* Services validation error */}
+                {errors.services && (
+                  <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <p className="text-red-400 text-sm">{errors.services}</p>
                   </div>
                 )}
               </div>

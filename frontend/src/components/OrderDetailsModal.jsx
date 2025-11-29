@@ -4,6 +4,7 @@ import {
   CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
   Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send, Trash2, DollarSign, Bell
 } from 'lucide-react'
+import { validateEmail, validatePhone } from '@sales-order-manager/shared'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 import AuditLog from './AuditLog'
@@ -80,16 +81,22 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
 
   const validateForm = () => {
     const newErrors = {}
+
+    // Required fields
     if (!formData.spectrum_reference.trim()) newErrors.spectrum_reference = 'Required'
     if (!formData.customer_account_number.trim()) newErrors.customer_account_number = 'Required'
     if (!formData.business_name.trim()) newErrors.business_name = 'Required'
     if (!formData.customer_name.trim()) newErrors.customer_name = 'Required'
-    if (!formData.customer_email.trim()) {
-      newErrors.customer_email = 'Required'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.customer_email)) {
-      newErrors.customer_email = 'Invalid email'
-    }
-    if (!formData.customer_phone.trim()) newErrors.customer_phone = 'Required'
+
+    // Email validation using shared library (consistent with OrderInputModal)
+    const emailValidation = validateEmail(formData.customer_email)
+    if (!emailValidation.valid) newErrors.customer_email = emailValidation.error
+
+    // Phone validation using shared library (consistent with OrderInputModal)
+    const phoneValidation = validatePhone(formData.customer_phone)
+    if (!phoneValidation.valid) newErrors.customer_phone = phoneValidation.error
+
+    // Install date - allow past dates for existing orders (already installed)
     if (!formData.install_date) newErrors.install_date = 'Required'
     if (!formData.install_time.trim()) newErrors.install_time = 'Required'
 

@@ -215,3 +215,63 @@ export const validateForm = (values, rules) => {
     errors
   }
 }
+
+/**
+ * Validate install date is not in the past
+ * @param {string} date - Date in ISO format (YYYY-MM-DD)
+ * @param {boolean} allowToday - Whether today is valid (default: true)
+ * @returns {{valid: boolean, error: string|null}}
+ */
+export const validateInstallDate = (date, allowToday = true) => {
+  if (!date) {
+    return { valid: false, error: 'Install date is required' }
+  }
+
+  const dateObj = new Date(date + 'T00:00:00')
+  if (isNaN(dateObj.getTime())) {
+    return { valid: false, error: 'Invalid date format' }
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  if (allowToday) {
+    if (dateObj < today) {
+      return { valid: false, error: 'Install date cannot be in the past' }
+    }
+  } else {
+    if (dateObj <= today) {
+      return { valid: false, error: 'Install date must be in the future' }
+    }
+  }
+
+  return { valid: true, error: null }
+}
+
+/**
+ * Validate product quantity within reasonable limits
+ * @param {number} value - Quantity value
+ * @param {string} fieldName - Field name for error message
+ * @param {number} max - Maximum allowed (default: 250)
+ * @returns {{valid: boolean, error: string|null}}
+ */
+export const validateQuantity = (value, fieldName = 'Quantity', max = 250) => {
+  if (value === null || value === undefined || value === '') {
+    return { valid: true, error: null } // Optional field
+  }
+
+  const num = Number(value)
+  if (isNaN(num) || !Number.isInteger(num)) {
+    return { valid: false, error: `${fieldName} must be a whole number` }
+  }
+
+  if (num < 0) {
+    return { valid: false, error: `${fieldName} cannot be negative` }
+  }
+
+  if (num > max) {
+    return { valid: false, error: `${fieldName} cannot exceed ${max}` }
+  }
+
+  return { valid: true, error: null }
+}

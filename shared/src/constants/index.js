@@ -90,7 +90,7 @@ export const NOTIFICATION_TYPES = {
 
 // Validation Rules
 export const VALIDATION = {
-  EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  EMAIL_REGEX: /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/,  // Require 2+ char TLD
   PHONE_REGEX: /^[\d\s\-\+\(\)]+$/,
   MIN_PASSWORD_LENGTH: 8,
   MAX_NAME_LENGTH: 100,
