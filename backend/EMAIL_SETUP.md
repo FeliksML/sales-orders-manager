@@ -62,17 +62,17 @@ MAIL_FROM=your-gmail-address@gmail.com
 
 ## Alternative Email Providers
 
-### SendGrid
+### Resend (Currently Used)
+
+The application uses Resend's HTTP API for email delivery. Configure in `.env`:
 
 ```env
-MAIL_USERNAME=apikey
-MAIL_PASSWORD=your-sendgrid-api-key
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
 MAIL_FROM=noreply@yourdomain.com
-MAIL_PORT=587
-MAIL_SERVER=smtp.sendgrid.net
-MAIL_STARTTLS=True
-MAIL_SSL_TLS=False
 ```
+
+**Note:** The `MAIL_FROM` address must be from a domain verified in your Resend dashboard.
+Get your API key at: https://resend.com/api-keys
 
 ### Mailgun
 
@@ -159,7 +159,7 @@ Check the backend console for email sending status:
 **For production**:
 1. Use a custom domain email (e.g., noreply@yourdomain.com)
 2. Set up SPF, DKIM, and DMARC records
-3. Use a dedicated email service (SendGrid, Mailgun, AWS SES)
+3. Use a dedicated email service (Resend, Mailgun, AWS SES)
 
 ### "Connection refused" Error
 
@@ -196,7 +196,7 @@ You can customize:
 
 ## Production Recommendations
 
-1. **Use a dedicated email service** (SendGrid, Mailgun, AWS SES)
+1. **Use a dedicated email service** (Resend, Mailgun, AWS SES)
    - Better deliverability
    - Higher sending limits
    - Detailed analytics

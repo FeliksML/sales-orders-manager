@@ -16,6 +16,6 @@ httpx
 slowapi
 gunicorn
 sentry-sdk[fastapi]
-sendgrid
+resend
 python-multipart
 pdfplumber==0.11.0

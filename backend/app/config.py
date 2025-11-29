@@ -30,7 +30,7 @@ def validate_environment() -> None:
     # Required in production only
     production_required = {
         "RECAPTCHA_SECRET_KEY": "reCAPTCHA secret key",
-        "SENDGRID_API_KEY": "SendGrid API key for sending emails",
+        "RESEND_API_KEY": "Resend API key for sending emails",
     }
 
     # Check critical required variables
@@ -75,10 +75,10 @@ def validate_environment() -> None:
                 "⚠️  FRONTEND_URL uses http:// in production. HTTPS is strongly recommended."
             )
 
-    # Log email configuration for debugging (SendGrid HTTP API)
-    print("\n📧 EMAIL CONFIGURATION (SendGrid HTTP API):")
-    sendgrid_key = os.getenv('SENDGRID_API_KEY', '')
-    print(f"   SENDGRID_API_KEY: {'SET (' + str(len(sendgrid_key)) + ' chars, starts with ' + sendgrid_key[:10] + '...)' if sendgrid_key else 'NOT SET'}")
+    # Log email configuration for debugging (Resend API)
+    print("\n📧 EMAIL CONFIGURATION (Resend API):")
+    resend_key = os.getenv('RESEND_API_KEY', '')
+    print(f"   RESEND_API_KEY: {'SET (' + str(len(resend_key)) + ' chars, starts with ' + resend_key[:10] + '...)' if resend_key else 'NOT SET'}")
     print(f"   MAIL_FROM: {os.getenv('MAIL_FROM', 'NOT SET')}")
 
     # Print warnings

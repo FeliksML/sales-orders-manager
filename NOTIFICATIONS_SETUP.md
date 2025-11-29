@@ -273,7 +273,7 @@ Create a test order with install date set to tomorrow or today, then wait for th
 ### Email
 - Free with Gmail (using App Password)
 - Most email providers have free tiers
-- Consider SendGrid/Mailgun for higher volume
+- Consider Resend/Mailgun for higher volume
 
 ## Security Notes
 

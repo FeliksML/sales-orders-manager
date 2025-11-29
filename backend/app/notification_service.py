@@ -1,14 +1,13 @@
 """
 Notification service for sending email and SMS notifications
-Uses SendGrid HTTP API for emails
+Uses Resend API for emails
 """
 from twilio.rest import Client
 from datetime import datetime
 from typing import Optional
 import os
 import logging
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import resend
 from .models import User, Order, Notification
 from sqlalchemy.orm import Session
 
@@ -16,14 +15,13 @@ from sqlalchemy.orm import Session
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# SendGrid configuration
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+# Resend configuration
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
 
-# Initialize SendGrid client
-sg = None
-if SENDGRID_API_KEY:
-    sg = SendGridAPIClient(SENDGRID_API_KEY)
+# Initialize Resend client
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 # Twilio configuration (from environment variables)
 TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
@@ -48,10 +46,10 @@ async def send_email_notification(
     message: str,
     order: Optional[Order] = None
 ):
-    """Send email notification using SendGrid HTTP API"""
+    """Send email notification using Resend API"""
 
-    if not sg:
-        logger.error("SendGrid API key not configured")
+    if not RESEND_API_KEY:
+        logger.error("Resend API key not configured")
         return False
 
     # Build order details if order is provided
@@ -152,15 +150,15 @@ async def send_email_notification(
     """
 
     try:
-        mail = Mail(
-            from_email=MAIL_FROM,
-            to_emails=user_email,
-            subject=subject,
-            html_content=html_body
-        )
-        
-        response = sg.send(mail)
-        logger.info(f"Email notification sent to {user_email} (status: {response.status_code})")
+        params: resend.Emails.SendParams = {
+            "from": MAIL_FROM,
+            "to": [user_email],
+            "subject": subject,
+            "html": html_body,
+        }
+
+        response = resend.Emails.send(params)
+        logger.info(f"Email notification sent to {user_email} (id: {response.get('id', 'N/A')})")
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {user_email}: {str(e)}")
@@ -349,10 +347,10 @@ async def send_order_details_email(
     user: User,
     order: Order
 ):
-    """Send complete order details via email using SendGrid HTTP API"""
+    """Send complete order details via email using Resend API"""
 
-    if not sg:
-        logger.error("SendGrid API key not configured")
+    if not RESEND_API_KEY:
+        logger.error("Resend API key not configured")
         return False
 
     # Build comprehensive order details including products
@@ -517,15 +515,15 @@ async def send_order_details_email(
     """
 
     try:
-        mail = Mail(
-            from_email=MAIL_FROM,
-            to_emails=user.email,
-            subject=f"Order Details - {order.business_name} (Order #{order.orderid})",
-            html_content=html_body
-        )
-        
-        response = sg.send(mail)
-        logger.info(f"Order details email sent to {user.email} for order {order.orderid} (status: {response.status_code})")
+        params: resend.Emails.SendParams = {
+            "from": MAIL_FROM,
+            "to": [user.email],
+            "subject": f"Order Details - {order.business_name} (Order #{order.orderid})",
+            "html": html_body,
+        }
+
+        response = resend.Emails.send(params)
+        logger.info(f"Order details email sent to {user.email} for order {order.orderid} (id: {response.get('id', 'N/A')})")
         return True
     except Exception as e:
         logger.error(f"Failed to send order details email to {user.email}: {str(e)}")

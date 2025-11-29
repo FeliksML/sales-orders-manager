@@ -1,6 +1,6 @@
 """
 Email service for sending scheduled reports and export emails with attachments
-Uses SendGrid HTTP API
+Uses Resend API
 """
 from datetime import datetime
 import base64
@@ -8,17 +8,15 @@ import asyncio
 import tempfile
 import os
 import logging
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+import resend
 
-# Get SendGrid configuration
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+# Get Resend configuration
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
 
-# Initialize SendGrid client
-sg = None
-if SENDGRID_API_KEY:
-    sg = SendGridAPIClient(SENDGRID_API_KEY)
+# Initialize Resend client
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -33,9 +31,9 @@ async def send_scheduled_report_email(
 ):
     """Send scheduled report email with Excel attachment"""
     logger.info(f"📧 Starting scheduled report email to {user_email} (type: {schedule_type})")
-    
-    if not sg:
-        raise Exception("SendGrid API key not configured")
+
+    if not RESEND_API_KEY:
+        raise Exception("Resend API key not configured")
 
     # Create HTML body
     html_body = f"""
@@ -165,28 +163,24 @@ async def send_scheduled_report_email(
     filename = f'sales_report_{schedule_type}_{datetime.now().strftime("%Y%m%d")}.xlsx'
 
     try:
-        # Create message
-        message = Mail(
-            from_email=MAIL_FROM,
-            to_emails=user_email,
-            subject=f"Your {schedule_type.capitalize()} Sales Report - {datetime.now().strftime('%B %d, %Y')}",
-            html_content=html_body
-        )
-        
-        # Add attachment
-        encoded_file = base64.b64encode(excel_data).decode()
-        attachment = Attachment(
-            FileContent(encoded_file),
-            FileName(filename),
-            FileType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
-            Disposition('attachment')
-        )
-        message.attachment = attachment
+        # Create params with attachment
+        params: resend.Emails.SendParams = {
+            "from": MAIL_FROM,
+            "to": [user_email],
+            "subject": f"Your {schedule_type.capitalize()} Sales Report - {datetime.now().strftime('%B %d, %Y')}",
+            "html": html_body,
+            "attachments": [
+                {
+                    "filename": filename,
+                    "content": list(excel_data),
+                }
+            ],
+        }
 
         # Send email
         logger.info(f"📤 Sending scheduled report email to {user_email}")
-        response = sg.send(message)
-        logger.info(f"✅ Successfully sent scheduled report email to {user_email} (status: {response.status_code})")
+        response = resend.Emails.send(params)
+        logger.info(f"✅ Successfully sent scheduled report email to {user_email} (id: {response.get('id', 'N/A')})")
 
     except Exception as e:
         logger.error(f"❌ Failed to send scheduled report email to {user_email}: {str(e)}")
@@ -201,9 +195,9 @@ async def send_export_email(
 ):
     """Send export file via email"""
     logger.info(f"📧 Starting export email to {user_email} (format: {file_format}, count: {order_count})")
-    
-    if not sg:
-        raise Exception("SendGrid API key not configured")
+
+    if not RESEND_API_KEY:
+        raise Exception("Resend API key not configured")
 
     # Determine file extension and media type
     if file_format == 'excel':
@@ -293,32 +287,28 @@ async def send_export_email(
     filename = f'orders_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.{file_ext}'
 
     try:
-        # Create message
-        message = Mail(
-            from_email=MAIL_FROM,
-            to_emails=user_email,
-            subject=f"Your Orders Export - {datetime.now().strftime('%B %d, %Y')}",
-            html_content=html_body
-        )
-        
         # Handle file_data - could be bytes or string for CSV
         if isinstance(file_data, str):
             file_data = file_data.encode('utf-8')
-        
-        # Add attachment
-        encoded_file = base64.b64encode(file_data).decode()
-        attachment = Attachment(
-            FileContent(encoded_file),
-            FileName(filename),
-            FileType(mime_type),
-            Disposition('attachment')
-        )
-        message.attachment = attachment
+
+        # Create params with attachment
+        params: resend.Emails.SendParams = {
+            "from": MAIL_FROM,
+            "to": [user_email],
+            "subject": f"Your Orders Export - {datetime.now().strftime('%B %d, %Y')}",
+            "html": html_body,
+            "attachments": [
+                {
+                    "filename": filename,
+                    "content": list(file_data),
+                }
+            ],
+        }
 
         # Send email
         logger.info(f"📤 Sending export email to {user_email}")
-        response = sg.send(message)
-        logger.info(f"✅ Successfully sent export email to {user_email} (status: {response.status_code})")
+        response = resend.Emails.send(params)
+        logger.info(f"✅ Successfully sent export email to {user_email} (id: {response.get('id', 'N/A')})")
 
     except Exception as e:
         logger.error(f"❌ Failed to send export email to {user_email}: {str(e)}")

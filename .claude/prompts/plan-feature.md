@@ -28,7 +28,7 @@ You are my senior software engineer working INSIDE this repository in Claude Cod
 - `orders.py` – Order CRUD endpoints
 - `admin.py` – Admin panel endpoints
 - `pdf_extractor.py` – PDF parsing logic
-- `email_service.py` – Email notifications (SendGrid)
+- `email_service.py` – Email notifications (Resend)
 - `notification_service.py` – Push/SMS notifications
 - `scheduler.py` – APScheduler for scheduled jobs
 

@@ -1,12 +1,11 @@
 """
 Email configuration for sending verification and notification emails
-Uses SendGrid HTTP API to bypass SMTP port blocks on cloud providers
+Uses Resend API for reliable email delivery
 """
 import os
 import logging
 from dotenv import load_dotenv
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
+import resend
 
 load_dotenv()
 
@@ -15,27 +14,26 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Get email configuration from environment
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "noreply@salesorder.com")
 
 # Log email configuration at module load (without sensitive data)
-print(f"\n🔧 EMAIL_CONFIG MODULE LOADING (SendGrid HTTP API)...")
+print(f"\n🔧 EMAIL_CONFIG MODULE LOADING (Resend API)...")
 print(f"   MAIL_FROM: {MAIL_FROM}")
 # Security: Only log whether API key is set, never log any part of the key itself
-print(f"   SENDGRID_API_KEY: {'SET (' + str(len(SENDGRID_API_KEY)) + ' chars)' if SENDGRID_API_KEY else 'NOT SET'}")
+print(f"   RESEND_API_KEY: {'SET (' + str(len(RESEND_API_KEY)) + ' chars)' if RESEND_API_KEY else 'NOT SET'}")
 
-# Initialize SendGrid client
-sg = None
-if SENDGRID_API_KEY:
-    sg = SendGridAPIClient(SENDGRID_API_KEY)
-    print(f"✅ SendGrid client initialized (HTTP API)")
+# Initialize Resend client
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
+    print(f"✅ Resend client initialized")
 else:
-    print(f"⚠️ SendGrid API key not set - emails will fail")
+    print(f"⚠️ Resend API key not set - emails will fail")
 
 
 async def send_verification_email(email: str, name: str, verification_link: str):
     """
-    Send email verification link to user using SendGrid HTTP API
+    Send email verification link to user using Resend API
 
     Args:
         email: User's email address
@@ -43,9 +41,9 @@ async def send_verification_email(email: str, name: str, verification_link: str)
         verification_link: The verification URL with token
     """
     logger.info(f"📧 Starting verification email to {email}")
-    
-    if not sg:
-        raise Exception("SendGrid API key not configured")
+
+    if not RESEND_API_KEY:
+        raise Exception("Resend API key not configured")
     
     html_content = f"""
     <!DOCTYPE html>
@@ -128,26 +126,25 @@ async def send_verification_email(email: str, name: str, verification_link: str)
     </html>
     """
 
-    print(f"📤 ATTEMPTING TO SEND EMAIL VIA SENDGRID HTTP API...")
+    print(f"📤 ATTEMPTING TO SEND EMAIL VIA RESEND API...")
     print(f"   To: {email}")
     print(f"   From: {MAIL_FROM}")
-    print(f"   Method: HTTP API (port 443)")
-    
+
     try:
-        message = Mail(
-            from_email=MAIL_FROM,
-            to_emails=email,
-            subject="Verify Your Email - Sales Order Manager",
-            html_content=html_content
-        )
-        
-        response = sg.send(message)
-        
+        params: resend.Emails.SendParams = {
+            "from": MAIL_FROM,
+            "to": [email],
+            "subject": "Verify Your Email - Sales Order Manager",
+            "html": html_content,
+        }
+
+        response = resend.Emails.send(params)
+
         print(f"✅ EMAIL SENT SUCCESSFULLY!")
-        print(f"   Status code: {response.status_code}")
+        print(f"   ID: {response.get('id', 'N/A')}")
         print(f"   To: {email}")
-        logger.info(f"✅ Successfully sent verification email to {email} (status: {response.status_code})")
-        
+        logger.info(f"✅ Successfully sent verification email to {email} (id: {response.get('id', 'N/A')})")
+
     except Exception as e:
         print(f"❌ EMAIL SEND FAILED!")
         print(f"   Error type: {type(e).__name__}")
@@ -158,7 +155,7 @@ async def send_verification_email(email: str, name: str, verification_link: str)
 
 async def send_password_reset_email(email: str, name: str, reset_link: str):
     """
-    Send password reset link to user using SendGrid HTTP API
+    Send password reset link to user using Resend API
 
     Args:
         email: User's email address
@@ -166,9 +163,9 @@ async def send_password_reset_email(email: str, name: str, reset_link: str):
         reset_link: The password reset URL with token
     """
     logger.info(f"📧 Starting password reset email to {email}")
-    
-    if not sg:
-        raise Exception("SendGrid API key not configured")
+
+    if not RESEND_API_KEY:
+        raise Exception("Resend API key not configured")
     
     html_content = f"""
     <!DOCTYPE html>
@@ -256,24 +253,24 @@ async def send_password_reset_email(email: str, name: str, reset_link: str):
     </html>
     """
 
-    print(f"📤 ATTEMPTING TO SEND PASSWORD RESET EMAIL VIA SENDGRID HTTP API...")
+    print(f"📤 ATTEMPTING TO SEND PASSWORD RESET EMAIL VIA RESEND API...")
     print(f"   To: {email}")
     print(f"   From: {MAIL_FROM}")
-    
+
     try:
-        message = Mail(
-            from_email=MAIL_FROM,
-            to_emails=email,
-            subject="Reset Your Password - Sales Order Manager",
-            html_content=html_content
-        )
-        
-        response = sg.send(message)
-        
+        params: resend.Emails.SendParams = {
+            "from": MAIL_FROM,
+            "to": [email],
+            "subject": "Reset Your Password - Sales Order Manager",
+            "html": html_content,
+        }
+
+        response = resend.Emails.send(params)
+
         print(f"✅ PASSWORD RESET EMAIL SENT SUCCESSFULLY!")
-        print(f"   Status code: {response.status_code}")
-        logger.info(f"✅ Successfully sent password reset email to {email} (status: {response.status_code})")
-        
+        print(f"   ID: {response.get('id', 'N/A')}")
+        logger.info(f"✅ Successfully sent password reset email to {email} (id: {response.get('id', 'N/A')})")
+
     except Exception as e:
         print(f"❌ PASSWORD RESET EMAIL SEND FAILED!")
         print(f"   Error type: {type(e).__name__}")
