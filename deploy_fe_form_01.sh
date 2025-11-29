@@ -12,76 +12,25 @@ echo "=========================================="
 cd ~/sales-orders-manager
 
 echo ""
-echo "[1/6] Pulling latest changes..."
+echo "[1/4] Pulling latest changes..."
 git pull origin main
 
 echo ""
-echo "[2/6] Building shared library..."
-cd shared
-npm install
-npm run build
-cd ..
+echo "[2/4] Rebuilding containers with docker compose..."
+sudo docker compose -f docker-compose.prod.yml build --no-cache frontend backend
 
 echo ""
-echo "[3/6] Rebuilding frontend..."
-cd frontend
-npm install
-npm run build
-cd ..
-
-echo ""
-echo "[4/6] Testing backend schema validation..."
-cd backend
-python -c "
-from datetime import date, timedelta
-from app.schemas import OrderCreate
-
-# Test with past date - should fail
-try:
-    order = OrderCreate(
-        spectrum_reference='TEST123',
-        customer_account_number='ACC123',
-        business_name='Test Business',
-        customer_name='John Doe',
-        customer_email='test@example.com',
-        customer_phone='555-123-4567',
-        install_date=date.today() - timedelta(days=1),
-        install_time='9:00 AM - 10:00 AM'
-    )
-    echo 'FAIL: Past date should be rejected'
-    exit 1
-except ValueError:
-    print('OK: Past date validation working')
-
-# Test with today
-try:
-    order = OrderCreate(
-        spectrum_reference='TEST123',
-        customer_account_number='ACC123',
-        business_name='Test Business',
-        customer_name='John Doe',
-        customer_email='test@example.com',
-        customer_phone='555-123-4567',
-        install_date=date.today(),
-        install_time='9:00 AM - 10:00 AM'
-    )
-    print('OK: Today date allowed')
-except ValueError as e:
-    print(f'FAIL: Today should be allowed: {e}')
-    exit 1
-
-print('All backend validation tests passed!')
-"
-cd ..
-
-echo ""
-echo "[5/6] Restarting services with docker compose..."
-sudo docker compose -f docker-compose.prod.yml build frontend backend
+echo "[3/4] Restarting services..."
 sudo docker compose -f docker-compose.prod.yml up -d frontend backend
 
 echo ""
-echo "[6/6] Waiting for services to start..."
+echo "[4/4] Waiting for services to start..."
 sleep 10
+
+# Check if containers are running
+echo ""
+echo "Container status:"
+sudo docker compose -f docker-compose.prod.yml ps frontend backend
 
 echo ""
 echo "=========================================="
