@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   X, Edit2, Save, Calendar, User, MapPin, Phone, Briefcase, Package,
   CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
@@ -37,12 +37,19 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [emailMessage, setEmailMessage] = useState(null)
   const [errors, setErrors] = useState({})
   const [formData, setFormData] = useState({})
+  const [isDirty, setIsDirty] = useState(false)
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false)
+  const [pendingAction, setPendingAction] = useState(null)
   const { createFollowup, loading: followupLoading } = useCreateFollowup()
+
+  // Refs for tracking original data and preventing double-save
+  const originalFormDataRef = useRef(null)
+  const isSavingRef = useRef(false)
 
   useEffect(() => {
     if (order) {
       console.log('OrderDetailsModal: Updating formData from order:', order)
-      setFormData({
+      const initialData = {
         spectrum_reference: order.spectrum_reference || '',
         customer_account_number: order.customer_account_number || '',
         customer_security_code: order.customer_security_code || '',
@@ -66,14 +73,23 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
         monthly_total: order.monthly_total || '',
         initial_payment: order.initial_payment || '',
         notes: order.notes || ''
-      })
+      }
+      setFormData(initialData)
+      originalFormDataRef.current = initialData
+      setIsDirty(false)
     }
   }, [order])
 
   if (!isOpen || !order) return null
 
   const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value }
+      // Check if form is dirty by comparing to original
+      const hasChanges = JSON.stringify(newData) !== JSON.stringify(originalFormDataRef.current)
+      setIsDirty(hasChanges)
+      return newData
+    })
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: undefined }))
     }
@@ -105,8 +121,12 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   }
 
   const handleSave = async () => {
+    // Synchronous check prevents race condition from rapid clicks
+    if (isSavingRef.current || isSubmitting) return
+
     if (!validateForm()) return
 
+    isSavingRef.current = true
     setIsSubmitting(true)
     try {
       // Clean up form data - convert empty strings to null for numeric fields
@@ -119,14 +139,18 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
         job_number: formData.job_number === '' ? null : formData.job_number,
         notes: formData.notes === '' ? null : formData.notes,
       }
-      
+
       await onUpdate(order.orderid, cleanedData)
       // Update local state is already done via formData
+      // Reset dirty state after successful save
+      originalFormDataRef.current = formData
+      setIsDirty(false)
       setIsEditing(false)
       setShowReschedule(false)
     } catch (error) {
       console.error('Failed to update order:', error)
     } finally {
+      isSavingRef.current = false
       setIsSubmitting(false)
     }
   }
@@ -188,6 +212,72 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const handleDeleteCancel = () => {
     console.log('Delete cancelled by user')
     setShowDeleteConfirm(false)
+  }
+
+  // Handlers for unsaved changes warning
+  const handleCloseAttempt = () => {
+    if (isDirty) {
+      setPendingAction('close')
+      setShowUnsavedWarning(true)
+    } else {
+      onClose()
+    }
+  }
+
+  const handleCancelAttempt = () => {
+    if (isDirty) {
+      setPendingAction('cancel')
+      setShowUnsavedWarning(true)
+    } else {
+      // Reset and close (existing behavior)
+      if (order) {
+        const initialData = {
+          spectrum_reference: order.spectrum_reference || '',
+          customer_account_number: order.customer_account_number || '',
+          customer_security_code: order.customer_security_code || '',
+          job_number: order.job_number || '',
+          business_name: order.business_name || '',
+          customer_name: order.customer_name || '',
+          customer_email: order.customer_email || '',
+          customer_address: order.customer_address || '',
+          customer_phone: order.customer_phone || '',
+          install_date: order.install_date || '',
+          install_time: order.install_time || '',
+          has_internet: order.has_internet || false,
+          has_voice: order.has_voice || 0,
+          has_tv: order.has_tv || false,
+          has_sbc: order.has_sbc || 0,
+          has_mobile: order.has_mobile || 0,
+          mobile_activated: order.mobile_activated || 0,
+          has_wib: order.has_wib || false,
+          has_gig: order.has_gig || false,
+          internet_tier: order.internet_tier || '',
+          monthly_total: order.monthly_total || '',
+          initial_payment: order.initial_payment || '',
+          notes: order.notes || ''
+        }
+        setFormData(initialData)
+      }
+      setIsDirty(false)
+      setIsEditing(false)
+      setShowReschedule(false)
+      setErrors({})
+    }
+  }
+
+  const handleConfirmDiscard = () => {
+    setShowUnsavedWarning(false)
+    setIsDirty(false)
+    setPendingAction(null)
+    setIsEditing(false)
+    setShowReschedule(false)
+    setErrors({})
+    onClose()
+  }
+
+  const handleCancelDiscard = () => {
+    setShowUnsavedWarning(false)
+    setPendingAction(null)
   }
 
   const copyToClipboard = async (text, label) => {
@@ -296,7 +386,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                   <p className="text-gray-400 text-xs sm:text-sm mt-1">Order #{order.orderid}</p>
                 </div>
                 <button
-                  onClick={onClose}
+                  onClick={handleCloseAttempt}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex-shrink-0"
                   title="Close"
                 >
@@ -373,11 +463,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                 {(isEditing || showReschedule) && (
                   <>
                     <button
-                      onClick={() => {
-                        setIsEditing(false)
-                        setShowReschedule(false)
-                        setErrors({})
-                      }}
+                      onClick={handleCancelAttempt}
                       className="px-3 sm:px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white text-sm font-medium border border-white/10"
                     >
                       Cancel
@@ -481,11 +567,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                 {(isEditing || showReschedule) && (
                   <>
                     <button
-                      onClick={() => {
-                        setIsEditing(false)
-                        setShowReschedule(false)
-                        setErrors({})
-                      }}
+                      onClick={handleCancelAttempt}
                       className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white text-sm font-medium border border-white/10"
                     >
                       Cancel
@@ -510,7 +592,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                   </>
                 )}
                 <button
-                  onClick={onClose}
+                  onClick={handleCloseAttempt}
                   className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white flex-shrink-0"
                   title="Close"
                 >
@@ -1010,6 +1092,41 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                 </div>
               </div>
             </Card>
+          </div>
+        )}
+
+        {/* Unsaved Changes Warning Dialog */}
+        {showUnsavedWarning && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 border border-white/10">
+              <div className="p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="p-3 rounded-full bg-yellow-500/20">
+                    <AlertCircle className="w-6 h-6 text-yellow-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Unsaved Changes</h3>
+                    <p className="text-gray-300 text-sm">
+                      You have unsaved changes. Are you sure you want to discard them?
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 p-4 bg-white/5 border-t border-white/10">
+                <button
+                  onClick={handleCancelDiscard}
+                  className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+                >
+                  Keep Editing
+                </button>
+                <button
+                  onClick={handleConfirmDiscard}
+                  className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                >
+                  Discard Changes
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
