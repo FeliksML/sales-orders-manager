@@ -28,6 +28,22 @@ export const isRequestCancelled = (error) => {
 }
 
 /**
+ * Error type constants for consistent error handling
+ */
+export const ERROR_TYPES = {
+  NETWORK: 'network_error',
+  TIMEOUT: 'timeout',
+  RATE_LIMIT: 'rate_limited',
+  UNAUTHORIZED: 'unauthorized',
+  FORBIDDEN: 'forbidden',
+  NOT_FOUND: 'not_found',
+  VALIDATION: 'validation_error',
+  SERVER: 'server_error',
+  TOKEN_EXPIRED: 'token_expired',
+  UNKNOWN: 'unknown_error'
+}
+
+/**
  * Custom error class for API-related errors
  */
 export class ApiError extends Error {
@@ -37,6 +53,7 @@ export class ApiError extends Error {
     this.status = status
     this.type = type
     this.data = data
+    this.retryAfter = null // For rate limiting
   }
 }
 
@@ -112,7 +129,7 @@ apiClient.interceptors.request.use(
     if (token && isTokenExpired(token)) {
       clearAuthData()
       redirectToLogin('expired')
-      return Promise.reject(new ApiError('Session expired. Please log in again.', 401, 'token_expired'))
+      return Promise.reject(new ApiError('Session expired. Please log in again.', 401, ERROR_TYPES.TOKEN_EXPIRED))
     }
     
     if (token) {
@@ -155,14 +172,14 @@ apiClient.interceptors.response.use(
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
         return Promise.reject(new ApiError(
           'Request timed out. Please check your connection and try again.',
-          0,
-          'timeout'
+          408,
+          ERROR_TYPES.TIMEOUT
         ))
       }
       return Promise.reject(new ApiError(
         'Unable to connect to server. Please check your internet connection.',
         0,
-        'network_error'
+        ERROR_TYPES.NETWORK
       ))
     }
 
@@ -174,33 +191,36 @@ apiClient.interceptors.response.use(
         // Unauthorized - clear auth and redirect
         clearAuthData()
         redirectToLogin('expired')
-        return Promise.reject(new ApiError('Session expired. Please log in again.', 401, 'unauthorized'))
-      
+        return Promise.reject(new ApiError('Session expired. Please log in again.', 401, ERROR_TYPES.UNAUTHORIZED))
+
       case 403:
         return Promise.reject(new ApiError(
           data?.detail || data?.error || 'You do not have permission to perform this action.',
           403,
-          'forbidden'
+          ERROR_TYPES.FORBIDDEN
         ))
-      
+
       case 404:
         return Promise.reject(new ApiError(
           data?.detail || data?.error || 'The requested resource was not found.',
           404,
-          'not_found'
+          ERROR_TYPES.NOT_FOUND
         ))
-      
+
       case 422:
         // Validation error
         const validationMsg = data?.detail?.[0]?.msg || data?.error || 'Invalid data provided.'
-        return Promise.reject(new ApiError(validationMsg, 422, 'validation_error', data?.detail))
+        return Promise.reject(new ApiError(validationMsg, 422, ERROR_TYPES.VALIDATION, data?.detail))
       
       case 429:
-        return Promise.reject(new ApiError(
-          'Too many requests. Please wait a moment and try again.',
-          429,
-          'rate_limited'
-        ))
+        const retryAfter = error.response.headers?.['retry-after']
+        const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : null
+        const rateLimitMessage = retrySeconds
+          ? `Too many requests. Please wait ${retrySeconds} seconds.`
+          : 'Too many requests. Please wait a moment and try again.'
+        const rateLimitError = new ApiError(rateLimitMessage, 429, ERROR_TYPES.RATE_LIMIT)
+        rateLimitError.retryAfter = retrySeconds
+        return Promise.reject(rateLimitError)
       
       case 500:
       case 502:
@@ -209,14 +229,14 @@ apiClient.interceptors.response.use(
         return Promise.reject(new ApiError(
           'Server error. Please try again later.',
           status,
-          'server_error'
+          ERROR_TYPES.SERVER
         ))
-      
+
       default:
         return Promise.reject(new ApiError(
           data?.detail || data?.error || data?.message || 'An unexpected error occurred.',
           status,
-          'unknown_error',
+          ERROR_TYPES.UNKNOWN,
           data
         ))
     }

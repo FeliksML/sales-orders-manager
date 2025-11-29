@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { X, CheckCircle, AlertCircle, Info } from 'lucide-react'
+import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 
 function Toast({ message, type = 'success', onClose, duration = 5000 }) {
   useEffect(() => {
@@ -23,6 +23,12 @@ function Toast({ message, type = 'success', onClose, duration = 5000 }) {
       border: 'border-red-500',
       icon: AlertCircle,
       iconColor: 'text-red-200'
+    },
+    warning: {
+      bg: 'bg-gradient-to-r from-yellow-600 to-amber-600',
+      border: 'border-yellow-500',
+      icon: AlertTriangle,
+      iconColor: 'text-yellow-200'
     },
     info: {
       bg: 'bg-gradient-to-r from-blue-600 to-indigo-600',

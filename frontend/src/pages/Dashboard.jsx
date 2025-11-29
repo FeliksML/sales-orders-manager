@@ -1,5 +1,5 @@
 import { useState, useCallback, lazy, Suspense } from 'react'
-import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus } from 'lucide-react'
+import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus, WifiOff } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
 import OrdersTable from '../components/ui/OrdersTable'
@@ -11,7 +11,10 @@ import EarningsCard from '../components/EarningsCard'
 import GoalProgress from '../components/GoalProgress'
 import { useDashboardData } from '../hooks/useDashboardData'
 import { useCommissionSettings } from '../hooks/useCommission'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useToast } from '../contexts/ToastContext'
 import { orderService } from '../services/orderService'
+import { ERROR_TYPES } from '../services/api'
 import TodaysFollowUps from '../components/TodaysFollowUps'
 import followupService from '../services/followupService'
 
@@ -30,6 +33,8 @@ const PerformanceInsights = lazy(() => import('../components/PerformanceInsights
 
 function Dashboard() {
   const [filters, setFilters] = useState({})
+  const isOnline = useOnlineStatus()
+  const { showToast } = useToast()
 
   // Centralized data hook - replaces 6 separate hooks and eliminates race conditions
   const {
@@ -97,6 +102,16 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Failed to create order:', error)
+      // Show user-friendly error toast
+      if (error.type === ERROR_TYPES.TIMEOUT) {
+        showToast('Request timed out. Please try again.', 'error')
+      } else if (error.type === ERROR_TYPES.RATE_LIMIT) {
+        showToast(error.message, 'warning', error.retryAfter ? error.retryAfter * 1000 : 5000)
+      } else if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to create order', 'error')
+      }
       throw error
     }
   }
@@ -122,6 +137,16 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Failed to update order:', error)
+      // Show user-friendly error toast
+      if (error.type === ERROR_TYPES.TIMEOUT) {
+        showToast('Request timed out. Please try again.', 'error')
+      } else if (error.type === ERROR_TYPES.RATE_LIMIT) {
+        showToast(error.message, 'warning', error.retryAfter ? error.retryAfter * 1000 : 5000)
+      } else if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to update order', 'error')
+      }
       throw error
     }
   }
@@ -140,6 +165,16 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Dashboard: Failed to delete order:', error)
+      // Show user-friendly error toast
+      if (error.type === ERROR_TYPES.TIMEOUT) {
+        showToast('Request timed out. Please try again.', 'error')
+      } else if (error.type === ERROR_TYPES.RATE_LIMIT) {
+        showToast(error.message, 'warning', error.retryAfter ? error.retryAfter * 1000 : 5000)
+      } else if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to delete order', 'error')
+      }
       throw error
     }
   }
@@ -182,6 +217,11 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Failed to reschedule order:', error)
+      if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to reschedule order', 'error')
+      }
     }
   }
 
@@ -195,6 +235,11 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Failed to mark orders as installed:', error)
+      if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to mark orders as installed', 'error')
+      }
     }
   }
 
@@ -208,6 +253,11 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Failed to reschedule orders:', error)
+      if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to reschedule orders', 'error')
+      }
     }
   }
 
@@ -221,6 +271,11 @@ function Dashboard() {
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
       console.error('Failed to delete orders:', error)
+      if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to delete orders', 'error')
+      }
     }
   }
 
@@ -230,6 +285,11 @@ function Dashboard() {
       setIsBulkExportModalOpen(false)
     } catch (error) {
       console.error('Failed to export orders:', error)
+      if (error.type === ERROR_TYPES.NETWORK) {
+        showToast('Connection lost. Please check your internet.', 'error')
+      } else {
+        showToast(error.message || 'Failed to export orders', 'error')
+      }
     }
   }
 
@@ -287,6 +347,16 @@ function Dashboard() {
             <p className="text-white font-medium flex items-center gap-2">
               <span className="text-xl">✓</span>
               Order updated successfully!
+            </p>
+          </div>
+        )}
+
+        {/* Offline Banner */}
+        {!isOnline && (
+          <div className="mb-4 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30 backdrop-blur-sm">
+            <p className="text-yellow-200 font-medium flex items-center gap-2">
+              <WifiOff className="w-5 h-5 text-yellow-400" />
+              You appear to be offline. Some features may be unavailable.
             </p>
           </div>
         )}

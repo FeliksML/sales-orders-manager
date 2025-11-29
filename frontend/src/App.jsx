@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
+import { ToastProvider } from './contexts/ToastContext'
 import GoogleMapsLoader from './components/GoogleMapsLoader'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoadingSpinner from './components/ui/LoadingSpinner'
@@ -74,9 +75,10 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <GoogleMapsLoader>
-        <AuthProvider>
-          <Router>
+      <ToastProvider>
+        <GoogleMapsLoader>
+          <AuthProvider>
+            <Router>
             <Suspense fallback={
               <div className="flex items-center justify-center min-h-screen">
                 <LoadingSpinner />
@@ -133,9 +135,10 @@ function App() {
                 />
               </Routes>
             </Suspense>
-          </Router>
-        </AuthProvider>
-      </GoogleMapsLoader>
+            </Router>
+          </AuthProvider>
+        </GoogleMapsLoader>
+      </ToastProvider>
     </ErrorBoundary>
   )
 }
