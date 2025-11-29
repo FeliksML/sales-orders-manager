@@ -132,6 +132,42 @@ else
     echo -e "  ${BLUE}Add: RESEND_API_KEY=re_your_key_here${NC}"
 fi
 
+# 🧙‍♂️ EMAIL CONFIGURATION WIZARD - "Your inbox will thank you later"
+echo ""
+echo -e "  ${CYAN}📬 Email Deliverability Check${NC} - ${YELLOW}\"Spam folders hate this one trick!\"${NC}"
+
+# Default values (change these to match your domain)
+DEFAULT_MAIL_FROM="Sales Order Manager <orders@mail.salesordermanager.us>"
+DEFAULT_MAIL_REPLY_TO="support@salesordermanager.us"
+
+# Check MAIL_FROM
+if grep -q "^MAIL_FROM=" backend/.env; then
+    CURRENT_MAIL_FROM=$(grep "^MAIL_FROM=" backend/.env | cut -d '=' -f2-)
+    if [[ "$CURRENT_MAIL_FROM" == *"noreply"* ]]; then
+        echo -e "  ${YELLOW}🤔 MAIL_FROM contains 'noreply'${NC} - That's so 2010!"
+        echo -e "  ${BLUE}Upgrading to: ${DEFAULT_MAIL_FROM}${NC}"
+        sed -i.bak "s|^MAIL_FROM=.*|MAIL_FROM=${DEFAULT_MAIL_FROM}|" backend/.env
+        echo -e "  ${GREEN}✅ MAIL_FROM upgraded!${NC} - Your emails just got friendlier! 🤗"
+    else
+        echo -e "  ${GREEN}✅ MAIL_FROM${NC} - Looking professional! 💼"
+    fi
+else
+    echo -e "  ${YELLOW}📝 Adding MAIL_FROM...${NC}"
+    echo "MAIL_FROM=${DEFAULT_MAIL_FROM}" >> backend/.env
+    echo -e "  ${GREEN}✅ MAIL_FROM added!${NC} - First impressions matter! 💅"
+fi
+
+# Check MAIL_REPLY_TO
+if grep -q "^MAIL_REPLY_TO=" backend/.env; then
+    echo -e "  ${GREEN}✅ MAIL_REPLY_TO${NC} - Users can reply! Revolutionary! 🎉"
+else
+    echo -e "  ${YELLOW}📝 Adding MAIL_REPLY_TO...${NC}"
+    echo "MAIL_REPLY_TO=${DEFAULT_MAIL_REPLY_TO}" >> backend/.env
+    echo -e "  ${GREEN}✅ MAIL_REPLY_TO added!${NC} - Two-way communication unlocked! 📞"
+fi
+
+echo -e "  ${MAGENTA}💡 Pro tip: Configure mail.yourdomain.com in Resend for max deliverability${NC}"
+
 echo -e "  ${GREEN}✅ Environment files${NC} - All secrets accounted for! 🔐"
 echo ""
 
@@ -474,7 +510,14 @@ echo -e "   Password: ${YELLOW}Check logs below${NC} 👇"
 echo ""
 echo -e "${CYAN}📧 Email Status:${NC}"
 if grep -q "RESEND_API_KEY=re_" backend/.env 2>/dev/null; then
-    echo -e "   ${GREEN}✅ Resend configured${NC} - Emails will work! 📬"
+    echo -e "   ${GREEN}✅ Resend API${NC} - Connected! 📬"
+    MAIL_FROM_VAL=$(grep "^MAIL_FROM=" backend/.env 2>/dev/null | cut -d '=' -f2- || echo "not set")
+    MAIL_REPLY_VAL=$(grep "^MAIL_REPLY_TO=" backend/.env 2>/dev/null | cut -d '=' -f2- || echo "not set")
+    echo -e "   ${GREEN}✅ From:${NC} ${MAIL_FROM_VAL}"
+    echo -e "   ${GREEN}✅ Reply-To:${NC} ${MAIL_REPLY_VAL}"
+    if [[ "$MAIL_FROM_VAL" == *"mail."* ]]; then
+        echo -e "   ${GREEN}🏆 Subdomain detected${NC} - Maximum deliverability! 💪"
+    fi
 else
     echo -e "   ${YELLOW}⚠️  Add RESEND_API_KEY to backend/.env for email support${NC}"
 fi
