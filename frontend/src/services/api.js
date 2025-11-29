@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE_URL } from '../utils/apiUrl'
+import { isTokenExpired, clearAuthData, redirectToLogin } from '../utils/authUtils'
 
 /**
  * Custom error class for API-related errors
@@ -65,21 +66,7 @@ const shouldRetry = (error) => {
   return false
 }
 
-/**
- * Check if a JWT token is expired (client-side check)
- * Uses a 10-second buffer to account for network latency
- * (reduced from 60s to minimize premature logouts with minor clock skew)
- */
-const isTokenExpired = (token) => {
-  if (!token) return true
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    // 10 second buffer to account for network latency while minimizing premature logout
-    return payload.exp * 1000 < Date.now() + 10000
-  } catch {
-    return true
-  }
-}
+// isTokenExpired is imported from ../utils/authUtils for consistency with AuthContext
 
 // Create axios instance with default config
 const apiClient = axios.create({
@@ -98,9 +85,8 @@ apiClient.interceptors.request.use(
     
     // Check for expired token before making request
     if (token && isTokenExpired(token)) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login?expired=true'
+      clearAuthData()
+      redirectToLogin('expired')
       return Promise.reject(new ApiError('Session expired. Please log in again.', 401, 'token_expired'))
     }
     
@@ -161,12 +147,8 @@ apiClient.interceptors.response.use(
     switch (status) {
       case 401:
         // Unauthorized - clear auth and redirect
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
-        // Don't redirect if already on login page
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login?session=expired'
-        }
+        clearAuthData()
+        redirectToLogin('expired')
         return Promise.reject(new ApiError('Session expired. Please log in again.', 401, 'unauthorized'))
       
       case 403:

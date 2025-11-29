@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 const AuthContext = createContext(null)
 
 import { API_BASE_URL as API_URL } from '../utils/apiUrl'
+import { isTokenExpired, clearAuthData } from '../utils/authUtils'
 
 /**
  * Custom error class for authentication-related errors
@@ -27,20 +28,7 @@ const safeJSONParse = (value) => {
   }
 }
 
-/**
- * Check if a JWT token is expired (client-side check)
- * Note: This is a rough check - the server is the source of truth
- */
-const isTokenExpired = (token) => {
-  if (!token) return true
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    // Add 60 second buffer to handle clock drift
-    return payload.exp * 1000 < Date.now() + 60000
-  } catch {
-    return true
-  }
-}
+// isTokenExpired is imported from ../utils/authUtils for consistency with api.js
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -59,8 +47,7 @@ export const AuthProvider = ({ children }) => {
     const storedToken = localStorage.getItem('token')
     // Clear expired tokens on init
     if (storedToken && isTokenExpired(storedToken)) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      clearAuthData()
       return null
     }
     return storedToken || null
@@ -74,8 +61,7 @@ export const AuthProvider = ({ children }) => {
     const checkExpiration = () => {
       if (isTokenExpired(token)) {
         // Token expired - log out user
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        clearAuthData()
         setToken(null)
         setUser(null)
       }
@@ -199,9 +185,7 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    localStorage.removeItem('rememberMe')
+    clearAuthData()
     setToken(null)
     setUser(null)
   }, [])
