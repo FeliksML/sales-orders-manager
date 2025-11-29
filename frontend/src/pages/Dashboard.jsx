@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useCallback, lazy, Suspense } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
@@ -9,12 +9,10 @@ import BulkActionsToolbar from '../components/ui/BulkActionsToolbar'
 import PullToRefresh from '../components/ui/PullToRefresh'
 import EarningsCard from '../components/EarningsCard'
 import GoalProgress from '../components/GoalProgress'
-import { useOrders, useOrderStats } from '../hooks/useOrders'
-import { useEarnings } from '../hooks/useCommission'
-import { useGoalProgress } from '../hooks/useGoals'
-import { useTodaysFollowups } from '../hooks/useFollowups'
+import { useDashboardData } from '../hooks/useDashboardData'
 import { orderService } from '../services/orderService'
 import TodaysFollowUps from '../components/TodaysFollowUps'
+import followupService from '../services/followupService'
 
 // Lazy load heavy components for better performance
 const OrderCharts = lazy(() => import('../components/ui/OrderCharts'))
@@ -31,21 +29,25 @@ const PerformanceInsights = lazy(() => import('../components/PerformanceInsights
 
 function Dashboard() {
   const [filters, setFilters] = useState({})
-  const { orders, loading: ordersLoading, error: ordersError, refetch } = useOrders(filters)
-  // Fetch all orders (unfiltered) for analytics
-  const { orders: allOrders, refetch: refetchAllOrders } = useOrders({})
-  const [statsRefreshTrigger, setStatsRefreshTrigger] = useState(0)
-  const { stats, loading: statsLoading, error: statsError } = useOrderStats(statsRefreshTrigger)
-  const { currentInternetCount, refetch: refetchEarnings } = useEarnings()
-  const { refetch: refetchGoalProgress } = useGoalProgress()
-  const { 
-    todaysFollowups, 
-    overdueCount, 
-    loading: followupsLoading, 
-    refetch: refetchFollowups,
-    completeFollowup,
-    snoozeFollowup 
-  } = useTodaysFollowups()
+
+  // Centralized data hook - replaces 6 separate hooks and eliminates race conditions
+  const {
+    orders,
+    allOrders,
+    stats,
+    todaysFollowups,
+    overdueCount,
+    currentInternetCount,
+    ordersLoading,
+    statsLoading,
+    loading: followupsLoading,
+    error: ordersError,
+    refresh
+  } = useDashboardData(filters)
+
+  // Derive statsError from ordersError for backwards compatibility
+  const statsError = ordersError
+
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [isGoalSettingsModalOpen, setIsGoalSettingsModalOpen] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
@@ -62,9 +64,6 @@ function Dashboard() {
   const [isBulkRescheduleModalOpen, setIsBulkRescheduleModalOpen] = useState(false)
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
-  
-  // Chart refresh key to force re-render on data changes
-  const [chartsKey, setChartsKey] = useState(0)
 
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters)
@@ -80,14 +79,8 @@ function Dashboard() {
       setIsOrderModalOpen(false)
       setSubmitSuccess(true)
 
-      // Refetch orders, stats, earnings, and goal progress - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
-      
-      // Trigger stats refresh
-      setStatsRefreshTrigger(t => t + 1)
-      
-      // Force chart re-render
-      setChartsKey(k => k + 1)
+      // Single refresh call replaces 6 separate calls - no more race conditions
+      await refresh()
 
       // Hide success message after 3 seconds
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -108,23 +101,11 @@ function Dashboard() {
       await orderService.updateOrder(orderId, orderData)
       console.log('Dashboard: Order updated successfully')
 
-      // Refetch orders, stats, earnings, and goal progress - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
-      
-      // Trigger stats refresh
-      setStatsRefreshTrigger(t => t + 1)
-      
-      // Force chart re-render
-      setChartsKey(k => k + 1)
+      // Single refresh call replaces 6 separate calls - no more race conditions
+      await refresh()
 
       // Update selected order with new data
-      console.log('Dashboard: Updating selectedOrder state')
-      setSelectedOrder(prev => {
-        const updated = { ...prev, ...orderData }
-        console.log('Dashboard: Previous order:', prev)
-        console.log('Dashboard: Updated order:', updated)
-        return updated
-      })
+      setSelectedOrder(prev => ({ ...prev, ...orderData }))
 
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -140,14 +121,8 @@ function Dashboard() {
       await orderService.deleteOrder(orderId)
       console.log('Dashboard: Order deleted successfully')
 
-      // Refetch orders, stats, earnings, and goal progress - await all to ensure data is fresh
-      await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress()])
-      
-      // Trigger stats refresh
-      setStatsRefreshTrigger(t => t + 1)
-      
-      // Force chart re-render
-      setChartsKey(k => k + 1)
+      // Single refresh call replaces 6 separate calls - no more race conditions
+      await refresh()
 
       setIsDetailsModalOpen(false)
       setSubmitSuccess(true)
@@ -189,14 +164,8 @@ function Dashboard() {
       // Update the order with the new install date
       await orderService.updateOrder(orderId, { install_date: formattedDate })
 
-      // Refetch orders and stats to update both calendar and table views
-      await Promise.all([refetch(), refetchAllOrders()])
-      
-      // Trigger stats refresh
-      setStatsRefreshTrigger(t => t + 1)
-      
-      // Force chart re-render
-      setChartsKey(k => k + 1)
+      // Refresh only orders and stats (not earnings/goals for simple date change)
+      await refresh({ orders: true, stats: true })
 
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -209,9 +178,7 @@ function Dashboard() {
   const handleBulkMarkInstalled = async () => {
     try {
       await orderService.bulkMarkInstalled(selectedOrders)
-      await Promise.all([refetch(), refetchAllOrders()])
-      setStatsRefreshTrigger(t => t + 1)
-      setChartsKey(k => k + 1)
+      await refresh({ orders: true, stats: true })
       setSelectedOrders([])
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -223,9 +190,7 @@ function Dashboard() {
   const handleBulkReschedule = async (newDate) => {
     try {
       await orderService.bulkReschedule(selectedOrders, newDate)
-      await Promise.all([refetch(), refetchAllOrders()])
-      setStatsRefreshTrigger(t => t + 1)
-      setChartsKey(k => k + 1)
+      await refresh({ orders: true, stats: true })
       setSelectedOrders([])
       setIsBulkRescheduleModalOpen(false)
       setSubmitSuccess(true)
@@ -238,9 +203,7 @@ function Dashboard() {
   const handleBulkDelete = async () => {
     try {
       await orderService.bulkDelete(selectedOrders)
-      await Promise.all([refetch(), refetchAllOrders()])
-      setStatsRefreshTrigger(t => t + 1)
-      setChartsKey(k => k + 1)
+      await refresh()
       setSelectedOrders([])
       setIsBulkDeleteModalOpen(false)
       setSubmitSuccess(true)
@@ -261,17 +224,18 @@ function Dashboard() {
 
   // Pull to refresh handler
   const handleRefresh = async () => {
-    await Promise.all([refetch(), refetchAllOrders(), refetchEarnings(), refetchGoalProgress(), refetchFollowups()])
-    setStatsRefreshTrigger(t => t + 1)
+    await refresh()
   }
 
   // Follow-up handlers
   const handleFollowupComplete = async (followupId) => {
-    await completeFollowup(followupId)
+    await followupService.complete(followupId)
+    await refresh({ followups: true })
   }
 
   const handleFollowupSnooze = async (followupId, days) => {
-    await snoozeFollowup(followupId, days)
+    await followupService.snooze(followupId, days)
+    await refresh({ followups: true })
   }
 
   const handleFollowupOrderClick = (order) => {
@@ -283,7 +247,7 @@ function Dashboard() {
 
   // Goal save handler - refresh goal progress
   const handleGoalSave = async () => {
-    await refetchGoalProgress()
+    await refresh({ goals: true })
   }
 
   return (
@@ -450,7 +414,7 @@ function Dashboard() {
                   <LoadingSpinner />
                 </div>
               }>
-                <OrderCharts key={chartsKey} orders={allOrders} stats={stats} />
+                <OrderCharts orders={allOrders} stats={stats} />
               </Suspense>
             )}
           </div>
