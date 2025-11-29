@@ -10,6 +10,7 @@ import PullToRefresh from '../components/ui/PullToRefresh'
 import EarningsCard from '../components/EarningsCard'
 import GoalProgress from '../components/GoalProgress'
 import { useDashboardData } from '../hooks/useDashboardData'
+import { useCommissionSettings } from '../hooks/useCommission'
 import { orderService } from '../services/orderService'
 import TodaysFollowUps from '../components/TodaysFollowUps'
 import followupService from '../services/followupService'
@@ -47,6 +48,16 @@ function Dashboard() {
 
   // Derive statsError from ordersError for backwards compatibility
   const statsError = ordersError
+
+  // Get commission settings for accurate per-order estimation
+  const { settings: commissionSettings } = useCommissionSettings()
+
+  // Create userSettings object for commission estimation
+  const userSettings = {
+    isNewHire: commissionSettings?.is_new_hire || false,
+    aeType: commissionSettings?.ae_type || 'Account Executive',
+    newHireMonth: commissionSettings?.new_hire_month || null
+  }
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [isGoalSettingsModalOpen, setIsGoalSettingsModalOpen] = useState(false)
@@ -551,6 +562,7 @@ function Dashboard() {
                           selectedOrders={selectedOrders}
                           onSelectionChange={setSelectedOrders}
                           currentInternetCount={currentInternetCount}
+                          userSettings={userSettings}
                         />
                       ) : (
                         <Suspense fallback={

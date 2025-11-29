@@ -10,6 +10,25 @@ export const REGULAR_RATE_TABLE = [
   { min: 40, max: Infinity, internet: 300, mobile: 225, voice: 225, video: 200, mrr: 0.75, label: '40+' },
 ]
 
+// New hire rate table - different tier structure (no 0-4 tier with $0 rates)
+export const NEW_HIRE_RATE_TABLE = [
+  { min: 0, max: 9, internet: 100, mobile: 75, voice: 75, video: 60, mrr: 0.25, label: '0-9' },
+  { min: 10, max: 19, internet: 200, mobile: 150, voice: 150, video: 120, mrr: 0.5, label: '10-19' },
+  { min: 20, max: 29, internet: 225, mobile: 175, voice: 175, video: 150, mrr: 0.55, label: '20-29' },
+  { min: 30, max: 39, internet: 250, mobile: 200, voice: 200, video: 175, mrr: 0.6, label: '30-39' },
+  { min: 40, max: Infinity, internet: 300, mobile: 225, voice: 225, video: 200, mrr: 0.75, label: '40+' },
+]
+
+// New hire ramp - guaranteed minimum commission for first 4 months
+export const RAMP_TABLE = {
+  1: 1300,
+  2: 1100,
+  3: 1000,
+  4: 750,
+  5: 0,
+  6: 0,
+}
+
 const ALACARTE_RATES = {
   wib: 100,
   gig_internet: 100,
@@ -110,17 +129,19 @@ export function getNextTierInfo(currentInternetCount, currentTotals) {
 }
 
 /**
- * Get rate tier based on current internet count
+ * Get rate tier based on current internet count and user type
  * @param {number} internetCount - Total internet sales this fiscal month
+ * @param {boolean} isNewHire - Whether user is a new hire (different rate table)
  * @returns {Object} Rate tier with rates for each product
  */
-export function getRateTier(internetCount = 0) {
-  for (const tier of REGULAR_RATE_TABLE) {
+export function getRateTier(internetCount = 0, isNewHire = false) {
+  const table = isNewHire ? NEW_HIRE_RATE_TABLE : REGULAR_RATE_TABLE
+  for (const tier of table) {
     if (internetCount >= tier.min && internetCount <= tier.max) {
       return tier
     }
   }
-  return REGULAR_RATE_TABLE[0]
+  return table[0]
 }
 
 /**
@@ -137,60 +158,62 @@ export function getTierLabel(internetCount = 0) {
 }
 
 /**
- * Estimate commission for a single order based on current tier
+ * Estimate commission for a single order based on current tier and user settings
  * @param {Object} order - The order object
  * @param {number} currentInternetCount - User's current internet count for the fiscal month
+ * @param {Object} userSettings - { isNewHire, aeType, newHireMonth }
  * @returns {number} Estimated commission
  */
-export function estimateOrderCommission(order, currentInternetCount = 10) {
-  const rates = getRateTier(currentInternetCount)
+export function estimateOrderCommission(order, currentInternetCount = 10, userSettings = {}) {
+  const { isNewHire = false } = userSettings
+
+  const rates = getRateTier(currentInternetCount, isNewHire)
+
+  // For new hires, mobile/voice/video are ALWAYS eligible (no >4 requirement)
+  // For regular reps, need internet > 4
+  const productsEligible = isNewHire || currentInternetCount > 4
   const alacarteEligible = currentInternetCount > 4
-  
+
   let total = 0
-  
+
   // Internet (HSD)
   if (order.has_internet) {
     total += rates.internet
   }
-  
-  // Mobile - only paid if internet > 4 (for regular reps)
-  if (order.has_mobile > 0 && currentInternetCount > 4) {
+
+  // Mobile - only paid if eligible
+  if (order.has_mobile > 0 && productsEligible) {
     total += order.has_mobile * rates.mobile
   }
-  
-  // Voice - only paid if internet > 4 (for regular reps)
-  if (order.has_voice > 0 && currentInternetCount > 4) {
+
+  // Voice - only paid if eligible
+  if (order.has_voice > 0 && productsEligible) {
     total += order.has_voice * rates.voice
   }
-  
-  // Video/TV - only paid if internet > 4 (for regular reps)
-  if (order.has_tv && currentInternetCount > 4) {
+
+  // Video/TV - only paid if eligible
+  if (order.has_tv && productsEligible) {
     total += rates.video
   }
-  
-  // MRR - only paid if internet > 4
-  if (order.monthly_total > 0 && currentInternetCount > 4) {
+
+  // MRR - only paid if eligible
+  if (order.monthly_total > 0 && productsEligible) {
     total += order.monthly_total * rates.mrr
   }
-  
-  // A-la-carte items (require >4 internet)
+
+  // A-la-carte items (always require >4 internet, even for new hires)
   if (alacarteEligible) {
-    // WIB
     if (order.has_wib) {
       total += ALACARTE_RATES.wib
     }
-    
-    // Gig Internet bonus
     if (order.has_gig) {
       total += ALACARTE_RATES.gig_internet
     }
-    
-    // SBC
     if (order.has_sbc > 0) {
       total += order.has_sbc * ALACARTE_RATES.sbc
     }
   }
-  
+
   return Math.round(total)
 }
 

@@ -4,7 +4,7 @@ import { getInstallStatus, isDateToday, isDatePast, formatDate, DATE_FORMATS } f
 import CustomCheckbox from './CustomCheckbox'
 import { estimateOrderCommission, formatCommission, getTierLabel } from '../../utils/commissionUtils'
 
-function OrderCard({ order, onOrderClick, isSelected, onSelectionChange, currentInternetCount = 0 }) {
+function OrderCard({ order, onOrderClick, isSelected, onSelectionChange, currentInternetCount = 0, userSettings = {} }) {
   const status = getInstallStatus(order.install_date)
   const isPast = isDatePast(order.install_date)
   const isToday = isDateToday(order.install_date)
@@ -12,8 +12,8 @@ function OrderCard({ order, onOrderClick, isSelected, onSelectionChange, current
   const statusColor = status === 'installed' ? 'green' : status === 'today' ? 'yellow' : 'blue'
   const statusText = status === 'installed' ? 'Installed' : status === 'today' ? 'Today' : 'Pending'
 
-  // Calculate estimated commission for this order using current tier
-  const estimatedCommission = estimateOrderCommission(order, currentInternetCount)
+  // Calculate estimated commission for this order using current tier and user settings
+  const estimatedCommission = estimateOrderCommission(order, currentInternetCount, userSettings)
 
   const products = []
   if (order.has_internet) products.push('Internet')

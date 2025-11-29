@@ -10,7 +10,7 @@ import CustomCheckbox from './CustomCheckbox'
 import OrderCard from './OrderCard'
 import { estimateOrderCommission, formatCommission, getTierLabel } from '../../utils/commissionUtils'
 
-function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange, currentInternetCount = 0 }) {
+function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange, currentInternetCount = 0, userSettings = {} }) {
   const [isMobile, setIsMobile] = useState(false)
   const [sortField, setSortField] = useState('install_date')
   const [sortDirection, setSortDirection] = useState('desc')
@@ -239,6 +239,7 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
               isSelected={selectedOrders.includes(order.orderid)}
               onSelectionChange={handleSelectOrder}
               currentInternetCount={currentInternetCount}
+              userSettings={userSettings}
             />
           ))}
         </div>
@@ -538,7 +539,7 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
                   {visibleColumns.commission && (
                     <td className="p-4 cursor-pointer" onClick={() => onOrderClick?.(order)}>
                       {(() => {
-                        const commission = estimateOrderCommission(order, currentInternetCount)
+                        const commission = estimateOrderCommission(order, currentInternetCount, userSettings)
                         return commission > 0 ? (
                           <div 
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/25"
