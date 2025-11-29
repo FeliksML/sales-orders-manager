@@ -36,6 +36,9 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
   // Separate state for search input with debouncing
   const [searchInput, setSearchInput] = useState('')
 
+  // Date range validation error
+  const [dateRangeError, setDateRangeError] = useState('')
+
   // Detect mobile screen size
   useEffect(() => {
     const checkMobile = () => {
@@ -78,6 +81,19 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
   }
 
   const handleDateChange = (field, value) => {
+    // Clear previous error
+    setDateRangeError('')
+
+    // Validate date range
+    if (field === 'dateFrom' && filters.dateTo && value > filters.dateTo) {
+      setDateRangeError('Start date cannot be after end date')
+      return
+    }
+    if (field === 'dateTo' && filters.dateFrom && value < filters.dateFrom) {
+      setDateRangeError('End date cannot be before start date')
+      return
+    }
+
     setFilters(prev => ({ ...prev, [field]: value }))
   }
 
@@ -179,16 +195,23 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               type="date"
               value={filters.dateFrom}
               onChange={(e) => handleDateChange('dateFrom', e.target.value)}
-              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors"
+              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors ${
+                dateRangeError ? 'border-red-400' : 'border-gray-300'
+              }`}
               placeholder="From"
             />
             <input
               type="date"
               value={filters.dateTo}
               onChange={(e) => handleDateChange('dateTo', e.target.value)}
-              className="w-full px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors"
+              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors ${
+                dateRangeError ? 'border-red-400' : 'border-gray-300'
+              }`}
               placeholder="To"
             />
+            {dateRangeError && (
+              <p className="text-red-500 text-sm">{dateRangeError}</p>
+            )}
           </div>
         </div>
 

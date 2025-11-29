@@ -3,19 +3,40 @@ import { X, Calendar } from 'lucide-react'
 
 function BulkRescheduleModal({ isOpen, onClose, onConfirm, selectedCount }) {
   const [newDate, setNewDate] = useState('')
+  const [dateError, setDateError] = useState('')
+
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const today = new Date().toISOString().split('T')[0]
 
   if (!isOpen) return null
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (newDate) {
-      onConfirm(newDate)
-      setNewDate('')
+    setDateError('')
+
+    // Validate date is provided
+    if (!newDate) {
+      setDateError('Please select a date')
+      return
     }
+
+    // Validate date is not in the past
+    const selectedDate = new Date(newDate + 'T00:00:00')
+    const todayDate = new Date()
+    todayDate.setHours(0, 0, 0, 0)
+
+    if (selectedDate < todayDate) {
+      setDateError('Cannot reschedule to a past date')
+      return
+    }
+
+    onConfirm(newDate)
+    setNewDate('')
   }
 
   const handleClose = () => {
     setNewDate('')
+    setDateError('')
     onClose()
   }
 
@@ -53,10 +74,19 @@ function BulkRescheduleModal({ isOpen, onClose, onConfirm, selectedCount }) {
               <input
                 type="date"
                 value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
+                onChange={(e) => {
+                  setNewDate(e.target.value)
+                  setDateError('')
+                }}
+                min={today}
                 required
-                className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`w-full px-4 py-2 bg-white/5 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                  dateError ? 'border-red-500' : 'border-white/10'
+                }`}
               />
+              {dateError && (
+                <p className="text-red-400 text-sm mt-1">{dateError}</p>
+              )}
             </div>
           </div>
 

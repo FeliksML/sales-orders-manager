@@ -17,6 +17,20 @@ export const validateEmail = (email) => {
     return { valid: false, error: `Email must be less than ${VALIDATION.MAX_EMAIL_LENGTH} characters` }
   }
 
+  // Check for consecutive dots (invalid per RFC 5321)
+  if (email.includes('..')) {
+    return { valid: false, error: 'Invalid email format' }
+  }
+
+  // Check for leading/trailing dots in local part
+  const atIndex = email.indexOf('@')
+  if (atIndex > 0) {
+    const local = email.substring(0, atIndex)
+    if (local.startsWith('.') || local.endsWith('.')) {
+      return { valid: false, error: 'Invalid email format' }
+    }
+  }
+
   if (!VALIDATION.EMAIL_REGEX.test(email)) {
     return { valid: false, error: 'Invalid email format' }
   }
