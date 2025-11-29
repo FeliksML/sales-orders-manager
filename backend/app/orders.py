@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from fastapi.responses import Response, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract, or_
+from sqlalchemy import func, and_, extract, or_, case
 from typing import List, Optional
 from datetime import datetime, timedelta, date
 import io
@@ -432,8 +432,96 @@ def get_delta_sync(
 
 # calculate_psu_from_order is imported from utils.py
 
+def calculate_metrics_from_db(
+    db: Session,
+    user_id: int,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    start_datetime: Optional[datetime] = None,
+    end_datetime: Optional[datetime] = None
+) -> PeriodMetrics:
+    """
+    Calculate metrics directly from database using SQL aggregations.
+    This is memory-efficient and avoids loading all orders into memory.
+    
+    Args:
+        db: Database session
+        user_id: User ID to filter orders
+        start_date: Optional start date filter (inclusive, uses install_date)
+        end_date: Optional end date filter (inclusive, uses install_date)
+        start_datetime: Optional start datetime filter (for fiscal month boundaries)
+        end_datetime: Optional end datetime filter (for fiscal month boundaries)
+    
+    Returns:
+        PeriodMetrics object with aggregated data
+    """
+    # Build base query
+    query = db.query(Order).filter(Order.userid == user_id)
+    
+    # Apply date filters
+    # Note: For fiscal months with datetime boundaries, we approximate using install_date
+    # This is slightly less precise but much more performant
+    if start_datetime:
+        query = query.filter(Order.install_date >= start_datetime.date())
+    elif start_date:
+        query = query.filter(Order.install_date >= start_date)
+    
+    if end_datetime:
+        query = query.filter(Order.install_date <= end_datetime.date())
+    elif end_date:
+        query = query.filter(Order.install_date <= end_date)
+    
+    # Calculate all metrics in a single query using SQL aggregations
+    # This is much more efficient than multiple separate queries
+    metrics_result = query.with_entities(
+        func.count(Order.orderid).label('total_orders'),
+        func.sum(case((Order.has_internet == True, 1), else_=0)).label('internet'),
+        func.sum(case((Order.has_tv == True, 1), else_=0)).label('tv'),
+        func.sum(case((Order.has_mobile > 0, 1), else_=0)).label('mobile'),
+        func.sum(case((Order.has_voice > 0, 1), else_=0)).label('voice'),
+        func.sum(case((Order.has_sbc > 0, 1), else_=0)).label('sbc'),
+        func.sum(case((Order.has_wib == True, 1), else_=0)).label('wib'),
+        func.coalesce(func.sum(Order.monthly_total), 0).label('revenue'),
+        # PSU calculation: sum of product category flags per order
+        func.sum(
+            case((Order.has_internet == True, 1), else_=0) +
+            case((Order.has_voice > 0, 1), else_=0) +
+            case((Order.has_mobile > 0, 1), else_=0) +
+            case((Order.has_tv == True, 1), else_=0) +
+            case((Order.has_sbc > 0, 1), else_=0)
+        ).label('psu')
+    ).first()
+    
+    # Extract results (handle None values)
+    total_orders = int(metrics_result.total_orders) if metrics_result.total_orders else 0
+    internet_count = int(metrics_result.internet) if metrics_result.internet else 0
+    tv_count = int(metrics_result.tv) if metrics_result.tv else 0
+    mobile_count = int(metrics_result.mobile) if metrics_result.mobile else 0
+    voice_count = int(metrics_result.voice) if metrics_result.voice else 0
+    sbc_count = int(metrics_result.sbc) if metrics_result.sbc else 0
+    wib_count = int(metrics_result.wib) if metrics_result.wib else 0
+    revenue = float(metrics_result.revenue) if metrics_result.revenue else 0.0
+    psu = int(metrics_result.psu) if metrics_result.psu else 0
+    
+    return PeriodMetrics(
+        orders=total_orders,
+        internet=internet_count,
+        tv=tv_count,
+        mobile=mobile_count,
+        voice=voice_count,
+        sbc=sbc_count,
+        wib=wib_count,
+        psu=psu,
+        revenue=revenue
+    )
+
+
 def calculate_metrics_from_orders(orders: list) -> PeriodMetrics:
-    """Calculate all metrics from a list of orders."""
+    """Calculate all metrics from a list of orders.
+    
+    Note: This function is kept for backward compatibility and testing.
+    For production use, prefer calculate_metrics_from_db() for better performance.
+    """
     return PeriodMetrics(
         orders=len(orders),
         internet=sum(1 for o in orders if o.has_internet),
@@ -527,23 +615,33 @@ def get_performance_insights(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get comprehensive performance insights with comparisons and trends."""
+    """Get comprehensive performance insights with comparisons and trends.
+    
+    This endpoint uses database aggregations instead of loading all orders into memory,
+    making it efficient even for users with thousands of orders.
+    """
     user_id = current_user.userid
     today = date.today()
-    
-    # Get all user orders for analysis
-    all_orders = db.query(Order).filter(Order.userid == user_id).all()
     
     # ========== MONTH COMPARISON ==========
     # Current fiscal month
     curr_start, curr_end, curr_label = get_fiscal_month_boundaries(today)
-    curr_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, curr_start, curr_end)]
-    curr_month_metrics = calculate_metrics_from_orders(curr_month_orders)
+    # Use datetime boundaries for fiscal month filtering (approximated to dates for performance)
+    curr_month_metrics = calculate_metrics_from_db(
+        db=db,
+        user_id=user_id,
+        start_datetime=curr_start,
+        end_datetime=curr_end
+    )
     
     # Previous fiscal month
     prev_start, prev_end, prev_label = get_previous_fiscal_month(curr_start, curr_end)
-    prev_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, prev_start, prev_end)]
-    prev_month_metrics = calculate_metrics_from_orders(prev_month_orders)
+    prev_month_metrics = calculate_metrics_from_db(
+        db=db,
+        user_id=user_id,
+        start_datetime=prev_start,
+        end_datetime=prev_end
+    )
     
     # Calculate month changes
     month_change_percent = {
@@ -575,14 +673,22 @@ def get_performance_insights(
     # ========== WEEK COMPARISON ==========
     # Current week (Monday-Sunday)
     curr_week_start, curr_week_end = get_week_boundaries(today)
-    curr_week_orders = [o for o in all_orders if curr_week_start <= o.install_date <= curr_week_end]
-    curr_week_metrics = calculate_metrics_from_orders(curr_week_orders)
+    curr_week_metrics = calculate_metrics_from_db(
+        db=db,
+        user_id=user_id,
+        start_date=curr_week_start,
+        end_date=curr_week_end
+    )
     
     # Previous week
     prev_week_start = curr_week_start - timedelta(days=7)
     prev_week_end = curr_week_end - timedelta(days=7)
-    prev_week_orders = [o for o in all_orders if prev_week_start <= o.install_date <= prev_week_end]
-    prev_week_metrics = calculate_metrics_from_orders(prev_week_orders)
+    prev_week_metrics = calculate_metrics_from_db(
+        db=db,
+        user_id=user_id,
+        start_date=prev_week_start,
+        end_date=prev_week_end
+    )
     
     week_change_percent = {
         "orders": calculate_change(curr_week_metrics.orders, prev_week_metrics.orders),
@@ -618,8 +724,13 @@ def get_performance_insights(
         if i > 0:
             temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
         
-        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
-        metrics = calculate_metrics_from_orders(month_orders)
+        # Use database aggregation instead of loading orders
+        metrics = calculate_metrics_from_db(
+            db=db,
+            user_id=user_id,
+            start_datetime=temp_start,
+            end_datetime=temp_end
+        )
         
         # Get the label from the end date's month
         period_label = temp_end.strftime("%b %Y")
@@ -644,8 +755,13 @@ def get_performance_insights(
         week_start = curr_week_start - timedelta(days=week_offset)
         week_end = week_start + timedelta(days=6)
         
-        week_orders = [o for o in all_orders if week_start <= o.install_date <= week_end]
-        metrics = calculate_metrics_from_orders(week_orders)
+        # Use database aggregation instead of loading orders
+        metrics = calculate_metrics_from_db(
+            db=db,
+            user_id=user_id,
+            start_date=week_start,
+            end_date=week_end
+        )
         
         # Week number label
         week_num = week_start.isocalendar()[1]
@@ -678,8 +794,13 @@ def get_performance_insights(
         if i > 0:
             temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
         
-        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
-        metrics = calculate_metrics_from_orders(month_orders)
+        # Use database aggregation instead of loading orders
+        metrics = calculate_metrics_from_db(
+            db=db,
+            user_id=user_id,
+            start_datetime=temp_start,
+            end_datetime=temp_end
+        )
         period_label = temp_end.strftime("%B %Y")
         
         if metrics.orders > best_orders_month["value"]:
@@ -740,8 +861,14 @@ def get_performance_insights(
     
     for i in range(1, 6):  # Check up to 5 previous months
         temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
-        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
-        month_count = len(month_orders)
+        # Use database aggregation instead of loading orders
+        month_metrics = calculate_metrics_from_db(
+            db=db,
+            user_id=user_id,
+            start_datetime=temp_start,
+            end_datetime=temp_end
+        )
+        month_count = month_metrics.orders
         
         if i == 1:
             # Compare current to previous
@@ -898,25 +1025,34 @@ async def generate_ai_insights_endpoint(
     
     # Current fiscal month
     curr_start, curr_end, curr_label = get_fiscal_month_boundaries(today)
-    all_orders = db.query(Order).filter(Order.userid == user_id).all()
-    curr_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, curr_start, curr_end)]
+    curr_month_metrics = calculate_metrics_from_db(
+        db=db,
+        user_id=user_id,
+        start_datetime=curr_start,
+        end_datetime=curr_end
+    )
     
     # Previous fiscal month
     prev_start, prev_end, prev_label = get_previous_fiscal_month(curr_start, curr_end)
-    prev_month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, prev_start, prev_end)]
+    prev_month_metrics = calculate_metrics_from_db(
+        db=db,
+        user_id=user_id,
+        start_datetime=prev_start,
+        end_datetime=prev_end
+    )
     
-    # Calculate current metrics
-    curr_orders = len(curr_month_orders)
-    curr_revenue = sum(o.monthly_total or 0 for o in curr_month_orders)
-    curr_psu = sum(calculate_psu_from_order(o) for o in curr_month_orders)
-    curr_internet = sum(1 for o in curr_month_orders if o.has_internet)
-    curr_mobile = sum(1 for o in curr_month_orders if o.has_mobile and o.has_mobile > 0)
+    # Extract current metrics
+    curr_orders = curr_month_metrics.orders
+    curr_revenue = curr_month_metrics.revenue
+    curr_psu = curr_month_metrics.psu
+    curr_internet = curr_month_metrics.internet
+    curr_mobile = curr_month_metrics.mobile
     
-    # Calculate previous metrics
-    prev_orders = len(prev_month_orders)
-    prev_revenue = sum(o.monthly_total or 0 for o in prev_month_orders)
-    prev_internet = sum(1 for o in prev_month_orders if o.has_internet)
-    prev_mobile = sum(1 for o in prev_month_orders if o.has_mobile and o.has_mobile > 0)
+    # Extract previous metrics
+    prev_orders = prev_month_metrics.orders
+    prev_revenue = prev_month_metrics.revenue
+    prev_internet = prev_month_metrics.internet
+    prev_mobile = prev_month_metrics.mobile
     
     # Calculate changes
     order_change = ((curr_orders - prev_orders) / prev_orders * 100) if prev_orders > 0 else (100 if curr_orders > 0 else 0)
@@ -931,9 +1067,15 @@ async def generate_ai_insights_endpoint(
     for i in range(12):
         if i > 0:
             temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
-        month_orders = [o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)]
-        if len(month_orders) > best_orders:
-            best_orders = len(month_orders)
+        # Use database aggregation
+        month_metrics = calculate_metrics_from_db(
+            db=db,
+            user_id=user_id,
+            start_datetime=temp_start,
+            end_datetime=temp_end
+        )
+        if month_metrics.orders > best_orders:
+            best_orders = month_metrics.orders
             best_period = temp_end.strftime("%B %Y")
     
     # Detect streak
@@ -943,7 +1085,14 @@ async def generate_ai_insights_endpoint(
     prev_count = curr_orders
     for i in range(1, 6):
         temp_start, temp_end, _ = get_previous_fiscal_month(temp_start, temp_end)
-        month_count = len([o for o in all_orders if is_order_in_fiscal_month(o, temp_start, temp_end)])
+        # Use database aggregation
+        month_metrics = calculate_metrics_from_db(
+            db=db,
+            user_id=user_id,
+            start_datetime=temp_start,
+            end_datetime=temp_end
+        )
+        month_count = month_metrics.orders
         if i == 1:
             if curr_orders > month_count:
                 streak = 1
