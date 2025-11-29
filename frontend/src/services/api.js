@@ -3,6 +3,31 @@ import { API_BASE_URL } from '../utils/apiUrl'
 import { isTokenExpired, clearAuthData, redirectToLogin } from '../utils/authUtils'
 
 /**
+ * Create a cancellable request configuration
+ * Returns an object with signal and cancel function for use with fetch/axios
+ * @returns {{ signal: AbortSignal, cancel: () => void }}
+ */
+export const createCancellableRequest = () => {
+  const controller = new AbortController()
+  return {
+    signal: controller.signal,
+    cancel: () => controller.abort()
+  }
+}
+
+/**
+ * Check if an error is from a cancelled/aborted request
+ * Works with both fetch AbortError and axios CanceledError
+ * @param {Error} error - The error to check
+ * @returns {boolean}
+ */
+export const isRequestCancelled = (error) => {
+  return axios.isCancel(error) ||
+    error?.name === 'AbortError' ||
+    error?.code === 'ERR_CANCELED'
+}
+
+/**
  * Custom error class for API-related errors
  */
 export class ApiError extends Error {

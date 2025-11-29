@@ -72,13 +72,14 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval)
   }, [token])
 
-  const login = useCallback(async (email, password, recaptchaToken) => {
+  const login = useCallback(async (email, password, recaptchaToken, signal = null) => {
     setLoading(true)
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, recaptcha_token: recaptchaToken })
+        body: JSON.stringify({ email, password, recaptcha_token: recaptchaToken }),
+        signal // Allow caller to pass AbortController signal
       })
 
       // Handle network errors
@@ -121,6 +122,10 @@ export const AuthProvider = ({ children }) => {
 
       return data
     } catch (error) {
+      // Ignore abort errors - request was cancelled (component unmounted)
+      if (error.name === 'AbortError') {
+        return null
+      }
       // Re-throw AuthError as-is
       if (error instanceof AuthError) {
         throw error
@@ -136,13 +141,14 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const signup = useCallback(async (email, password, name, salesid, recaptchaToken) => {
+  const signup = useCallback(async (email, password, name, salesid, recaptchaToken, signal = null) => {
     setLoading(true)
     try {
       const response = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, salesid, name, recaptcha_token: recaptchaToken })
+        body: JSON.stringify({ email, password, salesid, name, recaptcha_token: recaptchaToken }),
+        signal // Allow caller to pass AbortController signal
       })
 
       // Handle network errors
@@ -172,6 +178,10 @@ export const AuthProvider = ({ children }) => {
 
       return data
     } catch (error) {
+      // Ignore abort errors - request was cancelled (component unmounted)
+      if (error.name === 'AbortError') {
+        return null
+      }
       if (error instanceof AuthError) {
         throw error
       }

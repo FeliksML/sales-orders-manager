@@ -6,6 +6,7 @@ function AddressAutocomplete({ value, onChange, error, placeholder = "Start typi
   const [localValue, setLocalValue] = useState(value)
   const lastSavedValue = useRef(value)
   const placeChangedFired = useRef(false)
+  const resetTimeoutRef = useRef(null)
 
   useEffect(() => {
     setLocalValue(value)
@@ -38,8 +39,13 @@ function AddressAutocomplete({ value, onChange, error, placeholder = "Start typi
         lastSavedValue.current = address
         onChange(address)
 
+        // Clear any existing reset timeout
+        if (resetTimeoutRef.current) {
+          clearTimeout(resetTimeoutRef.current)
+        }
+
         // Reset flag after a delay
-        setTimeout(() => {
+        resetTimeoutRef.current = setTimeout(() => {
           placeChangedFired.current = false
         }, 500)
       }
@@ -48,6 +54,10 @@ function AddressAutocomplete({ value, onChange, error, placeholder = "Start typi
     return () => {
       if (window.google?.maps?.event) {
         window.google.maps.event.removeListener(listener)
+      }
+      // Clean up timeout on unmount
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current)
       }
     }
   }, [onChange])

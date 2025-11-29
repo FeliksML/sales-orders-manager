@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileUp, CheckCircle, X, ArrowLeft, Loader2, Package, Calendar, User, DollarSign } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
@@ -10,13 +10,23 @@ import { API_BASE_URL } from '../utils/apiUrl'
 function Import() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
-  
+  const abortControllerRef = useRef(null)
+
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [extractedData, setExtractedData] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   const handlePdfUpload = async (file) => {
     if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
@@ -28,6 +38,14 @@ function Import() {
       setUploadError('File size must be less than 10MB')
       return
     }
+
+    // Cancel any existing upload request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController()
 
     setIsUploading(true)
     setUploadError('')
@@ -43,7 +61,8 @@ function Import() {
         headers: {
           'Authorization': `Bearer ${token}`
         },
-        body: formData
+        body: formData,
+        signal: abortControllerRef.current.signal
       })
 
       if (!response.ok) {
@@ -52,11 +71,15 @@ function Import() {
       }
 
       const result = await response.json()
-      
+
       if (result.success && result.data) {
         setExtractedData(result.data)
       }
     } catch (error) {
+      // Ignore abort errors - request was cancelled (user navigated away or uploaded new file)
+      if (error.name === 'AbortError') {
+        return
+      }
       console.error('PDF upload error:', error)
       setUploadError(error.message || 'Failed to extract PDF data')
     } finally {
