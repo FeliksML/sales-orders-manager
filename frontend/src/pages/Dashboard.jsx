@@ -414,7 +414,7 @@ function Dashboard() {
                   <LoadingSpinner />
                 </div>
               }>
-                <OrderCharts orders={allOrders} stats={stats} />
+                <OrderCharts orders={allOrders} stats={stats} statsLoading={statsLoading} />
               </Suspense>
             )}
           </div>

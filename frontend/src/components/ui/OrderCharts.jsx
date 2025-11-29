@@ -1,8 +1,8 @@
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { BarChart3 } from 'lucide-react'
+import { BarChart3, Loader2 } from 'lucide-react'
 import Card from './Card'
 
-function OrderCharts({ orders = [], stats }) {
+function OrderCharts({ orders = [], stats, statsLoading = false }) {
   // Prepare product distribution data
   const productData = [
     { name: 'Internet', value: stats?.total_internet || 0, color: '#3b82f6' },
@@ -93,39 +93,48 @@ function OrderCharts({ orders = [], stats }) {
       )}
 
       {/* Product Distribution Chart */}
-      {productData.length > 0 && (
+      {(productData.length > 0 || statsLoading) && (
         <Card>
           <h3 className="text-white text-xl font-bold mb-4">Product Distribution</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={productData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                outerRadius={100}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {productData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
+          {statsLoading ? (
+            <div className="flex flex-col items-center justify-center h-[300px]">
+              <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+              <p className="text-gray-400 mt-2">Loading stats...</p>
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={productData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {productData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {productData.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="text-gray-300 text-sm">{item.name}: {item.value}</span>
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {productData.map((item) => (
-              <div key={item.name} className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: item.color }}
-                />
-                <span className="text-gray-300 text-sm">{item.name}: {item.value}</span>
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </Card>
       )}
     </div>

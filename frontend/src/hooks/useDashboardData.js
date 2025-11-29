@@ -34,6 +34,7 @@ export function useDashboardData(filters = {}) {
   // Ref to track pending refresh for cancellation
   const pendingRefresh = useRef(null)
   const filtersRef = useRef(filters)
+  const isInitialMount = useRef(true)
 
   // Keep filters ref updated
   useEffect(() => {
@@ -200,8 +201,12 @@ export function useDashboardData(filters = {}) {
     }
   }, [refresh])
 
-  // Refetch when filters change
+  // Refetch when filters change (skip initial mount - handled by above effect)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
     const token = localStorage.getItem('token')
     if (token) {
       refresh({ orders: true })
