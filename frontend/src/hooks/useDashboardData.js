@@ -54,13 +54,20 @@ export function useDashboardData(filters = {}) {
   const refresh = useCallback(async (options = { all: true }) => {
     console.log('[useDashboardData] refresh called with options:', options)
 
+    const isFullRefresh = options.all === true
+
     // Cancel any pending refresh to prevent race conditions
+    // BUT: Don't let a partial refresh cancel a full refresh
     if (pendingRefresh.current) {
+      if (pendingRefresh.current.isFullRefresh && !isFullRefresh) {
+        console.log('[useDashboardData] Skipping partial refresh - full refresh in progress')
+        return
+      }
       console.log('[useDashboardData] Cancelling previous refresh')
       pendingRefresh.current.cancelled = true
     }
 
-    const thisRefresh = { cancelled: false }
+    const thisRefresh = { cancelled: false, isFullRefresh }
     pendingRefresh.current = thisRefresh
 
     // Small debounce to batch rapid successive calls
