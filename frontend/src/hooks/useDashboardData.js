@@ -52,8 +52,11 @@ export function useDashboardData(filters = {}) {
    * @param {boolean} options.followups - Refresh followups
    */
   const refresh = useCallback(async (options = { all: true }) => {
+    console.log('[useDashboardData] refresh called with options:', options)
+
     // Cancel any pending refresh to prevent race conditions
     if (pendingRefresh.current) {
+      console.log('[useDashboardData] Cancelling previous refresh')
       pendingRefresh.current.cancelled = true
     }
 
@@ -64,7 +67,10 @@ export function useDashboardData(filters = {}) {
     await new Promise(resolve => setTimeout(resolve, 50))
 
     // If this refresh was cancelled by a newer one, abort
-    if (thisRefresh.cancelled) return
+    if (thisRefresh.cancelled) {
+      console.log('[useDashboardData] This refresh was cancelled, aborting')
+      return
+    }
 
     const shouldRefresh = {
       orders: options.all || options.orders,
@@ -73,6 +79,7 @@ export function useDashboardData(filters = {}) {
       goals: options.all || options.goals,
       followups: options.all || options.followups
     }
+    console.log('[useDashboardData] shouldRefresh:', shouldRefresh)
 
     // Set loading states for what we're refreshing
     setLoading(prev => ({
@@ -97,8 +104,11 @@ export function useDashboardData(filters = {}) {
       }
 
       if (shouldRefresh.stats) {
+        console.log('[useDashboardData] Adding stats to promises')
         promises.push(orderService.getStats())
         promiseKeys.push('stats')
+      } else {
+        console.log('[useDashboardData] SKIPPING stats - shouldRefresh.stats is false')
       }
 
       if (shouldRefresh.earnings) {
@@ -117,6 +127,7 @@ export function useDashboardData(filters = {}) {
       }
 
       // Execute all promises in parallel
+      console.log('[useDashboardData] Executing promises for:', promiseKeys)
       const results = await Promise.all(promises)
 
       // If cancelled during fetch, don't update state
@@ -187,10 +198,13 @@ export function useDashboardData(filters = {}) {
 
   // Initial fetch on mount
   useEffect(() => {
+    console.log('[useDashboardData] Mount effect running')
     const token = localStorage.getItem('token')
     if (token) {
+      console.log('[useDashboardData] Token found, calling refresh()')
       refresh()
     } else {
+      console.log('[useDashboardData] No token, skipping refresh')
       setLoading({
         orders: false,
         stats: false,
@@ -203,12 +217,15 @@ export function useDashboardData(filters = {}) {
 
   // Refetch when filters change (skip initial mount - handled by above effect)
   useEffect(() => {
+    console.log('[useDashboardData] Filter effect running, isInitialMount:', isInitialMount.current)
     if (isInitialMount.current) {
+      console.log('[useDashboardData] Skipping filter effect on initial mount')
       isInitialMount.current = false
       return
     }
     const token = localStorage.getItem('token')
     if (token) {
+      console.log('[useDashboardData] Filters changed, calling refresh({ orders: true })')
       refresh({ orders: true })
     }
   }, [JSON.stringify(filters), refresh])
