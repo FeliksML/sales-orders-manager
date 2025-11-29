@@ -43,15 +43,15 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
   const borderColor = isPositive ? 'rgba(16, 185, 129, 0.3)' : isNeutral ? 'rgba(245, 158, 11, 0.3)' : 'rgba(244, 63, 94, 0.3)'
   
   return (
-    <div 
-      className="p-4 rounded-xl relative overflow-hidden group hover:scale-[1.02] transition-transform"
+    <div
+      className="p-3 xs:p-4 rounded-xl relative overflow-hidden group hover:scale-[1.02] transition-transform"
       style={{
         background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
       }}
     >
       {/* Header with icon and label */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-1 xs:gap-0 mb-3">
         <div className="flex items-center gap-2">
           <div 
             className="p-2 rounded-lg"
@@ -66,19 +66,19 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
         </div>
         
         {/* Change badge */}
-        <div 
-          className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${trendColor}`}
+        <div
+          className={`self-start xs:self-auto flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${trendColor}`}
           style={{ background: bgColor, border: `1px solid ${borderColor}` }}
         >
           <TrendIcon className="w-3 h-3" />
-          <span>{isPositive ? '+' : ''}{changePercent.toFixed(1)}%</span>
+          <span>{isPositive ? '+' : ''}{Math.round(changePercent)}%</span>
         </div>
       </div>
       
       {/* Main value */}
       <div className="mb-2">
         <span 
-          className="text-3xl font-bold text-white"
+          className="text-2xl xs:text-3xl font-bold text-white"
           style={{ fontFamily: "'Space Mono', monospace" }}
         >
           {config.format(current)}
