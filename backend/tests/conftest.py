@@ -15,6 +15,8 @@ from sqlalchemy.orm import sessionmaker
 if not os.getenv("SECRET_KEY"):
     os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only-min-32-chars"
 os.environ["ENVIRONMENT"] = "development"
+# Disable scheduler during tests to prevent background job interference
+os.environ["SCHEDULER_ENABLED"] = "false"
 if not os.getenv("FRONTEND_URL"):
     os.environ["FRONTEND_URL"] = "http://localhost:5173"
 os.environ["RECAPTCHA_SECRET_KEY"] = "test-key"

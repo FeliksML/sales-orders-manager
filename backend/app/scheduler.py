@@ -366,8 +366,13 @@ def check_due_followups():
         db.close()
 
 
-def start_scheduler():
-    """Start the scheduler"""
+def start_scheduler(run_initial_checks: bool = True):
+    """Start the scheduler.
+
+    Args:
+        run_initial_checks: If True, run notification checks immediately on startup.
+                           Set to False when starting asynchronously to avoid blocking.
+    """
     if not scheduler.running:
         logger.info("=" * 70)
         logger.info("STARTING NOTIFICATION SCHEDULER")
@@ -404,14 +409,15 @@ def start_scheduler():
         logger.info("✓ Scheduler started successfully")
         logger.info("=" * 70)
 
-        # Run checks immediately on startup
-        logger.info("Running initial notification checks on startup...")
-        try:
-            check_installation_reminders()
-            check_today_installations()
-            check_due_followups()
-        except Exception as e:
-            logger.error(f"Failed to run initial checks: {str(e)}")
+        # Run checks immediately on startup (optional - skipped when starting async)
+        if run_initial_checks:
+            logger.info("Running initial notification checks on startup...")
+            try:
+                check_installation_reminders()
+                check_today_installations()
+                check_due_followups()
+            except Exception as e:
+                logger.error(f"Failed to run initial checks: {str(e)}")
     else:
         logger.warning("Scheduler already running")
 
@@ -420,3 +426,27 @@ def shutdown_scheduler():
     if scheduler.running:
         scheduler.shutdown()
         logger.info("Scheduler shutdown")
+
+
+def get_scheduler_status() -> dict:
+    """Get current scheduler status and job information."""
+    if not scheduler.running:
+        return {
+            "running": False,
+            "jobs": [],
+            "scheduled_reports_count": len(scheduled_reports)
+        }
+
+    jobs = []
+    for job in scheduler.get_jobs():
+        jobs.append({
+            "id": job.id,
+            "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+            "trigger": str(job.trigger)
+        })
+
+    return {
+        "running": True,
+        "jobs": jobs,
+        "scheduled_reports_count": len(scheduled_reports)
+    }

@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -18,7 +19,7 @@ from contextlib import asynccontextmanager
 from .scheduler import start_scheduler, shutdown_scheduler
 from .models import ErrorLog
 from .database import SessionLocal
-from .config import validate_environment
+from .config import validate_environment, is_scheduler_enabled
 from .security_headers import SecurityHeadersMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -33,14 +34,25 @@ validate_environment()
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
+async def _delayed_scheduler_start():
+    """Start scheduler after brief delay to allow health checks to pass."""
+    await asyncio.sleep(3)  # Allow health checks to respond first
+    start_scheduler(run_initial_checks=False)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events."""
     # Startup
-    # start_scheduler()  # Enable when scheduler is needed
+    scheduler_task = None
+    if is_scheduler_enabled():
+        scheduler_task = asyncio.create_task(_delayed_scheduler_start())
     yield
     # Shutdown
-    # shutdown_scheduler()  # Enable when scheduler is needed
+    if scheduler_task:
+        scheduler_task.cancel()
+    if is_scheduler_enabled():
+        shutdown_scheduler()
 
 app = FastAPI(
     lifespan=lifespan,
@@ -155,7 +167,8 @@ def health_check():
     """
     return {
         "status": "healthy",
-        "service": "sales-order-manager-api"
+        "service": "sales-order-manager-api",
+        "scheduler_enabled": is_scheduler_enabled()
     }
 
 @app.get("/readiness")

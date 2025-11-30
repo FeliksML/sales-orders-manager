@@ -139,3 +139,8 @@ def is_production() -> bool:
 def is_development() -> bool:
     """Check if running in development environment"""
     return os.getenv("ENVIRONMENT", "production").lower() == "development"
+
+
+def is_scheduler_enabled() -> bool:
+    """Check if the scheduler should be enabled (default: True)"""
+    return os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"

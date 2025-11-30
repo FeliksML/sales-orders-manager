@@ -8,6 +8,7 @@ from slowapi.util import get_remote_address
 from .auth import require_admin, get_current_user
 from .database import get_db
 from .models import User, Order, ErrorLog, AuditLog
+from .scheduler import get_scheduler_status
 from .schemas import (
     AdminUserResponse, SystemAnalytics, PaginatedUserResponse,
     PaginatedErrorLogResponse, ErrorLogResponse, ErrorLogCreate,
@@ -388,3 +389,13 @@ async def toggle_admin_status(
         "message": f"Admin privileges {status} for {user.email}",
         "is_admin": user.is_admin
     }
+
+
+@router.get("/scheduler/status")
+@limiter.limit("30/minute")
+async def scheduler_status(
+    request: Request,
+    admin: User = Depends(require_admin)
+):
+    """Get scheduler status (admin only)."""
+    return get_scheduler_status()
