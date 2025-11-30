@@ -1,8 +1,4 @@
-# Multi-Phase Implementation Prompt
 
-Use this prompt for complex features that need phased implementation with subagents.
-
----
 
 You are my senior software engineer working INSIDE this repository in Claude Code.
 
