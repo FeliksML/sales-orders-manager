@@ -13,7 +13,8 @@ function BulkActionsToolbar({
   onReschedule,
   onDelete,
   onExport,
-  onClearSelection
+  onClearSelection,
+  bottomOffset = 0
 }) {
   if (selectedCount === 0) return null
 
@@ -23,7 +24,9 @@ function BulkActionsToolbar({
       <div
         className="fixed left-1/2 transform -translate-x-1/2 z-[60] animate-slideUp px-2 sm:px-0 w-full sm:w-auto max-w-[calc(100vw-1rem)] sm:max-w-none"
         style={{
-          bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))'
+          bottom: bottomOffset > 0
+            ? `calc(${bottomOffset}px + env(safe-area-inset-bottom, 0px) + 1rem)`
+            : 'max(1rem, env(safe-area-inset-bottom, 1rem))'
         }}
         role="toolbar"
         aria-label="Bulk actions toolbar"

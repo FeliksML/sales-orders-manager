@@ -98,13 +98,13 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             <span className="hidden min-[420px]:inline text-sm">Import</span>
           </button>
 
-          {/* Notification Bell */}
+          {/* Notification Bell - Hidden on mobile (bottom nav has notifications tab) */}
           <button
             onClick={() => {
               setIsNotificationCenterOpen(true)
               loadUnreadCount()
             }}
-            className="flex-1 relative flex items-center justify-center h-10 min-w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="hidden md:flex flex-1 relative items-center justify-center h-10 min-w-10 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',

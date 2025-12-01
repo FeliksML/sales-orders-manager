@@ -66,6 +66,13 @@ const NotificationSettings = lazy(() => import('./pages/NotificationSettings'))
 const Import = lazy(() => import('./pages/Import'))
 const CommissionSettings = lazy(() => import('./pages/CommissionSettings'))
 
+// Mobile dashboard tabs
+const DashboardLayout = lazy(() => import('./pages/dashboard/DashboardLayout'))
+const OrdersTab = lazy(() => import('./pages/dashboard/OrdersTab'))
+const EarningsTab = lazy(() => import('./pages/dashboard/EarningsTab'))
+const AnalyticsTab = lazy(() => import('./pages/dashboard/AnalyticsTab'))
+const NotificationsTab = lazy(() => import('./pages/dashboard/NotificationsTab'))
+
 function App() {
   // Check for updates and clean up old service workers on mount
   useEffect(() => {
@@ -97,10 +104,16 @@ function App() {
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <Dashboard />
+                      <DashboardLayout />
                     </ProtectedRoute>
                   }
-                />
+                >
+                  <Route index element={<Navigate to="orders" replace />} />
+                  <Route path="orders" element={<OrdersTab />} />
+                  <Route path="earnings" element={<EarningsTab />} />
+                  <Route path="analytics" element={<AnalyticsTab />} />
+                  <Route path="notifications" element={<NotificationsTab />} />
+                </Route>
                 <Route
                   path="/admin"
                   element={
