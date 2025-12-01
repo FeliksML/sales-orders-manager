@@ -1,27 +1,18 @@
 """
 Database migration script to add SMS subscription billing features.
 Creates subscriptions and sms_usage tables for tracking billing status and usage limits.
-
-Standalone script - no app imports required.
-Run with: python3 migrate_subscriptions.py
 """
 
+import sys
 import os
-from sqlalchemy import create_engine, text
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from app.database import engine
+from sqlalchemy import text
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Get database URL from environment or use default
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    logger.error("DATABASE_URL environment variable not set!")
-    logger.info("Set it with: export DATABASE_URL='postgresql://user:pass@host:port/db'")
-    exit(1)
-
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 
 def migrate():
