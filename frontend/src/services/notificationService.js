@@ -92,12 +92,6 @@ export const notificationService = {
 
       return notification;
     }
-  },
-
-  // Test send reminders
-  async testSendReminders() {
-    const response = await api.post('/api/notifications/test/send-reminders');
-    return response.data;
   }
 };
 

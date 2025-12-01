@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from typing import List, Optional
-from datetime import datetime, date, timedelta
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from .database import get_db
-from .models import User, Notification, Order
+from .models import User, Notification
 from .auth import get_current_user
-from .notification_service import send_install_reminder, send_today_install_notification
 import logging
 
 logger = logging.getLogger(__name__)
@@ -224,71 +223,3 @@ def delete_all_notifications(
     db.commit()
 
     return {"message": "All notifications deleted successfully"}
-
-
-@router.post("/test/send-reminders")
-async def test_send_reminders(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Test endpoint to manually trigger installation reminders
-    Sends reminders for orders scheduled tomorrow and today
-    """
-
-    results = {
-        "tomorrow_reminders": 0,
-        "today_reminders": 0,
-        "errors": []
-    }
-
-    try:
-        # Get installations scheduled for tomorrow
-        tomorrow = date.today() + timedelta(days=1)
-        tomorrow_orders = db.query(Order).filter(
-            and_(
-                Order.userid == current_user.userid,
-                Order.install_date == tomorrow
-            )
-        ).all()
-
-        logger.info(f"Found {len(tomorrow_orders)} installations scheduled for tomorrow")
-
-        for order in tomorrow_orders:
-            try:
-                await send_install_reminder(db, current_user, order, hours_before=24)
-                results["tomorrow_reminders"] += 1
-            except Exception as e:
-                logger.error(f"Failed to send reminder for order {order.orderid}: {str(e)}")
-                results["errors"].append(f"Order {order.orderid}: {str(e)}")
-
-        # Get installations scheduled for today
-        today = date.today()
-        today_orders = db.query(Order).filter(
-            and_(
-                Order.userid == current_user.userid,
-                Order.install_date == today
-            )
-        ).all()
-
-        logger.info(f"Found {len(today_orders)} installations scheduled for today")
-
-        for order in today_orders:
-            try:
-                await send_today_install_notification(db, current_user, order)
-                results["today_reminders"] += 1
-            except Exception as e:
-                logger.error(f"Failed to send today notification for order {order.orderid}: {str(e)}")
-                results["errors"].append(f"Order {order.orderid}: {str(e)}")
-
-        return {
-            "message": "Test reminders sent",
-            "results": results
-        }
-
-    except Exception as e:
-        logger.error(f"Test reminder failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send test reminders: {str(e)}"
-        )

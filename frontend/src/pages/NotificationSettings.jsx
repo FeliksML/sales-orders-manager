@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, Mail, Smartphone, Globe, Bell } from 'lucide-react';
 import notificationService from '../services/notificationService';
 import { formatErrorMessage } from '../utils/errorHandler';
 
@@ -15,7 +16,6 @@ const NotificationSettings = () => {
   });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [browserPermission, setBrowserPermission] = useState('default');
-  const [sendingTest, setSendingTest] = useState(false);
 
   useEffect(() => {
     loadPreferences();
@@ -91,97 +91,103 @@ const NotificationSettings = () => {
     });
   };
 
-  const handleTestSendReminders = async () => {
-    setSendingTest(true);
-    setMessage({ type: '', text: '' });
+  const glassCardStyle = {
+    backgroundColor: 'rgba(0, 15, 33, 0.25)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(0, 200, 255, 0.3)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.37), inset 0 0 80px rgba(0, 200, 255, 0.1)',
+  };
 
-    try {
-      const response = await notificationService.testSendReminders();
-      const { results } = response;
-
-      let message = '';
-      if (results.tomorrow_reminders > 0 || results.today_reminders > 0) {
-        message = `Sent ${results.tomorrow_reminders} 24-hour reminder(s) and ${results.today_reminders} today reminder(s). Check your notification center!`;
-      } else {
-        message = 'No installations found for today or tomorrow. Create an order with install date set to today or tomorrow to test.';
-      }
-
-      if (results.errors.length > 0) {
-        message += ` Errors: ${results.errors.join(', ')}`;
-      }
-
-      setMessage({
-        type: results.errors.length > 0 ? 'error' : 'success',
-        text: message
-      });
-    } catch (error) {
-      console.error('Failed to send test reminders:', error);
-      setMessage({
-        type: 'error',
-        text: formatErrorMessage(error, 'Failed to send test reminders')
-      });
-    } finally {
-      setSendingTest(false);
-    }
+  const pageBackground = {
+    background: `
+      radial-gradient(circle at 25% 25%, rgba(30, 58, 138, 0.3), transparent 25%),
+      radial-gradient(circle at 75% 75%, rgba(20, 125, 190, 0.2), transparent 30%),
+      radial-gradient(circle at 75% 25%, rgba(5, 150, 105, 0.2), transparent 25%),
+      linear-gradient(142deg, #1e40af, #0d4f8b 30%, #067a5b 70%, #059669)
+    `
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700"></div>
+      <div className="min-h-screen flex items-center justify-center" style={pageBackground}>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-green-600 text-white shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="text-white hover:text-gray-200 text-2xl"
+    <div className="min-h-screen p-4 sm:p-8" style={pageBackground}>
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-8">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="p-2 rounded-lg text-white hover:scale-105 transition-transform"
+            style={{
+              backgroundColor: 'rgba(0, 15, 33, 0.3)',
+              border: '1px solid rgba(0, 200, 255, 0.3)',
+            }}
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2 rounded-lg"
+              style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.3) 100%)',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+              }}
             >
-              ←
-            </button>
-            <h1 className="text-3xl font-bold">Notification Settings</h1>
+              <Bell className="w-6 h-6 text-emerald-400" />
+            </div>
+            <h1 className="text-3xl font-bold text-white">Notification Settings</h1>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Message */}
         {message.text && (
           <div
-            className={`mb-6 p-4 rounded-lg ${
-              message.type === 'success'
-                ? 'bg-green-100 text-green-800 border border-green-200'
-                : 'bg-red-100 text-red-800 border border-red-200'
-            }`}
+            className="mb-6 p-4 rounded-xl"
+            style={{
+              backgroundColor: message.type === 'success'
+                ? 'rgba(16, 185, 129, 0.15)'
+                : 'rgba(239, 68, 68, 0.15)',
+              border: `1px solid ${message.type === 'success'
+                ? 'rgba(16, 185, 129, 0.4)'
+                : 'rgba(239, 68, 68, 0.4)'}`,
+            }}
           >
-            {message.text}
+            <p className={message.type === 'success' ? 'text-emerald-300' : 'text-red-300'}>
+              {message.text}
+            </p>
           </div>
         )}
 
         {/* Settings Card */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">
+        <div className="rounded-xl p-6" style={glassCardStyle}>
+          <h2 className="text-xl font-bold text-white mb-6">
             Manage Your Notifications
           </h2>
 
           {/* Email Notifications */}
-          <div className="mb-6 pb-6 border-b border-gray-200">
+          <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(0, 200, 255, 0.2)' }}>
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">📧</span>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(37, 99, 235, 0.3) 100%)',
+                    }}
+                  >
+                    <Mail className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">
                     Email Notifications
                   </h3>
                 </div>
-                <p className="text-sm text-gray-600 ml-8">
+                <p className="text-sm text-gray-300 ml-12">
                   Receive installation reminders and updates via email
                 </p>
               </div>
@@ -197,22 +203,29 @@ const NotificationSettings = () => {
                   }
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
               </label>
             </div>
           </div>
 
           {/* SMS Notifications */}
-          <div className="mb-6 pb-6 border-b border-gray-200">
+          <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(0, 200, 255, 0.2)' }}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">📱</span>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%)',
+                    }}
+                  >
+                    <Smartphone className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">
                     SMS Notifications
                   </h3>
                 </div>
-                <p className="text-sm text-gray-600 ml-8">
+                <p className="text-sm text-gray-300 ml-12">
                   Receive text message reminders for installations
                 </p>
               </div>
@@ -228,13 +241,13 @@ const NotificationSettings = () => {
                   }
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
               </label>
             </div>
 
             {preferences.sms_notifications && (
-              <div className="ml-8">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="ml-12">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Phone Number
                 </label>
                 <input
@@ -247,9 +260,13 @@ const NotificationSettings = () => {
                     })
                   }
                   placeholder="+1 234 567 8900"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                  style={{
+                    backgroundColor: 'rgba(0, 15, 33, 0.4)',
+                    border: '1px solid rgba(0, 200, 255, 0.3)',
+                  }}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Include country code (e.g., +1 for US)
                 </p>
               </div>
@@ -260,13 +277,20 @@ const NotificationSettings = () => {
           <div className="mb-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">🌐</span>
-                  <h3 className="text-lg font-semibold text-gray-900">
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(14, 165, 233, 0.3) 100%)',
+                    }}
+                  >
+                    <Globe className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">
                     Browser Notifications
                   </h3>
                 </div>
-                <p className="text-sm text-gray-600 ml-8">
+                <p className="text-sm text-gray-300 ml-12">
                   Receive push notifications in your browser
                 </p>
               </div>
@@ -282,20 +306,30 @@ const NotificationSettings = () => {
                   }
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
               </label>
             </div>
 
             {preferences.browser_notifications && (
-              <div className="ml-8 space-y-3">
+              <div className="ml-12 space-y-3">
                 {browserPermission === 'default' && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800 mb-2">
+                  <div
+                    className="rounded-lg p-3"
+                    style={{
+                      backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                      border: '1px solid rgba(251, 191, 36, 0.3)',
+                    }}
+                  >
+                    <p className="text-sm text-amber-300 mb-2">
                       Browser notifications require your permission
                     </p>
                     <button
                       onClick={handleRequestBrowserPermission}
-                      className="text-sm bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+                      className="text-sm px-4 py-2 rounded-lg text-white hover:scale-105 transition-transform"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.6) 0%, rgba(245, 158, 11, 0.6) 100%)',
+                        border: '1px solid rgba(251, 191, 36, 0.4)',
+                      }}
                     >
                       Enable Browser Notifications
                     </button>
@@ -303,8 +337,14 @@ const NotificationSettings = () => {
                 )}
 
                 {browserPermission === 'denied' && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-800">
+                  <div
+                    className="rounded-lg p-3"
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                    }}
+                  >
+                    <p className="text-sm text-red-300">
                       Browser notifications are blocked. Please enable them in
                       your browser settings.
                     </p>
@@ -312,14 +352,24 @@ const NotificationSettings = () => {
                 )}
 
                 {browserPermission === 'granted' && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div
+                    className="rounded-lg p-3"
+                    style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                    }}
+                  >
                     <div className="flex items-center justify-between">
-                      <p className="text-sm text-green-800">
+                      <p className="text-sm text-emerald-300">
                         ✓ Browser notifications are enabled
                       </p>
                       <button
                         onClick={handleTestNotification}
-                        className="text-sm bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                        className="text-sm px-4 py-2 rounded-lg text-white hover:scale-105 transition-transform"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.6) 0%, rgba(5, 150, 105, 0.6) 100%)',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                        }}
                       >
                         Test Notification
                       </button>
@@ -331,44 +381,22 @@ const NotificationSettings = () => {
           </div>
 
           {/* Info Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h4 className="font-semibold text-blue-900 mb-2">
-              📋 What you'll receive:
+          <div
+            className="rounded-lg p-4 mb-6"
+            style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+            }}
+          >
+            <h4 className="font-semibold text-emerald-300 mb-2 flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              What you'll receive:
             </h4>
-            <ul className="text-sm text-blue-800 space-y-1 ml-4">
+            <ul className="text-sm text-emerald-200 space-y-1 ml-6">
               <li>• 24-hour reminders before installations</li>
               <li>• Same-day notifications for today's installs</li>
               <li>• Important order updates</li>
             </ul>
-          </div>
-
-          {/* Test Notifications Section */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4 mb-6">
-            <h4 className="font-semibold text-purple-900 mb-3">
-              🧪 Test Your Notifications
-            </h4>
-            <p className="text-sm text-purple-800 mb-3">
-              Click the button below to send test reminders for any orders you
-              have scheduled for today or tomorrow.
-            </p>
-            <button
-              onClick={handleTestSendReminders}
-              disabled={sendingTest}
-              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {sendingTest ? (
-                <span className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Sending Test Notifications...
-                </span>
-              ) : (
-                'Send Test Notifications Now'
-              )}
-            </button>
-            <p className="text-xs text-purple-600 mt-2">
-              Note: Make sure you have at least one order with install date set
-              to today or tomorrow
-            </p>
           </div>
 
           {/* Save Button */}
@@ -376,7 +404,13 @@ const NotificationSettings = () => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-gradient-to-r from-blue-700 to-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:from-blue-800 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-8 py-3 rounded-xl text-white font-semibold hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(16, 185, 129, 0.7))',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3)'
+              }}
             >
               {saving ? 'Saving...' : 'Save Preferences'}
             </button>
