@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, Link } from 'react-router-dom'
-import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield, FileUp, DollarSign } from 'lucide-react'
+import { LogOut, User, Settings, Bell, Clock, FileBarChart, ChevronDown, Shield, FileUp, DollarSign, MoreHorizontal } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
 import NotificationCenter from './NotificationCenter'
+import ActionDropdown from './ui/ActionDropdown'
 
 function DashboardHeader({ onReportsClick, onExportClick }) {
   const { user, logout } = useAuth()
@@ -52,10 +53,27 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
 
         {/* Right: Actions + Account Controls */}
         <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
-          {/* Primary Actions: Reports & Export */}
+          {/* Mobile-only: Actions dropdown (contains Reports, Export, Import) */}
+          <div className="flex md:hidden">
+            <ActionDropdown
+              trigger={
+                <>
+                  <MoreHorizontal size={18} />
+                  <span className="text-sm">Actions</span>
+                </>
+              }
+              items={[
+                { icon: Clock, label: 'Scheduled Reports', onClick: onReportsClick },
+                { icon: FileBarChart, label: 'Export Stats', onClick: onExportClick },
+                { icon: FileUp, label: 'Import PDF', onClick: () => navigate('/import'), variant: 'success' }
+              ]}
+            />
+          </div>
+
+          {/* Desktop-only: Individual action buttons */}
           <button
             onClick={onReportsClick}
-            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="hidden md:flex flex-1 items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -65,12 +83,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Reports"
           >
             <Clock size={16} />
-            <span className="hidden min-[560px]:inline text-sm">Reports</span>
+            <span className="hidden lg:inline text-sm">Reports</span>
           </button>
 
           <button
             onClick={onExportClick}
-            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="hidden md:flex flex-1 items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(0, 15, 33, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -80,12 +98,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Export"
           >
             <FileBarChart size={16} />
-            <span className="hidden min-[480px]:inline text-sm">Export</span>
+            <span className="hidden lg:inline text-sm">Export</span>
           </button>
 
           <button
             onClick={() => navigate('/import')}
-            className="flex-1 flex items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
+            className="hidden md:flex flex-1 items-center justify-center gap-2 h-10 px-3 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
             style={{
               backgroundColor: 'rgba(5, 150, 105, 0.3)',
               backdropFilter: 'blur(20px)',
@@ -95,7 +113,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
             title="Import PDF"
           >
             <FileUp size={16} />
-            <span className="hidden min-[420px]:inline text-sm">Import</span>
+            <span className="hidden lg:inline text-sm">Import</span>
           </button>
 
           {/* Notification Bell - Hidden on mobile (bottom nav has notifications tab) */}
@@ -134,7 +152,7 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
                 }}
               >
                 <User size={18} className="text-blue-400" />
-                <span className="hidden min-[340px]:inline text-sm font-medium">{user?.name}</span>
+                <span className="hidden sm:inline text-sm font-medium">{user?.name}</span>
                 <ChevronDown size={16} className={`transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
@@ -228,21 +246,6 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
         }}
       />
 
-      <style>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideDown {
-          animation: slideDown 0.2s ease-out;
-        }
-      `}</style>
     </header>
   )
 }
