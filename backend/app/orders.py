@@ -14,7 +14,7 @@ from .schemas import (
 from .auth import get_current_user, verify_recaptcha
 from .export_utils import generate_excel, generate_csv, generate_stats_excel, ALL_COLUMNS
 from .email_service import send_export_email
-from .notification_service import send_order_details_email
+from .notification_service import send_order_details_email, send_new_order_sms, send_order_rescheduled_sms
 from . import audit_service
 from .pdf_extractor import extract_order_from_pdf, validate_pdf
 from .commission import get_fiscal_month_boundaries, get_previous_fiscal_month, is_order_in_fiscal_month
@@ -263,6 +263,9 @@ def create_order(
         ip_address=None,
         reason="Order created"
     )
+
+    # Send SMS notification for new order (if user has SMS enabled)
+    send_new_order_sms(db, current_user, db_order)
 
     return db_order
 
@@ -1556,7 +1559,8 @@ def bulk_reschedule(
             detail="Some orders not found or don't belong to you"
         )
 
-    # Update all orders to new date
+    # Store old dates and update all orders to new date
+    old_dates = {order.orderid: order.install_date for order in orders}
     for order in orders:
         order.install_date = request.new_date
 
@@ -1577,11 +1581,18 @@ def bulk_reschedule(
         "updated_count": len(orders),
         "new_date": str(request.new_date)
     }
-    
+
     # Save idempotency key
     save_idempotency_key(db, request.idempotency_key, current_user.userid, 'bulk_reschedule', 200, response)
-    
+
     db.commit()
+
+    # Send SMS notifications for rescheduled orders (after commit, one per order)
+    for order in orders:
+        old_date = old_dates.get(order.orderid)
+        if old_date and old_date != request.new_date:
+            send_order_rescheduled_sms(db, current_user, order, old_date, request.new_date)
+
     return response
 
 @router.delete("/bulk/delete", status_code=status.HTTP_200_OK)

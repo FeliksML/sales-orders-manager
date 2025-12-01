@@ -698,3 +698,58 @@ class PerformanceInsightsResponse(BaseModel):
     
     # Smart insights (text-based)
     insights: List[str]
+
+
+# Subscription & Billing Schemas
+class SubscriptionResponse(BaseModel):
+    """Response for subscription status endpoint"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    status: str  # 'free', 'active', 'canceled', 'past_due'
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    current_period_end: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class SMSUsageResponse(BaseModel):
+    """Response for SMS usage tracking"""
+    model_config = ConfigDict(from_attributes=True)
+
+    month: str  # 'YYYY-MM'
+    sms_count: int
+    limit: int  # 10 for free tier, unlimited (-1) for subscribers
+    remaining: int  # Remaining SMS this month
+
+
+class BillingStatusResponse(BaseModel):
+    """Combined subscription and usage status for frontend"""
+    # Subscription info
+    subscription_status: str  # 'free', 'active', 'canceled', 'past_due'
+    is_subscribed: bool
+
+    # Usage info
+    sms_used: int
+    sms_limit: int  # 10 for free, -1 for unlimited
+    sms_remaining: int
+
+    # Billing info (only if subscribed)
+    current_period_end: Optional[datetime] = None
+    price_per_month: float = 20.00
+
+    # Stripe publishable key for checkout
+    stripe_publishable_key: Optional[str] = None
+
+
+class CheckoutSessionResponse(BaseModel):
+    """Response from create checkout session"""
+    checkout_url: str
+    session_id: str
+
+
+class PortalSessionResponse(BaseModel):
+    """Response from create portal session"""
+    portal_url: str

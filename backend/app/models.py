@@ -270,7 +270,7 @@ class DeletedOrder(Base):
 
 class IdempotencyKey(Base):
     """Track idempotency keys to prevent duplicate bulk operations.
-    
+
     When a bulk operation is performed with an idempotency key, we store the key
     and the response. If the same key is used again, we return the cached response.
     """
@@ -280,13 +280,60 @@ class IdempotencyKey(Base):
     key = Column(String(64), nullable=False, unique=True, index=True)
     user_id = Column(Integer, ForeignKey('users.userid'), nullable=False)
     operation = Column(String(50), nullable=False)  # bulk_install, bulk_reschedule, bulk_delete
-    
+
     # Cached response
     response_status = Column(Integer, nullable=False)  # HTTP status code
     response_body = Column(JSON, nullable=True)  # JSON response body
-    
+
     # When the key was used
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    
+
     # Keys expire after 24 hours
     # Clients should generate new keys for new operations
+
+
+class Subscription(Base):
+    """Track user SMS subscription status for billing.
+
+    Users get 10 free SMS/month. After that, they need a $20/month subscription
+    for unlimited SMS notifications.
+    """
+    __tablename__ = 'subscriptions'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.userid'), unique=True, nullable=False)
+
+    # Stripe integration
+    stripe_customer_id = Column(String(255), nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True)
+
+    # Subscription status: 'free', 'active', 'canceled', 'past_due'
+    status = Column(String(50), default='free', nullable=False)
+
+    # When the current billing period ends (for active subscriptions)
+    current_period_end = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class SMSUsage(Base):
+    """Track monthly SMS usage per user for free tier limits.
+
+    Free tier allows 10 SMS per month. This table tracks usage
+    to enforce the limit for non-subscribed users.
+    """
+    __tablename__ = 'sms_usage'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.userid'), nullable=False)
+
+    # Month in YYYY-MM format (e.g., '2025-11')
+    month = Column(String(7), nullable=False)
+
+    # Number of SMS sent this month
+    sms_count = Column(Integer, default=0, nullable=False)
+
+    # Unique constraint: one record per user per month
+    __table_args__ = (UniqueConstraint('user_id', 'month', name='uq_user_month_sms'),)

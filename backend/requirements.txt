@@ -11,6 +11,8 @@ aiofiles
 openpyxl
 apscheduler
 twilio
+telnyx
+stripe
 python-jose[cryptography]
 httpx
 slowapi

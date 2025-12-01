@@ -1,14 +1,14 @@
 """
 Notification service for sending email and SMS notifications
-Uses Resend API for emails
+Uses Resend API for emails and Telnyx for SMS
 """
-from twilio.rest import Client
+import telnyx
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 import os
 import logging
 import resend
-from .models import User, Order, Notification
+from .models import User, Order, Notification, Subscription, SMSUsage
 from sqlalchemy.orm import Session
 
 # Configure logging
@@ -24,19 +24,118 @@ MAIL_REPLY_TO = os.getenv("MAIL_REPLY_TO", "support@salesordermanager.us")
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
-# Twilio configuration (from environment variables)
-TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID')
-TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN')
-TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER')
+# Telnyx configuration (replaces Twilio for cost savings)
+TELNYX_API_KEY = os.getenv('TELNYX_API_KEY')
+TELNYX_PHONE_NUMBER = os.getenv('TELNYX_PHONE_NUMBER')
 
-# Initialize Twilio client if credentials are available
-twilio_client = None
-if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+# SMS subscription settings
+FREE_SMS_LIMIT = 10  # Free SMS per month for non-subscribers
+
+# Initialize Telnyx client if credentials are available
+telnyx_configured = False
+if TELNYX_API_KEY:
     try:
-        twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-        logger.info("Twilio client initialized successfully")
+        telnyx.api_key = TELNYX_API_KEY
+        telnyx_configured = True
+        logger.info("Telnyx client initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize Twilio client: {str(e)}")
+        logger.error(f"Failed to initialize Telnyx client: {str(e)}")
+
+
+def can_send_sms(db: Session, user_id: int) -> Tuple[bool, str, int, int]:
+    """
+    Check if user can send SMS based on subscription status and usage.
+
+    Returns:
+        Tuple of (can_send, reason, sms_used, sms_limit)
+        - can_send: True if SMS can be sent
+        - reason: 'ok', 'free_limit_reached', 'not_configured'
+        - sms_used: Number of SMS sent this month
+        - sms_limit: 10 for free tier, -1 for unlimited (subscribed)
+    """
+    if not telnyx_configured or not TELNYX_PHONE_NUMBER:
+        return False, "not_configured", 0, 0
+
+    # Get current month in YYYY-MM format
+    current_month = datetime.now().strftime('%Y-%m')
+
+    # Get current usage
+    usage = db.query(SMSUsage).filter(
+        SMSUsage.user_id == user_id,
+        SMSUsage.month == current_month
+    ).first()
+
+    sms_count = usage.sms_count if usage else 0
+
+    # Check subscription status
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user_id
+    ).first()
+
+    is_subscribed = subscription and subscription.status == 'active'
+
+    if is_subscribed:
+        # Unlimited for subscribers
+        return True, "ok", sms_count, -1
+
+    # Free tier: 10 SMS/month
+    if sms_count >= FREE_SMS_LIMIT:
+        return False, "free_limit_reached", sms_count, FREE_SMS_LIMIT
+
+    return True, "ok", sms_count, FREE_SMS_LIMIT
+
+
+def increment_sms_usage(db: Session, user_id: int) -> int:
+    """
+    Increment SMS usage count for the current month.
+
+    Returns:
+        New SMS count for the month
+    """
+    current_month = datetime.now().strftime('%Y-%m')
+
+    usage = db.query(SMSUsage).filter(
+        SMSUsage.user_id == user_id,
+        SMSUsage.month == current_month
+    ).first()
+
+    if usage:
+        usage.sms_count += 1
+        new_count = usage.sms_count
+    else:
+        usage = SMSUsage(user_id=user_id, month=current_month, sms_count=1)
+        db.add(usage)
+        new_count = 1
+
+    db.commit()
+    return new_count
+
+
+def get_sms_usage(db: Session, user_id: int) -> Tuple[int, int]:
+    """
+    Get SMS usage for the current month.
+
+    Returns:
+        Tuple of (sms_used, sms_limit)
+    """
+    current_month = datetime.now().strftime('%Y-%m')
+
+    usage = db.query(SMSUsage).filter(
+        SMSUsage.user_id == user_id,
+        SMSUsage.month == current_month
+    ).first()
+
+    sms_count = usage.sms_count if usage else 0
+
+    # Check subscription
+    subscription = db.query(Subscription).filter(
+        Subscription.user_id == user_id
+    ).first()
+
+    is_subscribed = subscription and subscription.status == 'active'
+    sms_limit = -1 if is_subscribed else FREE_SMS_LIMIT
+
+    return sms_count, sms_limit
 
 
 async def send_email_notification(
@@ -168,14 +267,14 @@ async def send_email_notification(
 
 
 def send_sms_notification(phone_number: str, message: str) -> bool:
-    """Send SMS notification via Twilio"""
+    """Send SMS notification via Telnyx"""
 
-    if not twilio_client:
-        logger.warning("Twilio client not configured. SMS notification skipped.")
+    if not telnyx_configured:
+        logger.warning("Telnyx client not configured. SMS notification skipped.")
         return False
 
-    if not TWILIO_PHONE_NUMBER:
-        logger.error("TWILIO_PHONE_NUMBER not configured")
+    if not TELNYX_PHONE_NUMBER:
+        logger.error("TELNYX_PHONE_NUMBER not configured")
         return False
 
     try:
@@ -183,17 +282,48 @@ def send_sms_notification(phone_number: str, message: str) -> bool:
         if not phone_number.startswith('+'):
             phone_number = f'+1{phone_number}'  # Assume US number
 
-        message_obj = twilio_client.messages.create(
-            body=message,
-            from_=TWILIO_PHONE_NUMBER,
-            to=phone_number
+        # Send via Telnyx
+        response = telnyx.Message.create(
+            from_=TELNYX_PHONE_NUMBER,
+            to=phone_number,
+            text=message
         )
 
-        logger.info(f"SMS notification sent to {phone_number}. SID: {message_obj.sid}")
+        logger.info(f"SMS notification sent to {phone_number}. ID: {response.id}")
         return True
     except Exception as e:
         logger.error(f"Failed to send SMS to {phone_number}: {str(e)}")
         return False
+
+
+def send_sms_with_gating(db: Session, user_id: int, phone_number: str, message: str) -> Tuple[bool, str]:
+    """
+    Send SMS with subscription gating.
+
+    This is the preferred function for sending SMS - it checks subscription
+    status and usage limits before sending.
+
+    Returns:
+        Tuple of (success, reason)
+        - success: True if SMS was sent
+        - reason: 'sent', 'free_limit_reached', 'not_configured', 'send_failed'
+    """
+    # Check if user can send SMS
+    can_send, reason, sms_used, sms_limit = can_send_sms(db, user_id)
+
+    if not can_send:
+        logger.info(f"SMS blocked for user {user_id}: {reason} (used: {sms_used}/{sms_limit})")
+        return False, reason
+
+    # Send the SMS
+    success = send_sms_notification(phone_number, message)
+
+    if success:
+        # Increment usage counter
+        increment_sms_usage(db, user_id)
+        return True, "sent"
+    else:
+        return False, "send_failed"
 
 
 async def send_install_reminder(
@@ -229,10 +359,10 @@ async def send_install_reminder(
         )
         notification.sent_via_email = email_sent
 
-    # Send via SMS if enabled and phone number is available
+    # Send via SMS if enabled and phone number is available (with subscription gating)
     if user.sms_notifications and user.phone_number:
         sms_message = f"Hi {user.name}, reminder: Installation for {order.business_name} tomorrow at {order.install_time}. Customer: {order.customer_name}, {order.customer_phone}"
-        sms_sent = send_sms_notification(user.phone_number, sms_message)
+        sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
         notification.sent_via_sms = sms_sent
 
     # Browser notifications handled by frontend
@@ -279,10 +409,10 @@ async def send_today_install_notification(
         )
         notification.sent_via_email = email_sent
 
-    # Send via SMS if enabled
+    # Send via SMS if enabled (with subscription gating)
     if user.sms_notifications and user.phone_number:
         sms_message = f"Hi {user.name}, installation TODAY at {order.install_time} for {order.business_name}. Customer: {order.customer_name}, {order.customer_phone}"
-        sms_sent = send_sms_notification(user.phone_number, sms_message)
+        sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
         notification.sent_via_sms = sms_sent
 
     # Browser notifications
@@ -332,7 +462,7 @@ async def send_custom_notification(
         sms_message = f"{title}: {message}"
         if order:
             sms_message += f" - {order.business_name}"
-        sms_sent = send_sms_notification(user.phone_number, sms_message)
+        sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
         notification.sent_via_sms = sms_sent
 
     if user.browser_notifications:
@@ -531,3 +661,73 @@ async def send_order_details_email(
     except Exception as e:
         logger.error(f"Failed to send order details email to {user.email}: {str(e)}")
         return False
+
+
+# =============================================================================
+# New SMS Trigger Functions (Phase 5)
+# =============================================================================
+
+def send_new_order_sms(db: Session, user: User, order: Order) -> bool:
+    """
+    Send SMS notification to sales rep when a new order is created.
+
+    Args:
+        db: Database session
+        user: The sales rep who owns the order
+        order: The newly created order
+
+    Returns:
+        True if SMS was sent successfully, False otherwise
+    """
+    if not user.sms_notifications or not user.phone_number:
+        return False
+
+    message = f"New order: {order.business_name} - Install {order.install_date.strftime('%m/%d')} at {order.install_time}"
+
+    success, reason = send_sms_with_gating(db, user.userid, user.phone_number, message)
+
+    if success:
+        logger.info(f"New order SMS sent to user {user.userid} for order {order.orderid}")
+    else:
+        logger.info(f"New order SMS not sent for user {user.userid}: {reason}")
+
+    return success
+
+
+def send_order_rescheduled_sms(
+    db: Session,
+    user: User,
+    order: Order,
+    old_date,
+    new_date
+) -> bool:
+    """
+    Send SMS notification to sales rep when an order is rescheduled.
+
+    Args:
+        db: Database session
+        user: The sales rep who owns the order
+        order: The rescheduled order
+        old_date: Previous install date
+        new_date: New install date
+
+    Returns:
+        True if SMS was sent successfully, False otherwise
+    """
+    if not user.sms_notifications or not user.phone_number:
+        return False
+
+    # Format dates for SMS
+    old_date_str = old_date.strftime('%m/%d') if hasattr(old_date, 'strftime') else str(old_date)
+    new_date_str = new_date.strftime('%m/%d') if hasattr(new_date, 'strftime') else str(new_date)
+
+    message = f"Rescheduled: {order.business_name} moved from {old_date_str} to {new_date_str}"
+
+    success, reason = send_sms_with_gating(db, user.userid, user.phone_number, message)
+
+    if success:
+        logger.info(f"Reschedule SMS sent to user {user.userid} for order {order.orderid}")
+    else:
+        logger.info(f"Reschedule SMS not sent for user {user.userid}: {reason}")
+
+    return success

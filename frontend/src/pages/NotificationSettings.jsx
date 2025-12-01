@@ -1,26 +1,64 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Smartphone, Globe, Bell } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Mail, Smartphone, Globe, Bell, CreditCard, Zap } from 'lucide-react';
 import notificationService from '../services/notificationService';
+import billingService from '../services/billingService';
 import { formatErrorMessage } from '../utils/errorHandler';
 
 const NotificationSettings = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [preferences, setPreferences] = useState({
     phone_number: '',
     email_notifications: true,
     sms_notifications: false,
     browser_notifications: true
   });
+  const [billingStatus, setBillingStatus] = useState({
+    subscription_status: 'free',
+    is_subscribed: false,
+    sms_used: 0,
+    sms_limit: 10,
+    sms_remaining: 10,
+    price_per_month: 20.00
+  });
   const [message, setMessage] = useState({ type: '', text: '' });
   const [browserPermission, setBrowserPermission] = useState('default');
 
   useEffect(() => {
     loadPreferences();
+    loadBillingStatus();
     checkBrowserPermission();
-  }, []);
+
+    // Check for checkout result
+    const checkoutResult = searchParams.get('checkout');
+    if (checkoutResult === 'success') {
+      setMessage({
+        type: 'success',
+        text: 'Successfully upgraded to SMS Pro! Unlimited SMS notifications are now active.'
+      });
+      // Reload billing status
+      loadBillingStatus();
+    } else if (checkoutResult === 'canceled') {
+      setMessage({
+        type: 'info',
+        text: 'Checkout was canceled. You can upgrade anytime.'
+      });
+    }
+  }, [searchParams]);
+
+  const loadBillingStatus = async () => {
+    try {
+      const data = await billingService.getSubscriptionStatus();
+      setBillingStatus(data);
+    } catch (error) {
+      console.error('Failed to load billing status:', error);
+      // Don't show error - billing might not be configured
+    }
+  };
 
   const checkBrowserPermission = () => {
     if ('Notification' in window) {
@@ -89,6 +127,32 @@ const NotificationSettings = () => {
       body: 'This is a test notification from Sales Order Manager',
       icon: '/icon.png'
     });
+  };
+
+  const handleUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      await billingService.redirectToCheckout();
+    } catch (error) {
+      console.error('Failed to start checkout:', error);
+      setMessage({
+        type: 'error',
+        text: formatErrorMessage(error, 'Failed to start checkout. Please try again.')
+      });
+      setUpgrading(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      await billingService.redirectToPortal();
+    } catch (error) {
+      console.error('Failed to open billing portal:', error);
+      setMessage({
+        type: 'error',
+        text: formatErrorMessage(error, 'Failed to open billing portal')
+      });
+    }
   };
 
   const glassCardStyle = {
@@ -224,6 +288,11 @@ const NotificationSettings = () => {
                   <h3 className="text-lg font-semibold text-white">
                     SMS Notifications
                   </h3>
+                  {billingStatus.is_subscribed && (
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      PRO
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-300 ml-12">
                   Receive text message reminders for installations
@@ -245,30 +314,153 @@ const NotificationSettings = () => {
               </label>
             </div>
 
+            {/* SMS Usage Display */}
             {preferences.sms_notifications && (
-              <div className="ml-12">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={preferences.phone_number || ''}
-                  onChange={(e) =>
-                    setPreferences({
-                      ...preferences,
-                      phone_number: e.target.value
-                    })
-                  }
-                  placeholder="+1 234 567 8900"
-                  className="w-full px-4 py-2 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              <div className="ml-12 space-y-4">
+                {/* Usage Bar */}
+                <div
+                  className="rounded-lg p-4"
                   style={{
                     backgroundColor: 'rgba(0, 15, 33, 0.4)',
-                    border: '1px solid rgba(0, 200, 255, 0.3)',
+                    border: '1px solid rgba(0, 200, 255, 0.2)',
                   }}
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Include country code (e.g., +1 for US)
-                </p>
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-300">
+                      {billingStatus.is_subscribed ? (
+                        <>Unlimited SMS</>
+                      ) : (
+                        <>SMS Usage This Month</>
+                      )}
+                    </span>
+                    <span className="text-sm font-medium text-white">
+                      {billingStatus.is_subscribed ? (
+                        <span className="text-emerald-400">{billingStatus.sms_used} sent</span>
+                      ) : (
+                        <>{billingStatus.sms_used} / {billingStatus.sms_limit}</>
+                      )}
+                    </span>
+                  </div>
+                  {!billingStatus.is_subscribed && (
+                    <>
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div
+                          className="h-2 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${Math.min(100, (billingStatus.sms_used / billingStatus.sms_limit) * 100)}%`,
+                            background: billingStatus.sms_remaining <= 2
+                              ? 'linear-gradient(90deg, #ef4444, #f87171)'
+                              : billingStatus.sms_remaining <= 5
+                              ? 'linear-gradient(90deg, #f59e0b, #fbbf24)'
+                              : 'linear-gradient(90deg, #10b981, #34d399)'
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        {billingStatus.sms_remaining} SMS remaining this month
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {/* Upgrade Banner (for non-subscribers) */}
+                {!billingStatus.is_subscribed && (
+                  <div
+                    className="rounded-lg p-4"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%)',
+                      border: '1px solid rgba(168, 85, 247, 0.4)',
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-purple-500/20">
+                        <Zap className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-white mb-1">
+                          Upgrade to SMS Pro
+                        </h4>
+                        <p className="text-sm text-gray-300 mb-3">
+                          Get unlimited SMS notifications for just ${billingStatus.price_per_month}/month.
+                          Never miss an installation reminder again!
+                        </p>
+                        <button
+                          onClick={handleUpgrade}
+                          disabled={upgrading}
+                          className="px-4 py-2 rounded-lg text-white font-medium hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{
+                            background: 'linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%)',
+                            boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)'
+                          }}
+                        >
+                          {upgrading ? 'Redirecting...' : `Upgrade - $${billingStatus.price_per_month}/mo`}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Manage Subscription (for subscribers) */}
+                {billingStatus.is_subscribed && (
+                  <div
+                    className="rounded-lg p-4"
+                    style={{
+                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CreditCard className="w-5 h-5 text-emerald-400" />
+                        <div>
+                          <p className="text-sm font-medium text-emerald-300">
+                            SMS Pro Active
+                          </p>
+                          {billingStatus.current_period_end && (
+                            <p className="text-xs text-gray-400">
+                              Renews {new Date(billingStatus.current_period_end).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleManageSubscription}
+                        className="px-4 py-2 rounded-lg text-emerald-300 text-sm font-medium hover:bg-emerald-500/10 transition-colors"
+                        style={{
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                        }}
+                      >
+                        Manage Subscription
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Phone Number Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={preferences.phone_number || ''}
+                    onChange={(e) =>
+                      setPreferences({
+                        ...preferences,
+                        phone_number: e.target.value
+                      })
+                    }
+                    placeholder="+1 234 567 8900"
+                    className="w-full px-4 py-2 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                    style={{
+                      backgroundColor: 'rgba(0, 15, 33, 0.4)',
+                      border: '1px solid rgba(0, 200, 255, 0.3)',
+                    }}
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Include country code (e.g., +1 for US)
+                  </p>
+                </div>
               </div>
             )}
           </div>
