@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Settings } from 'lucide-react'
 import notificationService from '../../services/notificationService'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 function NotificationsTab() {
-  const navigate = useNavigate()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -95,25 +92,8 @@ function NotificationsTab() {
   }
 
   return (
-    <div className="p-4 min-h-screen">
+    <div className="px-3 pt-3 min-h-screen">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-white text-2xl font-bold">Notifications</h1>
-          <button
-            onClick={() => navigate('/notification-settings')}
-            className="flex items-center gap-2 px-4 py-2 text-white/80 hover:text-white rounded-lg transition-all"
-            style={{
-              backgroundColor: 'rgba(0, 15, 33, 0.3)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0, 200, 255, 0.3)',
-            }}
-          >
-            <Settings size={18} />
-            <span className="text-sm">Settings</span>
-          </button>
-        </div>
-
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-4">
           <button

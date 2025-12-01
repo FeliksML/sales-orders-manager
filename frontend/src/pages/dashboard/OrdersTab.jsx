@@ -1,6 +1,6 @@
-import { useState, useCallback, lazy, Suspense } from 'react'
-import { Download, CalendarDays, List, Plus, WifiOff } from 'lucide-react'
-import DashboardHeader from '../../components/DashboardHeader'
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import { WifiOff } from 'lucide-react'
 import OrdersTable from '../../components/ui/OrdersTable'
 import FilterBar from '../../components/ui/FilterBar'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -18,8 +18,6 @@ import followupService from '../../services/followupService'
 // Lazy load heavy components
 const OrderInputModal = lazy(() => import('../../components/OrderInputModal'))
 const OrderDetailsModal = lazy(() => import('../../components/OrderDetailsModal'))
-const ExportModal = lazy(() => import('../../components/ExportModal'))
-const ScheduledReportsModal = lazy(() => import('../../components/ScheduledReportsModal'))
 const CalendarView = lazy(() => import('../../components/CalendarView'))
 const BulkRescheduleModal = lazy(() => import('../../components/BulkRescheduleModal'))
 const BulkDeleteModal = lazy(() => import('../../components/BulkDeleteModal'))
@@ -29,6 +27,9 @@ function OrdersTab() {
   const [filters, setFilters] = useState({})
   const isOnline = useOnlineStatus()
   const { showToast } = useToast()
+
+  // Get shared state from layout via outlet context
+  const { ordersViewMode: viewMode, orderModalTrigger } = useOutletContext()
 
   const {
     orders,
@@ -54,10 +55,6 @@ function OrdersTab() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
-  const [exportType, setExportType] = useState('orders')
-  const [isScheduledReportsModalOpen, setIsScheduledReportsModalOpen] = useState(false)
-  const [viewMode, setViewMode] = useState('table')
   const [prefilledDate, setPrefilledDate] = useState(null)
 
   // Bulk operations state
@@ -65,6 +62,14 @@ function OrdersTab() {
   const [isBulkRescheduleModalOpen, setIsBulkRescheduleModalOpen] = useState(false)
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
+
+  // Open order modal when triggered from header
+  useEffect(() => {
+    if (orderModalTrigger > 0) {
+      setPrefilledDate(null)
+      setIsOrderModalOpen(true)
+    }
+  }, [orderModalTrigger])
 
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters)
@@ -143,16 +148,6 @@ function OrdersTab() {
       }
       throw error
     }
-  }
-
-  const handleExportOrders = () => {
-    setExportType('orders')
-    setIsExportModalOpen(true)
-  }
-
-  const handleExportStats = () => {
-    setExportType('stats')
-    setIsExportModalOpen(true)
   }
 
   const handleCalendarDateClick = (date) => {
@@ -274,16 +269,11 @@ function OrdersTab() {
   }
 
   return (
-    <div className="p-4">
+    <div className="px-3 pt-3">
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader
-          onReportsClick={() => setIsScheduledReportsModalOpen(true)}
-          onExportClick={handleExportStats}
-        />
-
         {/* Success Message */}
         {submitSuccess && (
-          <div className="fixed top-4 right-4 z-50 p-4 rounded-lg bg-green-500/90 border border-green-400 shadow-2xl animate-slideDown backdrop-blur-sm">
+          <div className="fixed top-16 right-4 z-50 p-4 rounded-lg bg-green-500/90 border border-green-400 shadow-2xl animate-slideDown backdrop-blur-sm">
             <p className="text-white font-medium flex items-center gap-2">
               <span className="text-xl">✓</span>
               Order updated successfully!
@@ -293,7 +283,7 @@ function OrdersTab() {
 
         {/* Offline Banner */}
         {!isOnline && (
-          <div className="mb-4 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30 backdrop-blur-sm">
+          <div className="mb-3 p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/30 backdrop-blur-sm">
             <p className="text-yellow-200 font-medium flex items-center gap-2">
               <WifiOff className="w-5 h-5 text-yellow-400" />
               You appear to be offline. Some features may be unavailable.
@@ -303,7 +293,7 @@ function OrdersTab() {
 
         {/* Today's Follow-Ups Section */}
         {todaysFollowups.length > 0 && (
-          <section className="mb-6">
+          <section className="mb-4">
             <TodaysFollowUps
               followups={todaysFollowups}
               overdueCount={overdueCount}
@@ -315,150 +305,61 @@ function OrdersTab() {
           </section>
         )}
 
-        {/* Recent Orders Section */}
-        <section>
-          <div className="mb-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
-              <h2 className="text-white text-2xl font-bold flex-shrink-0">Orders</h2>
-
-              <div className="flex items-center gap-2 flex-wrap ml-auto">
-                {/* Export button */}
-                <button
-                  onClick={handleExportOrders}
-                  className="flex items-center justify-center gap-2 h-10 px-4 text-white rounded-lg transition-all hover:scale-105 transform duration-200"
-                  style={{
-                    backgroundColor: 'rgba(0, 15, 33, 0.3)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(0, 200, 255, 0.3)',
-                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-                  }}
-                  title="Export Orders"
-                >
-                  <Download size={16} />
-                  <span className="hidden min-[560px]:inline text-sm">Export</span>
-                </button>
-
-                {/* New Order button */}
-                <button
-                  onClick={() => {
-                    setPrefilledDate(null)
-                    setIsOrderModalOpen(true)
-                  }}
-                  className="flex items-center justify-center gap-2 h-10 px-4 text-white font-medium rounded-lg transition-all hover:scale-105 transform duration-200"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.7), rgba(59, 130, 246, 0.7))',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(59, 130, 246, 0.4)',
-                    boxShadow: '0 4px 16px rgba(37, 99, 235, 0.3)'
-                  }}
-                >
-                  <Plus size={16} />
-                  <span className="hidden min-[440px]:inline text-sm">New Order</span>
-                </button>
-
-                {/* View Toggle */}
-                <div className="flex items-center gap-1 rounded-lg p-1 backdrop-blur-md" style={{
-                  backgroundColor: 'rgba(0, 15, 33, 0.3)',
-                  backdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(0, 200, 255, 0.3)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
-                }}>
-                  <button
-                    onClick={() => setViewMode('table')}
-                    className={`flex items-center justify-center gap-1.5 h-8 px-3 rounded-md transition-all text-sm font-medium ${
-                      viewMode === 'table'
-                        ? 'text-white'
-                        : 'text-white/70 hover:text-white'
-                    }`}
-                    style={viewMode === 'table' ? {
-                      background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-                    } : {}}
-                    title="Table View"
-                  >
-                    <List size={16} />
-                    <span className="hidden min-[340px]:inline">Table</span>
-                  </button>
-
-                  <button
-                    onClick={() => setViewMode('calendar')}
-                    className={`flex items-center justify-center gap-1.5 h-8 px-3 rounded-md transition-all text-sm font-medium ${
-                      viewMode === 'calendar'
-                        ? 'text-white'
-                        : 'text-white/70 hover:text-white'
-                    }`}
-                    style={viewMode === 'calendar' ? {
-                      background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(59, 130, 246, 0.8))',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 2px 8px rgba(37, 99, 235, 0.4)'
-                    } : {}}
-                    title="Calendar View"
-                  >
-                    <CalendarDays size={16} />
-                    <span className="hidden min-[340px]:inline">Calendar</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+        {/* Filter Bar - Only show in table view */}
+        {viewMode === 'table' && (
+          <div className="mb-3">
+            <FilterBar
+              onFilterChange={handleFilterChange}
+              onClearFilters={handleClearFilters}
+              totalResults={stats?.total_orders || 0}
+              filteredResults={orders?.length || 0}
+            />
           </div>
+        )}
 
-          {/* Filter Bar - Only show in table view */}
-          {viewMode === 'table' && (
-            <div className="mb-4">
-              <FilterBar
-                onFilterChange={handleFilterChange}
-                onClearFilters={handleClearFilters}
-                totalResults={stats?.total_orders || 0}
-                filteredResults={orders?.length || 0}
-              />
-            </div>
-          )}
-
-          <PullToRefresh onRefresh={handleRefresh}>
-            <div style={{ minHeight: '400px', position: 'relative' }}>
-              {ordersError ? (
-                <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
-                  {ordersError}
-                </div>
-              ) : (
-                <>
-                  {ordersLoading && orders.length === 0 ? (
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                      <LoadingSpinner />
-                    </div>
-                  ) : (
-                    <div className="transition-opacity duration-300" style={{ opacity: ordersLoading ? 0.6 : 1 }}>
-                      {viewMode === 'table' ? (
-                        <OrdersTable
+        <PullToRefresh onRefresh={handleRefresh}>
+          <div style={{ minHeight: '400px', position: 'relative' }}>
+            {ordersError ? (
+              <div className="text-red-400 p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                {ordersError}
+              </div>
+            ) : (
+              <>
+                {ordersLoading && orders.length === 0 ? (
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                    <LoadingSpinner />
+                  </div>
+                ) : (
+                  <div className="transition-opacity duration-300" style={{ opacity: ordersLoading ? 0.6 : 1 }}>
+                    {viewMode === 'table' ? (
+                      <OrdersTable
+                        orders={orders}
+                        onOrderClick={handleOrderClick}
+                        selectedOrders={selectedOrders}
+                        onSelectionChange={setSelectedOrders}
+                        currentInternetCount={currentInternetCount}
+                        userSettings={userSettings}
+                      />
+                    ) : (
+                      <Suspense fallback={
+                        <div className="flex items-center justify-center p-8">
+                          <LoadingSpinner />
+                        </div>
+                      }>
+                        <CalendarView
                           orders={orders}
                           onOrderClick={handleOrderClick}
-                          selectedOrders={selectedOrders}
-                          onSelectionChange={setSelectedOrders}
-                          currentInternetCount={currentInternetCount}
-                          userSettings={userSettings}
+                          onDateClick={handleCalendarDateClick}
+                          onEventDrop={handleEventDrop}
                         />
-                      ) : (
-                        <Suspense fallback={
-                          <div className="flex items-center justify-center p-8">
-                            <LoadingSpinner />
-                          </div>
-                        }>
-                          <CalendarView
-                            orders={orders}
-                            onOrderClick={handleOrderClick}
-                            onDateClick={handleCalendarDateClick}
-                            onEventDrop={handleEventDrop}
-                          />
-                        </Suspense>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </PullToRefresh>
-        </section>
+                      </Suspense>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </PullToRefresh>
 
         {/* Modals */}
         <Suspense fallback={null}>
@@ -483,22 +384,6 @@ function OrdersTab() {
             }}
             onUpdate={handleOrderUpdate}
             onDelete={handleOrderDelete}
-          />
-        </Suspense>
-
-        <Suspense fallback={null}>
-          <ExportModal
-            isOpen={isExportModalOpen}
-            onClose={() => setIsExportModalOpen(false)}
-            filters={filters}
-            exportType={exportType}
-          />
-        </Suspense>
-
-        <Suspense fallback={null}>
-          <ScheduledReportsModal
-            isOpen={isScheduledReportsModalOpen}
-            onClose={() => setIsScheduledReportsModalOpen(false)}
           />
         </Suspense>
 

@@ -1,14 +1,30 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import BottomNav from '../../components/navigation/BottomNav'
-import DashboardHeader from '../../components/DashboardHeader'
+import MobileHeader from '../../components/navigation/MobileHeader'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import { Plus, Download, Clock, FileUp, Settings, List, CalendarDays } from 'lucide-react'
 
 // Lazy load the full dashboard for desktop
 const Dashboard = lazy(() => import('../Dashboard'))
 
+// Lazy load modals
+const ExportModal = lazy(() => import('../../components/ExportModal'))
+const ScheduledReportsModal = lazy(() => import('../../components/ScheduledReportsModal'))
+
 function DashboardLayout() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  // Shared modal states (lifted from tabs)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [isScheduledReportsModalOpen, setIsScheduledReportsModalOpen] = useState(false)
+  const [exportType, setExportType] = useState('stats')
+
+  // OrdersTab specific state (lifted for header actions)
+  const [ordersViewMode, setOrdersViewMode] = useState('table')
+  const [orderModalTrigger, setOrderModalTrigger] = useState(0) // Increment to trigger modal in OrdersTab
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -30,6 +46,67 @@ function DashboardLayout() {
     )
   }
 
+  // Get current tab info for mobile header
+  const getTabInfo = () => {
+    const path = location.pathname
+    if (path.includes('/orders')) {
+      return {
+        title: 'Orders',
+        actions: [
+          {
+            icon: Plus,
+            label: 'New',
+            showLabel: true,
+            primary: true,
+            onClick: () => setOrderModalTrigger(prev => prev + 1)
+          },
+          {
+            icon: ordersViewMode === 'table' ? CalendarDays : List,
+            label: ordersViewMode === 'table' ? 'Calendar' : 'Table',
+            onClick: () => setOrdersViewMode(prev => prev === 'table' ? 'calendar' : 'table')
+          },
+        ],
+        moreActions: [
+          { icon: Download, label: 'Export Orders', onClick: () => { setExportType('orders'); setIsExportModalOpen(true) } },
+          { icon: Clock, label: 'Scheduled Reports', onClick: () => setIsScheduledReportsModalOpen(true) },
+          { icon: FileUp, label: 'Import PDF', onClick: () => navigate('/import'), variant: 'success' },
+        ]
+      }
+    }
+    if (path.includes('/earnings')) {
+      return {
+        title: 'Earnings',
+        actions: [],
+        moreActions: [
+          { icon: Download, label: 'Export Stats', onClick: () => { setExportType('stats'); setIsExportModalOpen(true) } },
+          { icon: Clock, label: 'Scheduled Reports', onClick: () => setIsScheduledReportsModalOpen(true) },
+        ]
+      }
+    }
+    if (path.includes('/analytics')) {
+      return {
+        title: 'Analytics',
+        actions: [],
+        moreActions: [
+          { icon: Download, label: 'Export Stats', onClick: () => { setExportType('stats'); setIsExportModalOpen(true) } },
+          { icon: Clock, label: 'Scheduled Reports', onClick: () => setIsScheduledReportsModalOpen(true) },
+        ]
+      }
+    }
+    if (path.includes('/notifications')) {
+      return {
+        title: 'Notifications',
+        actions: [
+          { icon: Settings, label: 'Settings', onClick: () => navigate('/notification-settings') }
+        ],
+        moreActions: []
+      }
+    }
+    return { title: 'Dashboard', actions: [], moreActions: [] }
+  }
+
+  const tabInfo = getTabInfo()
+
   // Mobile: Render tab layout with bottom navigation
   return (
     <div
@@ -45,6 +122,13 @@ function DashboardLayout() {
         `
       }}
     >
+      {/* Compact Mobile Header */}
+      <MobileHeader
+        title={tabInfo.title}
+        actions={tabInfo.actions}
+        moreActions={tabInfo.moreActions}
+      />
+
       {/* Main content with bottom padding for mobile nav */}
       <main className="pb-20">
         <Suspense fallback={
@@ -52,12 +136,41 @@ function DashboardLayout() {
             <LoadingSpinner />
           </div>
         }>
-          <Outlet />
+          <Outlet context={{
+            // Pass shared state/handlers to tabs
+            isExportModalOpen,
+            setIsExportModalOpen,
+            exportType,
+            setExportType,
+            isScheduledReportsModalOpen,
+            setIsScheduledReportsModalOpen,
+            // Orders-specific
+            ordersViewMode,
+            setOrdersViewMode,
+            orderModalTrigger,
+          }} />
         </Suspense>
       </main>
 
       {/* Bottom navigation */}
       <BottomNav />
+
+      {/* Shared Modals - lifted from tabs */}
+      <Suspense fallback={null}>
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          filters={{}}
+          exportType={exportType}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <ScheduledReportsModal
+          isOpen={isScheduledReportsModalOpen}
+          onClose={() => setIsScheduledReportsModalOpen(false)}
+        />
+      </Suspense>
     </div>
   )
 }

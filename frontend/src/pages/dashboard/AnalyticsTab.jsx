@@ -1,6 +1,5 @@
-import { useState, lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone } from 'lucide-react'
-import DashboardHeader from '../../components/DashboardHeader'
 import StatCard from '../../components/ui/StatCard'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import { useDashboardData } from '../../hooks/useDashboardData'
@@ -8,8 +7,6 @@ import { useDashboardData } from '../../hooks/useDashboardData'
 // Lazy load heavy components
 const OrderCharts = lazy(() => import('../../components/ui/OrderCharts'))
 const PerformanceInsights = lazy(() => import('../../components/PerformanceInsights'))
-const ExportModal = lazy(() => import('../../components/ExportModal'))
-const ScheduledReportsModal = lazy(() => import('../../components/ScheduledReportsModal'))
 
 function AnalyticsTab() {
   const {
@@ -19,24 +16,12 @@ function AnalyticsTab() {
     error: statsError
   } = useDashboardData({})
 
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
-  const [isScheduledReportsModalOpen, setIsScheduledReportsModalOpen] = useState(false)
-
-  const handleExportStats = () => {
-    setIsExportModalOpen(true)
-  }
-
   return (
-    <div className="p-4">
+    <div className="px-3 pt-3">
       <div className="max-w-7xl mx-auto">
-        <DashboardHeader
-          onReportsClick={() => setIsScheduledReportsModalOpen(true)}
-          onExportClick={handleExportStats}
-        />
-
         {/* Statistics Section */}
-        <section className="mb-8">
-          <h2 className="text-white text-2xl font-bold mb-4">Overview</h2>
+        <section className="mb-6">
+          <h2 className="text-white text-lg font-semibold mb-3">Overview</h2>
           <div style={{ minHeight: '120px' }}>
             {statsLoading ? (
               <div className="flex items-center justify-center" style={{ height: '120px' }}>
@@ -47,7 +32,7 @@ function AnalyticsTab() {
                 {statsError}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 transition-opacity duration-300">
+              <div className="grid grid-cols-2 gap-3 transition-opacity duration-300">
                 <StatCard
                   title="Total Orders"
                   value={stats?.total_orders || 0}
@@ -78,8 +63,8 @@ function AnalyticsTab() {
         </section>
 
         {/* Product Statistics */}
-        <section className="mb-8">
-          <h2 className="text-white text-2xl font-bold mb-4">Products</h2>
+        <section className="mb-6">
+          <h2 className="text-white text-lg font-semibold mb-3">Products</h2>
           <div style={{ minHeight: '120px' }}>
             {statsLoading ? (
               <div className="flex items-center justify-center" style={{ height: '120px' }}>
@@ -90,7 +75,7 @@ function AnalyticsTab() {
                 {statsError}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 transition-opacity duration-300">
+              <div className="grid grid-cols-2 gap-3 transition-opacity duration-300">
                 <StatCard
                   title="Internet"
                   value={stats?.total_internet || 0}
@@ -117,7 +102,7 @@ function AnalyticsTab() {
         </section>
 
         {/* Performance Insights Section */}
-        <section className="mb-8">
+        <section className="mb-6">
           <Suspense fallback={
             <div className="flex items-center justify-center p-8">
               <LoadingSpinner />
@@ -128,8 +113,8 @@ function AnalyticsTab() {
         </section>
 
         {/* Charts Section */}
-        <section className="mb-8">
-          <h2 className="text-white text-2xl font-bold mb-4">Trends</h2>
+        <section className="mb-6">
+          <h2 className="text-white text-lg font-semibold mb-3">Trends</h2>
           <div style={{ minHeight: '300px' }}>
             {statsLoading ? (
               <div className="flex items-center justify-center" style={{ height: '300px' }}>
@@ -150,24 +135,6 @@ function AnalyticsTab() {
             )}
           </div>
         </section>
-
-        {/* Export Modal */}
-        <Suspense fallback={null}>
-          <ExportModal
-            isOpen={isExportModalOpen}
-            onClose={() => setIsExportModalOpen(false)}
-            filters={{}}
-            exportType="stats"
-          />
-        </Suspense>
-
-        {/* Scheduled Reports Modal */}
-        <Suspense fallback={null}>
-          <ScheduledReportsModal
-            isOpen={isScheduledReportsModalOpen}
-            onClose={() => setIsScheduledReportsModalOpen(false)}
-          />
-        </Suspense>
       </div>
     </div>
   )
