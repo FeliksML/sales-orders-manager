@@ -367,7 +367,7 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="w-full max-w-4xl max-h-[calc(100vh-100px)] sm:max-h-[90vh] flex flex-col overflow-hidden">
         <Card className="relative flex flex-col max-h-full overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 border-b border-white/10 flex-shrink-0">

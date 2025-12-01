@@ -75,7 +75,7 @@ function PullToRefresh({ onRefresh, children }) {
   const shouldTrigger = pullDistance >= PULL_THRESHOLD
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative overflow-hidden">
       {/* Pull indicator */}
       {(pullDistance > 0 || isRefreshing) && (
         <div

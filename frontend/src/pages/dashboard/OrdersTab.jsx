@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { WifiOff } from 'lucide-react'
 import OrdersTable from '../../components/ui/OrdersTable'
@@ -63,9 +63,13 @@ function OrdersTab() {
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
 
-  // Open order modal when triggered from header
+  // Track last processed trigger to prevent re-opening on tab switch
+  const lastProcessedTrigger = useRef(0)
+
+  // Open order modal when triggered from header (only for new triggers)
   useEffect(() => {
-    if (orderModalTrigger > 0) {
+    if (orderModalTrigger > lastProcessedTrigger.current) {
+      lastProcessedTrigger.current = orderModalTrigger
       setPrefilledDate(null)
       setIsOrderModalOpen(true)
     }
