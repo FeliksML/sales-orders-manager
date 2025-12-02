@@ -1,5 +1,7 @@
 # Sales Order Manager
 
+[![CI/CD](https://github.com/FeliksML/sales-orders-manager/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/FeliksML/sales-orders-manager/actions/workflows/ci-cd.yml)
+
 A full-stack web application that allows Spectrum sales representatives to manage and track sales orders with intelligent PDF auto-extraction and analytics dashboard.
 
 ## 🚀 Live Demo
