@@ -2,15 +2,18 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 import logging
 import asyncio
+import fcntl
+import os
+import re
 from .database import SessionLocal
 from .models import User, Order, Notification, FollowUp
 from .export_utils import generate_stats_excel
 from .email_service import send_scheduled_report_email
 from .notification_service import send_install_reminder, send_today_install_notification, send_custom_notification
-from sqlalchemy import func, and_, extract
+from sqlalchemy import func, and_, extract, text
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +21,120 @@ logger = logging.getLogger(__name__)
 
 # Initialize scheduler
 scheduler = BackgroundScheduler()
+
+# Scheduler lock to prevent multiple workers from running scheduler
+SCHEDULER_LOCK_FILE = "/tmp/sales_order_scheduler.lock"
+_scheduler_lock_fd = None
+
+
+def acquire_scheduler_lock() -> bool:
+    """
+    Try to acquire exclusive scheduler lock.
+    Returns True if acquired, False if another worker already has it.
+    Only one gunicorn worker should run the scheduler.
+    """
+    global _scheduler_lock_fd
+    try:
+        _scheduler_lock_fd = open(SCHEDULER_LOCK_FILE, 'w')
+        fcntl.flock(_scheduler_lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _scheduler_lock_fd.write(str(os.getpid()))
+        _scheduler_lock_fd.flush()
+        logger.info(f"Acquired scheduler lock (PID: {os.getpid()})")
+        return True
+    except (IOError, OSError) as e:
+        logger.info(f"Could not acquire scheduler lock (another worker owns it): {e}")
+        if _scheduler_lock_fd:
+            _scheduler_lock_fd.close()
+            _scheduler_lock_fd = None
+        return False
+
+
+def release_scheduler_lock():
+    """Release the scheduler lock."""
+    global _scheduler_lock_fd
+    if _scheduler_lock_fd:
+        try:
+            fcntl.flock(_scheduler_lock_fd.fileno(), fcntl.LOCK_UN)
+            _scheduler_lock_fd.close()
+            logger.info("Released scheduler lock")
+        except Exception as e:
+            logger.warning(f"Error releasing scheduler lock: {e}")
+        _scheduler_lock_fd = None
+
+
+def parse_install_datetime(install_date: date, install_time: str) -> Optional[datetime]:
+    """
+    Parse install_time string into a datetime combined with install_date.
+    Handles various formats: "9:00 AM", "9AM", "9AM-12PM", "8-10AM", etc.
+    Returns the START of the time window.
+    """
+    if not install_time:
+        # Default to 9 AM if no time specified
+        return datetime.combine(install_date, datetime.min.time().replace(hour=9))
+
+    time_str = install_time.strip().upper()
+
+    # Pattern 1: "9:00 AM" or "9:00AM" or "9:00" or "09:00"
+    match = re.match(r'^(\d{1,2}):(\d{2})\s*(AM|PM)?', time_str)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        ampm = match.group(3)
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour, minute=minute))
+        except ValueError:
+            pass
+
+    # Pattern 2: "9AM" or "9 AM" (no minutes)
+    match = re.match(r'^(\d{1,2})\s*(AM|PM)', time_str)
+    if match:
+        hour = int(match.group(1))
+        ampm = match.group(2)
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour))
+        except ValueError:
+            pass
+
+    # Pattern 3: "9AM-12PM" or "9:00AM-12:00PM" (range - take first time)
+    match = re.match(r'^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*[-–]\s*\d', time_str)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2)) if match.group(2) else 0
+        ampm = match.group(3)
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour, minute=minute))
+        except ValueError:
+            pass
+
+    # Pattern 4: "8-10AM" (range with AM/PM at end - take first time)
+    match = re.match(r'^(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(AM|PM)', time_str)
+    if match:
+        hour = int(match.group(1))
+        ampm = match.group(3)
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour))
+        except ValueError:
+            pass
+
+    # Fallback: default to 9 AM if parsing fails
+    logger.warning(f"Could not parse install_time '{install_time}', defaulting to 9 AM")
+    return datetime.combine(install_date, datetime.min.time().replace(hour=9))
 
 # In-memory storage for scheduled reports (in production, use database)
 scheduled_reports = {}
@@ -178,24 +295,46 @@ def get_user_scheduled_reports(user_id: int) -> list:
     return reports
 
 def check_installation_reminders():
-    """Check and send 24-hour installation reminders"""
+    """Check and send 24-hour installation reminders.
+
+    Fixed logic: Only sends reminder when we're within 23-25 hours of the
+    actual install time, not just when install_date == tomorrow.
+    """
     logger.info("=" * 50)
     logger.info("Running installation reminder check")
-    logger.info(f"Current time: {datetime.now()}")
+    now = datetime.now()
+    logger.info(f"Current time: {now}")
 
     db = SessionLocal()
     try:
-        # Get installations scheduled for tomorrow
+        # Get installations scheduled for tomorrow or day after (to catch edge cases)
         tomorrow = date.today() + timedelta(days=1)
-        logger.info(f"Checking for installations on: {tomorrow}")
+        day_after = tomorrow + timedelta(days=1)
+        logger.info(f"Checking for installations on: {tomorrow} and {day_after}")
 
-        # Get all orders scheduled for tomorrow
-        orders = db.query(Order).filter(Order.install_date == tomorrow).all()
+        # Get all orders scheduled for tomorrow or day after
+        orders = db.query(Order).filter(Order.install_date.in_([tomorrow, day_after])).all()
 
-        logger.info(f"Found {len(orders)} total installations scheduled for tomorrow")
+        logger.info(f"Found {len(orders)} potential installations to check")
 
         reminders_sent = 0
         for order in orders:
+            # Parse install_time to build full datetime
+            install_datetime = parse_install_datetime(order.install_date, order.install_time)
+            if install_datetime is None:
+                logger.warning(f"Could not parse install time for order {order.orderid}: {order.install_time}")
+                continue
+
+            # Calculate hours until install
+            hours_until_install = (install_datetime - now).total_seconds() / 3600
+
+            # Only send reminder if within 23-25 hour window (1 hour tolerance for scheduler interval)
+            if not (23 <= hours_until_install <= 25):
+                logger.debug(f"Order {order.orderid}: {hours_until_install:.1f} hours until install, outside 23-25h window")
+                continue
+
+            logger.info(f"Order {order.orderid}: {hours_until_install:.1f} hours until install at {install_datetime}")
+
             # Get user
             user = db.query(User).filter(User.userid == order.userid).first()
             if not user:
@@ -204,23 +343,26 @@ def check_installation_reminders():
 
             logger.info(f"Processing order {order.orderid} for user {user.email}")
 
-            # Check if reminder was already sent today
-            existing_notification = db.query(func.count(Notification.notificationid)).filter(
-                and_(
-                    Notification.userid == user.userid,
-                    Notification.orderid == order.orderid,
-                    Notification.notification_type == 'install_reminder_24h',
-                    func.date(Notification.created_at) == date.today()
-                )
-            ).scalar()
+            # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
+            existing = db.execute(
+                text("""
+                    SELECT notificationid FROM notifications
+                    WHERE userid = :userid
+                    AND orderid = :orderid
+                    AND notification_type = 'install_reminder_24h'
+                    AND DATE(created_at) = :today
+                    FOR UPDATE SKIP LOCKED
+                """),
+                {"userid": user.userid, "orderid": order.orderid, "today": date.today()}
+            ).fetchone()
 
-            if existing_notification > 0:
+            if existing:
                 logger.info(f"Reminder already sent today for order {order.orderid}")
                 continue
 
             # Check if user wants notifications
             if user.email_notifications or user.sms_notifications or user.browser_notifications:
-                logger.info(f"Sending reminder to {user.email} for order {order.orderid}")
+                logger.info(f"Sending 24h reminder to {user.email} for order {order.orderid}")
                 asyncio.run(send_install_reminder(db, user, order, hours_before=24))
                 reminders_sent += 1
             else:
@@ -236,7 +378,10 @@ def check_installation_reminders():
 
 
 def check_today_installations():
-    """Check and send notifications for today's installations"""
+    """Check and send notifications for today's installations.
+
+    Uses atomic deduplication to prevent duplicate notifications.
+    """
     logger.info("=" * 50)
     logger.info("Running today's installation check")
     logger.info(f"Current time: {datetime.now()}")
@@ -262,17 +407,20 @@ def check_today_installations():
 
             logger.info(f"Processing order {order.orderid} for user {user.email}")
 
-            # Check if notification was already sent today
-            existing_notification = db.query(func.count(Notification.notificationid)).filter(
-                and_(
-                    Notification.userid == user.userid,
-                    Notification.orderid == order.orderid,
-                    Notification.notification_type == 'today_install',
-                    func.date(Notification.created_at) == date.today()
-                )
-            ).scalar()
+            # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
+            existing = db.execute(
+                text("""
+                    SELECT notificationid FROM notifications
+                    WHERE userid = :userid
+                    AND orderid = :orderid
+                    AND notification_type = 'today_install'
+                    AND DATE(created_at) = :today
+                    FOR UPDATE SKIP LOCKED
+                """),
+                {"userid": user.userid, "orderid": order.orderid, "today": today}
+            ).fetchone()
 
-            if existing_notification > 0:
+            if existing:
                 logger.info(f"Today notification already sent for order {order.orderid}")
                 continue
 
@@ -373,9 +521,15 @@ def start_scheduler(run_initial_checks: bool = True):
         run_initial_checks: If True, run notification checks immediately on startup.
                            Set to False when starting asynchronously to avoid blocking.
     """
+    # Try to acquire lock - only one worker should run the scheduler
+    if not acquire_scheduler_lock():
+        logger.info("Skipping scheduler start - another worker owns the lock")
+        return
+
     if not scheduler.running:
         logger.info("=" * 70)
         logger.info("STARTING NOTIFICATION SCHEDULER")
+        logger.info(f"This worker (PID: {os.getpid()}) owns the scheduler")
         logger.info("=" * 70)
 
         # Add installation reminder job (runs every hour to continuously check)
@@ -422,10 +576,11 @@ def start_scheduler(run_initial_checks: bool = True):
         logger.warning("Scheduler already running")
 
 def shutdown_scheduler():
-    """Shutdown the scheduler"""
+    """Shutdown the scheduler and release lock"""
     if scheduler.running:
         scheduler.shutdown()
         logger.info("Scheduler shutdown")
+    release_scheduler_lock()
 
 
 def get_scheduler_status() -> dict:
