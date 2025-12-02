@@ -27,6 +27,13 @@ let dataCache = {
   aiStatus: { data: null, timestamp: 0 }
 }
 
+// Animation state (persists across tab switches)
+let animationState = {
+  analyticsVisited: false,
+  dataVersion: 0,
+  lastAnimatedVersion: 0
+}
+
 const DashboardDataContext = createContext(null)
 
 export const useDashboardDataContext = () => {
@@ -145,6 +152,30 @@ export const DashboardDataProvider = ({ children }) => {
         dataCache[type].timestamp = 0
       }
     })
+    // Signal data changed - animations should play on next Analytics visit
+    animationState.dataVersion++
+  }, [])
+
+  /**
+   * Mark Analytics tab as visited and record when animations played
+   */
+  const markAnalyticsVisited = useCallback(() => {
+    if (!animationState.analyticsVisited) {
+      animationState.analyticsVisited = true
+    }
+    animationState.lastAnimatedVersion = animationState.dataVersion
+  }, [])
+
+  /**
+   * Determine if chart animations should play on Analytics tab
+   */
+  const shouldAnimateAnalytics = useCallback(() => {
+    // First visit: animate
+    if (!animationState.analyticsVisited) return true
+    // Data changed since last animation: animate
+    if (animationState.dataVersion > animationState.lastAnimatedVersion) return true
+    // Return visit with no data change: skip animation
+    return false
   }, [])
 
   /**
@@ -353,7 +384,11 @@ export const DashboardDataProvider = ({ children }) => {
     refresh,
     invalidate,
     isStale,
-    filtersChanged
+    filtersChanged,
+
+    // Animation control
+    shouldAnimateAnalytics,
+    markAnalyticsVisited
   }
 
   return (

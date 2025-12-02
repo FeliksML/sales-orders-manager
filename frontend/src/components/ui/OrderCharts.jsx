@@ -3,7 +3,7 @@ import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Toolti
 import { BarChart3, Loader2 } from 'lucide-react'
 import Card from './Card'
 
-function OrderCharts({ orders = [], stats, statsLoading = false }) {
+function OrderCharts({ orders = [], stats, statsLoading = false, animateCharts = true }) {
   // Prepare product distribution data
   const productData = [
     { name: 'Internet', value: stats?.total_internet || 0, color: '#3b82f6' },
@@ -85,7 +85,7 @@ function OrderCharts({ orders = [], stats, statsLoading = false }) {
                 tick={{ fill: 'rgba(255,255,255,0.7)' }}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="orders" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="orders" fill="#3b82f6" radius={[8, 8, 0, 0]} isAnimationActive={animateCharts} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -113,6 +113,7 @@ function OrderCharts({ orders = [], stats, statsLoading = false }) {
                     outerRadius={100}
                     fill="#8884d8"
                     dataKey="value"
+                    isAnimationActive={animateCharts}
                   >
                     {productData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />

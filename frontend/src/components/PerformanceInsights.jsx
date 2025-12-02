@@ -97,7 +97,7 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
   )
 }
 
-function TrendChart({ data, selectedMetric, viewMode }) {
+function TrendChart({ data, selectedMetric, viewMode, animateCharts = true }) {
   const config = METRIC_CONFIG[selectedMetric]
   if (!config || !data || data.length === 0) return null
   
@@ -145,6 +145,7 @@ function TrendChart({ data, selectedMetric, viewMode }) {
             stroke={config.color}
             strokeWidth={2}
             fill={`url(#gradient-${selectedMetric})`}
+            isAnimationActive={animateCharts}
           />
         </AreaChart>
       </ResponsiveContainer>
@@ -244,7 +245,7 @@ function StreakBadge({ streak, type }) {
   )
 }
 
-function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, error, onRefresh }) {
+function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, error, onRefresh, animateCharts = true }) {
   const [viewMode, setViewMode] = useState('monthly') // 'monthly' or 'weekly'
   const [selectedMetric, setSelectedMetric] = useState('orders')
 
@@ -518,10 +519,11 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           </div>
         </div>
         
-        <TrendChart 
-          data={trendData} 
+        <TrendChart
+          data={trendData}
           selectedMetric={selectedMetric}
           viewMode={viewMode}
+          animateCharts={animateCharts}
         />
       </Card>
       

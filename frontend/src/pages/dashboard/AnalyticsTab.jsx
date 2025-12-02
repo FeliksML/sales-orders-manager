@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect, useMemo } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone } from 'lucide-react'
 import StatCard from '../../components/ui/StatCard'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
@@ -18,8 +18,18 @@ function AnalyticsTab() {
     aiStatus,
     aiStatusLoading,
     error: statsError,
-    refresh
+    refresh,
+    shouldAnimateAnalytics,
+    markAnalyticsVisited
   } = useDashboardDataCached({})
+
+  // Compute animation state once on mount
+  const animateCharts = useMemo(() => shouldAnimateAnalytics(), [])
+
+  // Mark as visited after first render
+  useEffect(() => {
+    markAnalyticsVisited()
+  }, [markAnalyticsVisited])
 
   return (
     <div className="px-3 pt-3">
@@ -120,6 +130,7 @@ function AnalyticsTab() {
               aiStatusLoading={aiStatusLoading}
               error={statsError}
               onRefresh={() => refresh({ performanceInsights: true, aiStatus: true })}
+              animateCharts={animateCharts}
             />
           </Suspense>
         </section>
@@ -142,7 +153,7 @@ function AnalyticsTab() {
                   <LoadingSpinner />
                 </div>
               }>
-                <OrderCharts orders={allOrders} stats={stats} statsLoading={statsLoading} />
+                <OrderCharts orders={allOrders} stats={stats} statsLoading={statsLoading} animateCharts={animateCharts} />
               </Suspense>
             )}
           </div>

@@ -30,7 +30,9 @@ export function useDashboardDataCached(filters = {}) {
     refresh,
     invalidate,
     isStale,
-    filtersChanged
+    filtersChanged,
+    shouldAnimateAnalytics,
+    markAnalyticsVisited
   } = useDashboardDataContext()
 
   const isInitialMount = useRef(true)
@@ -114,7 +116,11 @@ export function useDashboardDataCached(filters = {}) {
 
     // Actions
     refresh: refreshWithFilters,
-    invalidate
+    invalidate,
+
+    // Animation control
+    shouldAnimateAnalytics,
+    markAnalyticsVisited
   }
 }
 
