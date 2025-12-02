@@ -56,15 +56,38 @@ function ProgressBar({ metric, data, showPace = true }) {
   const Icon = METRIC_ICONS[metric]
   const label = METRIC_LABELS[metric]
   const colors = STATUS_COLORS[data.status]
-  const [animatedWidth, setAnimatedWidth] = useState(0)
-  
+  const targetWidth = Math.min(data.percentage, 100)
+
+  // Track previous value to detect actual data changes
+  const prevPercentageRef = useRef(data.percentage)
+  const hasInitializedRef = useRef(false)
+
+  // Initialize with actual value (no animation on cached render)
+  // Only animate from 0 on true first load, or when value changes
+  const [animatedWidth, setAnimatedWidth] = useState(() => {
+    // Start at target value to avoid animation on cached data
+    return targetWidth
+  })
+
   useEffect(() => {
-    // Animate progress bar on mount
-    const timer = setTimeout(() => {
-      setAnimatedWidth(Math.min(data.percentage, 100))
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [data.percentage])
+    const prevPercentage = prevPercentageRef.current
+    const valueChanged = Math.abs(prevPercentage - data.percentage) > 0.1
+
+    if (!hasInitializedRef.current) {
+      // First render - set immediately without animation
+      hasInitializedRef.current = true
+      setAnimatedWidth(targetWidth)
+    } else if (valueChanged) {
+      // Data actually changed from backend - animate the change
+      const timer = setTimeout(() => {
+        setAnimatedWidth(targetWidth)
+      }, 100)
+      prevPercentageRef.current = data.percentage
+      return () => clearTimeout(timer)
+    }
+
+    prevPercentageRef.current = data.percentage
+  }, [data.percentage, targetWidth])
   
   const formatValue = (val) => {
     if (metric === 'revenue') {
