@@ -50,11 +50,13 @@ jobs:
 
       - name: Run Black (code formatting check)
         working-directory: ./backend
-        run: black --check app/ || true  # Don't fail on formatting for now
+        run: black --check app/
+        continue-on-error: true  # Formatting warnings don't block deploy
 
       - name: Run Flake8 (linting)
         working-directory: ./backend
-        run: flake8 app/ --max-line-length=120 --extend-ignore=E203,W503 || true
+        run: flake8 app/ --max-line-length=120 --extend-ignore=E203,W503
+        continue-on-error: true  # Linting warnings don't block deploy
 
       - name: Run tests with coverage
         working-directory: ./backend
@@ -64,9 +66,7 @@ jobs:
           ENVIRONMENT: development
           FRONTEND_URL: http://localhost:5173
           RECAPTCHA_SECRET_KEY: test-key
-        run: |
-          pytest --cov=app --cov-report=xml --cov-report=term || true
-          echo "Tests completed (errors ignored for now - tests need to be created)"
+        run: pytest --cov=app --cov-report=xml --cov-report=term
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v4
@@ -96,14 +96,13 @@ jobs:
 
       - name: Run ESLint
         working-directory: ./frontend
-        run: npm run lint || true
+        run: npm run lint
+        continue-on-error: true  # Linting warnings don't block deploy
 
       - name: Run tests
         working-directory: ./frontend
-        run: |
-          echo "Frontend tests would run here"
-          echo "Tests need to be created"
-        continue-on-error: true
+        run: npm test --if-present
+        continue-on-error: true  # Enable once tests are added
 
       - name: Build frontend
         working-directory: ./frontend

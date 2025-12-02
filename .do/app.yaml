@@ -74,17 +74,18 @@ services:
 
     # Environment variables
     envs:
-      # Database connection string from attached database
+      # Database connection string - SET IN DIGITALOCEAN UI, NOT HERE
       - key: DATABASE_URL
         scope: RUN_TIME
         type: SECRET
-        value: "postgresql://doadmin:AVNS_UWagqbikulP2lN6_0Jw@db-postgresql-sfo3-98348-do-user-18370984-0.i.db.ondigitalocean.com:25060/defaultdb?sslmode=require"
+        value: "${DATABASE_URL}"
 
-      # Critical - Production secret key
+      # Critical - Production secret key - SET IN DIGITALOCEAN UI, NOT HERE
+      # Generate with: openssl rand -base64 64
       - key: SECRET_KEY
         scope: RUN_TIME
         type: SECRET
-        value: "SyRtO8XWcmHycEvVbz343bQJd96yy10JSneaeZftVH-gIgzoTzhO4iDw7BpeKhN9OVOaa5pLWTeCxxeKf0FFZA"
+        value: "${SECRET_KEY}"
 
       - key: ENVIRONMENT
         scope: RUN_TIME
@@ -95,22 +96,22 @@ services:
         scope: RUN_TIME
         value: "https://sales-order-manager-henzz.ondigitalocean.app"
 
-      # ReCAPTCHA secret key
+      # ReCAPTCHA secret key - SET IN DIGITALOCEAN UI, NOT HERE
       - key: RECAPTCHA_SECRET_KEY
         scope: RUN_TIME
         type: SECRET
-        value: "6LdZWRYsAAAAAOVccmuN5WX3I-myMZK4CFnL_atQ"
+        value: "${RECAPTCHA_SECRET_KEY}"
 
-      # Email configuration
+      # Email configuration - SET IN DIGITALOCEAN UI, NOT HERE
       - key: MAIL_USERNAME
         scope: RUN_TIME
         type: SECRET
-        value: "salesmanagerverif@gmail.com"
+        value: "${MAIL_USERNAME}"
 
       - key: MAIL_PASSWORD
         scope: RUN_TIME
         type: SECRET
-        value: "oral omab uklw ufhn"
+        value: "${MAIL_PASSWORD}"
 
       - key: MAIL_FROM
         scope: RUN_TIME
@@ -152,17 +153,17 @@ jobs:
     # The command to run
     run_command: python init_database.py
 
-    # Environment variables (same as backend)
+    # Environment variables (same as backend) - SET IN DIGITALOCEAN UI, NOT HERE
     envs:
       - key: DATABASE_URL
         scope: RUN_TIME
         type: SECRET
-        value: "postgresql://doadmin:AVNS_UWagqbikulP2lN6_0Jw@db-postgresql-sfo3-98348-do-user-18370984-0.i.db.ondigitalocean.com:25060/defaultdb?sslmode=require"
+        value: "${DATABASE_URL}"
 
       - key: SECRET_KEY
         scope: RUN_TIME
         type: SECRET
-        value: "SyRtO8XWcmHycEvVbz343bQJd96yy10JSneaeZftVH-gIgzoTzhO4iDw7BpeKhN9OVOaa5pLWTeCxxeKf0FFZA"
+        value: "${SECRET_KEY}"
 
       - key: ENVIRONMENT
         scope: RUN_TIME
