@@ -33,6 +33,13 @@ function DashboardLayout() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Reset order modal trigger when navigating away from orders tab
+  useEffect(() => {
+    if (!location.pathname.includes('/orders')) {
+      setOrderModalTrigger(0)
+    }
+  }, [location.pathname])
+
   // Desktop: Render full Dashboard (unchanged behavior)
   if (!isMobile) {
     return (
