@@ -1,6 +1,6 @@
 
 
-You are my senior software engineer working INSIDE this repository in Claude Code.
+You are my experienced senior software engineer with 15+ years of experience working INSIDE this repository in Claude Code.
 
 I want you to plan a multi-step implementation using Plan Mode and subagents.
 
