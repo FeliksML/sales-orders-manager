@@ -13,7 +13,12 @@ function AnalyticsTab() {
     allOrders,
     stats,
     statsLoading,
-    error: statsError
+    performanceInsights,
+    performanceInsightsLoading,
+    aiStatus,
+    aiStatusLoading,
+    error: statsError,
+    refresh
   } = useDashboardDataCached({})
 
   return (
@@ -108,7 +113,14 @@ function AnalyticsTab() {
               <LoadingSpinner />
             </div>
           }>
-            <PerformanceInsights />
+            <PerformanceInsights
+              insights={performanceInsights}
+              loading={performanceInsightsLoading}
+              aiStatus={aiStatus}
+              aiStatusLoading={aiStatusLoading}
+              error={statsError}
+              onRefresh={() => refresh({ performanceInsights: true, aiStatus: true })}
+            />
           </Suspense>
         </section>
 

@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { BarChart3, Loader2 } from 'lucide-react'
 import Card from './Card'
@@ -11,8 +12,8 @@ function OrderCharts({ orders = [], stats, statsLoading = false }) {
     { name: 'Voice', value: stats?.total_voice || 0, color: '#10b981' },
   ].filter(item => item.value > 0)
 
-  // Prepare monthly trend data (last 6 months)
-  const getMonthlyData = () => {
+  // Prepare monthly trend data (last 6 months) - memoized to prevent recalculation
+  const monthlyData = useMemo(() => {
     const monthCounts = {}
     const today = new Date()
 
@@ -36,9 +37,7 @@ function OrderCharts({ orders = [], stats, statsLoading = false }) {
       month,
       orders: count
     }))
-  }
-
-  const monthlyData = getMonthlyData()
+  }, [orders])
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {

@@ -10,7 +10,9 @@ const CACHE_TTL = {
   stats: 60000,       // 1 minute
   earnings: 60000,    // 1 minute
   goals: 60000,       // 1 minute
-  followups: 30000    // 30 seconds
+  followups: 30000,   // 30 seconds
+  performanceInsights: 120000,  // 2 minutes (heavy endpoint)
+  aiStatus: 300000              // 5 minutes (rarely changes)
 }
 
 // Module-level cache (survives re-renders and component unmounts)
@@ -20,7 +22,9 @@ let dataCache = {
   stats: { data: null, timestamp: 0 },
   earnings: { data: null, timestamp: 0 },
   goals: { data: null, timestamp: 0 },
-  followups: { data: [], overdueCount: 0, timestamp: 0 }
+  followups: { data: [], overdueCount: 0, timestamp: 0 },
+  performanceInsights: { data: null, timestamp: 0 },
+  aiStatus: { data: null, timestamp: 0 }
 }
 
 const DashboardDataContext = createContext(null)
@@ -47,6 +51,8 @@ export const DashboardDataProvider = ({ children }) => {
   const [goalProgress, setGoalProgress] = useState(dataCache.goals.data)
   const [todaysFollowups, setTodaysFollowups] = useState(dataCache.followups.data)
   const [overdueCount, setOverdueCount] = useState(dataCache.followups.overdueCount)
+  const [performanceInsights, setPerformanceInsights] = useState(dataCache.performanceInsights.data)
+  const [aiStatus, setAiStatus] = useState(dataCache.aiStatus.data)
 
   // Loading states
   const [loading, setLoading] = useState({
@@ -54,7 +60,9 @@ export const DashboardDataProvider = ({ children }) => {
     stats: false,
     earnings: false,
     goals: false,
-    followups: false
+    followups: false,
+    performanceInsights: false,
+    aiStatus: false
   })
   const [error, setError] = useState(null)
 
@@ -116,6 +124,14 @@ export const DashboardDataProvider = ({ children }) => {
         setTodaysFollowups(data.followups || [])
         setOverdueCount(data.overdue_count || 0)
         break
+      case 'performanceInsights':
+        dataCache.performanceInsights = { data, timestamp: now }
+        setPerformanceInsights(data)
+        break
+      case 'aiStatus':
+        dataCache.aiStatus = { data, timestamp: now }
+        setAiStatus(data)
+        break
     }
   }, [])
 
@@ -158,7 +174,9 @@ export const DashboardDataProvider = ({ children }) => {
       stats: options.all || options.stats,
       earnings: options.all || options.earnings,
       goals: options.all || options.goals,
-      followups: options.all || options.followups
+      followups: options.all || options.followups,
+      performanceInsights: options.performanceInsights,  // Not included in 'all' - only fetch on Analytics tab
+      aiStatus: options.aiStatus                          // Not included in 'all' - only fetch on Analytics tab
     }
 
     // Update filters ref
@@ -173,7 +191,9 @@ export const DashboardDataProvider = ({ children }) => {
       ...(shouldRefresh.stats && { stats: true }),
       ...(shouldRefresh.earnings && { earnings: true }),
       ...(shouldRefresh.goals && { goals: true }),
-      ...(shouldRefresh.followups && { followups: true })
+      ...(shouldRefresh.followups && { followups: true }),
+      ...(shouldRefresh.performanceInsights && { performanceInsights: true }),
+      ...(shouldRefresh.aiStatus && { aiStatus: true })
     }))
 
     try {
@@ -206,6 +226,16 @@ export const DashboardDataProvider = ({ children }) => {
       if (shouldRefresh.followups) {
         promises.push(followupService.getToday())
         promiseKeys.push('followups')
+      }
+
+      if (shouldRefresh.performanceInsights) {
+        promises.push(orderService.getPerformanceInsights())
+        promiseKeys.push('performanceInsights')
+      }
+
+      if (shouldRefresh.aiStatus) {
+        promises.push(orderService.getAIInsightsStatus())
+        promiseKeys.push('aiStatus')
       }
 
       const results = await Promise.all(promises)
@@ -250,6 +280,14 @@ export const DashboardDataProvider = ({ children }) => {
         updateCache('followups', resultMap.followups)
       }
 
+      if (resultMap.performanceInsights !== undefined) {
+        updateCache('performanceInsights', resultMap.performanceInsights)
+      }
+
+      if (resultMap.aiStatus !== undefined) {
+        updateCache('aiStatus', resultMap.aiStatus)
+      }
+
       setError(null)
     } catch (err) {
       if (!thisRefresh.cancelled) {
@@ -263,7 +301,9 @@ export const DashboardDataProvider = ({ children }) => {
           stats: false,
           earnings: false,
           goals: false,
-          followups: false
+          followups: false,
+          performanceInsights: false,
+          aiStatus: false
         })
       }
     }
@@ -296,11 +336,15 @@ export const DashboardDataProvider = ({ children }) => {
     todaysFollowups,
     overdueCount,
     currentInternetCount,
+    performanceInsights,
+    aiStatus,
 
     // Loading states
     loading: isLoadingAny,
     ordersLoading: isLoadingOrders,
     statsLoading: isLoadingStats,
+    performanceInsightsLoading: loading.performanceInsights,
+    aiStatusLoading: loading.aiStatus,
 
     // Error state
     error,

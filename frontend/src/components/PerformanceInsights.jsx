@@ -1,12 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
-import { 
-  TrendingUp, TrendingDown, Minus, Trophy, Flame, Zap, 
-  Package, Wifi, Smartphone, Layers, DollarSign, Tv, Phone, 
+import {
+  TrendingUp, TrendingDown, Minus, Trophy, Flame, Zap,
+  Package, Wifi, Smartphone, Layers, DollarSign, Tv, Phone,
   ChevronRight, Lightbulb, Calendar, BarChart3, Award, Sparkles, Loader2,
   Smile, Scale, Skull
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
-import { usePerformanceInsights } from '../hooks/usePerformanceInsights'
 import { orderService } from '../services/orderService'
 import Card from './ui/Card'
 import LoadingSpinner from './ui/LoadingSpinner'
@@ -245,21 +244,20 @@ function StreakBadge({ streak, type }) {
   )
 }
 
-function PerformanceInsights() {
-  const { insights, loading, error, refetch } = usePerformanceInsights()
+function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, error, onRefresh }) {
   const [viewMode, setViewMode] = useState('monthly') // 'monthly' or 'weekly'
   const [selectedMetric, setSelectedMetric] = useState('orders')
-  
-  // AI Insights state
+
+  // AI Insights state - initialize from props
   const [aiInsights, setAiInsights] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiRemaining, setAiRemaining] = useState(null) // null = not loaded yet
-  const [aiEnabled, setAiEnabled] = useState(true)
+  const [aiRemaining, setAiRemaining] = useState(aiStatus?.remaining_today ?? null)
+  const [aiEnabled, setAiEnabled] = useState(aiStatus?.ai_enabled ?? true)
   const [aiError, setAiError] = useState(null)
   const [aiTone, setAiTone] = useState('positive')
-  const [aiResetsAt, setAiResetsAt] = useState(null)
+  const [aiResetsAt, setAiResetsAt] = useState(aiStatus?.resets_at ?? null)
   const [aiMetrics, setAiMetrics] = useState(null) // Cached metrics for free tone changes
-  
+
   // LocalStorage key for persisting AI insights
   const AI_STORAGE_KEY = 'sales_ai_insights'
   
@@ -297,21 +295,14 @@ function PerformanceInsights() {
     }
   }, [])
   
-  // Fetch AI status on mount
+  // Sync AI status from props when they change
   useEffect(() => {
-    const fetchAIStatus = async () => {
-      try {
-        const status = await orderService.getAIInsightsStatus()
-        setAiRemaining(status.remaining_today)
-        setAiEnabled(status.ai_enabled)
-        setAiResetsAt(status.resets_at)
-      } catch (err) {
-        console.error('Failed to fetch AI status:', err)
-        setAiRemaining(3) // Default fallback
-      }
+    if (aiStatus) {
+      setAiRemaining(aiStatus.remaining_today)
+      setAiEnabled(aiStatus.ai_enabled)
+      setAiResetsAt(aiStatus.resets_at)
     }
-    fetchAIStatus()
-  }, [])
+  }, [aiStatus])
   
   // Generate AI insights handler
   const handleGenerateAI = async () => {
@@ -401,12 +392,14 @@ function PerformanceInsights() {
             <TrendingDown className="w-6 h-6 text-rose-400" />
           </div>
           <p className="text-rose-400 mb-2">{error}</p>
-          <button 
-            onClick={refetch}
-            className="text-sm text-cyan-400 hover:text-cyan-300 underline"
-          >
-            Try again
-          </button>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="text-sm text-cyan-400 hover:text-cyan-300 underline"
+            >
+              Try again
+            </button>
+          )}
         </div>
       </Card>
     )

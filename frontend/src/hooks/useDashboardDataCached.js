@@ -19,11 +19,16 @@ export function useDashboardDataCached(filters = {}) {
     todaysFollowups,
     overdueCount,
     currentInternetCount,
+    performanceInsights,
+    aiStatus,
     loading,
     ordersLoading,
     statsLoading,
+    performanceInsightsLoading,
+    aiStatusLoading,
     error,
     refresh,
+    invalidate,
     isStale,
     filtersChanged
   } = useDashboardDataContext()
@@ -42,15 +47,19 @@ export function useDashboardDataCached(filters = {}) {
     const needsEarnings = isStale('earnings') || earnings === null
     const needsGoals = isStale('goals') || goalProgress === null
     const needsFollowups = isStale('followups')
+    const needsPerformanceInsights = isStale('performanceInsights') || performanceInsights === null
+    const needsAiStatus = isStale('aiStatus') || aiStatus === null
 
-    if (needsOrders || needsStats || needsEarnings || needsGoals || needsFollowups) {
+    if (needsOrders || needsStats || needsEarnings || needsGoals || needsFollowups || needsPerformanceInsights || needsAiStatus) {
       // Selective refresh based on what's stale
       refresh({
         orders: needsOrders,
         stats: needsStats,
         earnings: needsEarnings,
         goals: needsGoals,
-        followups: needsFollowups
+        followups: needsFollowups,
+        performanceInsights: needsPerformanceInsights,
+        aiStatus: needsAiStatus
       }, filters)
     }
   }, []) // Only on mount
@@ -90,17 +99,22 @@ export function useDashboardDataCached(filters = {}) {
     todaysFollowups,
     overdueCount,
     currentInternetCount,
+    performanceInsights,
+    aiStatus,
 
     // Loading states
     loading,
     ordersLoading,
     statsLoading,
+    performanceInsightsLoading,
+    aiStatusLoading,
 
     // Error state
     error,
 
-    // Unified refresh function
-    refresh: refreshWithFilters
+    // Actions
+    refresh: refreshWithFilters,
+    invalidate
   }
 }
 

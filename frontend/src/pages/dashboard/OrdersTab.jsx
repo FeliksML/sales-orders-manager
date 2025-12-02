@@ -40,7 +40,8 @@ function OrdersTab() {
     ordersLoading,
     loading: followupsLoading,
     error: ordersError,
-    refresh
+    refresh,
+    invalidate
   } = useDashboardDataCached(filters)
 
   const { settings: commissionSettings } = useCommissionSettings()
@@ -88,6 +89,7 @@ function OrdersTab() {
       await orderService.createOrder(orderData)
       setIsOrderModalOpen(false)
       setSubmitSuccess(true)
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh()
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
@@ -113,6 +115,7 @@ function OrdersTab() {
   const handleOrderUpdate = async (orderId, orderData) => {
     try {
       await orderService.updateOrder(orderId, orderData)
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh()
       setSelectedOrder(prev => ({ ...prev, ...orderData }))
       setSubmitSuccess(true)
@@ -135,6 +138,7 @@ function OrdersTab() {
   const handleOrderDelete = async (orderId) => {
     try {
       await orderService.deleteOrder(orderId)
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh()
       setIsDetailsModalOpen(false)
       setSubmitSuccess(true)
@@ -170,6 +174,7 @@ function OrdersTab() {
       const day = String(newDate.getDate()).padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
       await orderService.updateOrder(orderId, { install_date: formattedDate })
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh({ orders: true, stats: true })
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
@@ -187,6 +192,7 @@ function OrdersTab() {
   const handleBulkMarkInstalled = async () => {
     try {
       await orderService.bulkMarkInstalled(selectedOrders)
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh({ orders: true, stats: true })
       setSelectedOrders([])
       setSubmitSuccess(true)
@@ -204,6 +210,7 @@ function OrdersTab() {
   const handleBulkReschedule = async (newDate) => {
     try {
       await orderService.bulkReschedule(selectedOrders, newDate)
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh({ orders: true, stats: true })
       setSelectedOrders([])
       setIsBulkRescheduleModalOpen(false)
@@ -222,6 +229,7 @@ function OrdersTab() {
   const handleBulkDelete = async () => {
     try {
       await orderService.bulkDelete(selectedOrders)
+      invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh()
       setSelectedOrders([])
       setIsBulkDeleteModalOpen(false)
