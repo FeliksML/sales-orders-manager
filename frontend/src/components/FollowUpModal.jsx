@@ -98,8 +98,8 @@ function FollowUpModal({ isOpen, onClose, onSubmit, order, loading = false }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm pb-[72px] sm:pb-4">
+      <Card className="w-full max-w-lg max-h-[calc(100vh-88px)] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
           <div>

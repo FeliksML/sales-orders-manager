@@ -366,8 +366,8 @@ function OrderInputModal({ isOpen, onClose, onSubmit, prefilledDate = null }) {
     (formData.has_gig ? 1 : 0)
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm pb-20 sm:pb-4">
-      <div className="w-full max-w-4xl max-h-[calc(100vh-140px)] sm:max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm pb-[72px] sm:pb-4">
+      <div className="w-full max-w-4xl max-h-[calc(100vh-88px)] sm:max-h-[90vh] flex flex-col overflow-hidden">
         <Card className="relative flex flex-col max-h-full overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between mb-4 sm:mb-6 pb-4 border-b border-white/10 flex-shrink-0">
