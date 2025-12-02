@@ -1,7 +1,7 @@
 import { useState, lazy, Suspense } from 'react'
 import EarningsCard from '../../components/EarningsCard'
 import GoalProgress from '../../components/GoalProgress'
-import { useDashboardData } from '../../hooks/useDashboardData'
+import { useDashboardDataCached } from '../../hooks/useDashboardDataCached'
 
 // Lazy load modals
 const GoalSettingsModal = lazy(() => import('../../components/GoalSettingsModal'))
@@ -9,7 +9,7 @@ const GoalSettingsModal = lazy(() => import('../../components/GoalSettingsModal'
 function EarningsTab() {
   const [isGoalSettingsModalOpen, setIsGoalSettingsModalOpen] = useState(false)
 
-  const { refresh } = useDashboardData({})
+  const { refresh } = useDashboardDataCached({})
 
   const handleGoalSave = async () => {
     await refresh({ goals: true })

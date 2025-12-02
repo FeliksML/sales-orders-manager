@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone } from 'lucide-react'
 import StatCard from '../../components/ui/StatCard'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
-import { useDashboardData } from '../../hooks/useDashboardData'
+import { useDashboardDataCached } from '../../hooks/useDashboardDataCached'
 
 // Lazy load heavy components
 const OrderCharts = lazy(() => import('../../components/ui/OrderCharts'))
@@ -14,7 +14,7 @@ function AnalyticsTab() {
     stats,
     statsLoading,
     error: statsError
-  } = useDashboardData({})
+  } = useDashboardDataCached({})
 
   return (
     <div className="px-3 pt-3">

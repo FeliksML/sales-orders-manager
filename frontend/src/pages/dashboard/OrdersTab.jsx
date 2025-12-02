@@ -7,7 +7,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import BulkActionsToolbar from '../../components/ui/BulkActionsToolbar'
 import PullToRefresh from '../../components/ui/PullToRefresh'
 import TodaysFollowUps from '../../components/TodaysFollowUps'
-import { useDashboardData } from '../../hooks/useDashboardData'
+import { useDashboardDataCached } from '../../hooks/useDashboardDataCached'
 import { useCommissionSettings } from '../../hooks/useCommission'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../contexts/ToastContext'
@@ -41,7 +41,7 @@ function OrdersTab() {
     loading: followupsLoading,
     error: ordersError,
     refresh
-  } = useDashboardData(filters)
+  } = useDashboardDataCached(filters)
 
   const { settings: commissionSettings } = useCommissionSettings()
 

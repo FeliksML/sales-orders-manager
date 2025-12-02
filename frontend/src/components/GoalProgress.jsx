@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Target, TrendingUp, Settings, Trophy, Flame, Layers, DollarSign, Wifi, Smartphone, Tv, Phone, Headphones, Radio, ChevronRight, AlertCircle } from 'lucide-react'
 import { useGoalProgress, useGoalHistory } from '../hooks/useGoals'
+import { useOptionalDashboardDataContext } from '../contexts/DashboardDataContext'
 
 // Status colors
 const STATUS_COLORS = {
@@ -217,8 +218,21 @@ function Confetti({ active }) {
 }
 
 function GoalProgress({ onSettingsClick }) {
-  const { progress, loading, error, refetch } = useGoalProgress()
+  // Try to use cached context if available (inside dashboard)
+  const dashboardContext = useOptionalDashboardDataContext()
+  const cachedGoalProgress = dashboardContext?.goalProgress
+  const contextRefresh = dashboardContext?.refresh
+
+  // Fall back to independent hook if outside dashboard context
+  const { progress: hookProgress, loading: hookLoading, error: hookError, refetch: hookRefetch } = useGoalProgress()
   const { history } = useGoalHistory(6)
+
+  // Use cached data if available, otherwise use hook data
+  const progress = cachedGoalProgress || hookProgress
+  const loading = cachedGoalProgress ? false : hookLoading
+  const error = cachedGoalProgress ? null : hookError
+  const refetch = contextRefresh ? () => contextRefresh({ goals: true }) : hookRefetch
+
   const [showConfetti, setShowConfetti] = useState(false)
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
   

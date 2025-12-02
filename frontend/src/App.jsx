@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { DashboardDataProvider } from './contexts/DashboardDataContext'
 import GoogleMapsLoader from './components/GoogleMapsLoader'
 import ProtectedRoute from './components/ProtectedRoute'
 import LoadingSpinner from './components/ui/LoadingSpinner'
@@ -104,7 +105,9 @@ function App() {
                   path="/dashboard"
                   element={
                     <ProtectedRoute>
-                      <DashboardLayout />
+                      <DashboardDataProvider>
+                        <DashboardLayout />
+                      </DashboardDataProvider>
                     </ProtectedRoute>
                   }
                 >

@@ -2,22 +2,46 @@ import { useState, useEffect, useMemo } from 'react'
 import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw, ChevronDown, Receipt, Building2, Landmark, Shield, Heart, Zap, Target, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { commissionService } from '../services/commissionService'
+import { useOptionalDashboardDataContext } from '../contexts/DashboardDataContext'
 import { getStateByCode } from '../utils/stateTaxRates'
 import { getNextTierInfo } from '../utils/commissionUtils'
 
 function EarningsCard() {
   const navigate = useNavigate()
-  const [earnings, setEarnings] = useState(null)
-  const [loading, setLoading] = useState(true)
+
+  // Try to use cached context if available (inside dashboard)
+  const dashboardContext = useOptionalDashboardDataContext()
+  const cachedEarnings = dashboardContext?.earnings
+  const contextRefresh = dashboardContext?.refresh
+  const isStale = dashboardContext?.isStale
+
+  // Local state for when context is not available or for manual refresh
+  const [localEarnings, setLocalEarnings] = useState(null)
+  const [loading, setLoading] = useState(!cachedEarnings)
   const [error, setError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showTaxBreakdown, setShowTaxBreakdown] = useState(false)
 
+  // Use cached earnings if available, otherwise use local state
+  const earnings = cachedEarnings || localEarnings
+
   const fetchEarnings = async () => {
+    // If we have context, use it for refresh
+    if (contextRefresh) {
+      try {
+        setRefreshing(true)
+        await contextRefresh({ earnings: true })
+      } finally {
+        setRefreshing(false)
+      }
+      return
+    }
+
+    // Otherwise, fetch independently
     try {
       setRefreshing(true)
       const data = await commissionService.getEarnings()
-      setEarnings(data)
+      setLocalEarnings(data)
       setError(null)
     } catch (err) {
       console.error('Failed to fetch earnings:', err)
@@ -28,9 +52,14 @@ function EarningsCard() {
     }
   }
 
+  // Initial fetch only if not using context or context data is missing
   useEffect(() => {
+    if (cachedEarnings) {
+      setLoading(false)
+      return
+    }
     fetchEarnings()
-  }, [])
+  }, [cachedEarnings])
 
   const formatCurrency = (val) => {
     if (val === 0) return '$0'
