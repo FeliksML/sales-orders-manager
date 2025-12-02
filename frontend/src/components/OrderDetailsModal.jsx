@@ -396,8 +396,8 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     (formData.has_gig ? 1 : 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-5xl my-auto flex flex-col max-h-[98vh] sm:max-h-[90vh]">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto" style={{ paddingBottom: 'max(80px, calc(80px + env(safe-area-inset-bottom, 0px)))' }}>
+      <div className="w-full max-w-5xl my-auto flex flex-col max-h-[75vh] sm:max-h-[85vh]">
         <Card className="relative flex flex-col max-h-full overflow-hidden">
           {/* Header */}
           <div className="mb-4 sm:mb-6 pb-4 border-b border-white/10 flex-shrink-0">
