@@ -681,7 +681,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
             }}
           >
             <div className="w-full max-w-2xl my-auto flex flex-col max-h-[calc(100vh-88px)] sm:max-h-[90vh]">
-              <Card className="relative flex flex-col max-h-full overflow-hidden">
+              <Card className="relative flex flex-col max-h-full overflow-hidden p-3! sm:p-6!">
                 {/* Modal Header */}
                 <div className="pb-4 border-b border-white/10 flex-shrink-0">
                   <div className="flex items-center justify-between">
