@@ -63,6 +63,7 @@ COPY --from=dependencies /usr/local/bin /usr/local/bin
 COPY --chown=appuser:appuser app /app/app
 COPY --chown=appuser:appuser gunicorn.conf.py /app/
 COPY --chown=appuser:appuser init_database.py /app/
+COPY --chown=appuser:appuser migrate_*.py /app/
 
 # Set PYTHONPATH so Python can find the app module
 ENV PYTHONPATH=/app
