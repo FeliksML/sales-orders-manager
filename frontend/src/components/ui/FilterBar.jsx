@@ -240,7 +240,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 min-w-0">
         {/* Date Range Filter */}
-        <div>
+        <div className="min-w-0 overflow-hidden">
           <label className="flex items-center gap-2 text-base font-bold text-white mb-4">
             <Calendar size={18} className="text-blue-400" />
             Install Date Range
@@ -250,7 +250,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               type="date"
               value={filters.dateFrom}
               onChange={(e) => handleDateChange('dateFrom', e.target.value)}
-              className={`w-full max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
+              className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
                 dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
               placeholder="From"
@@ -259,7 +259,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               type="date"
               value={filters.dateTo}
               onChange={(e) => handleDateChange('dateTo', e.target.value)}
-              className={`w-full max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
+              className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
                 dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
               placeholder="To"
