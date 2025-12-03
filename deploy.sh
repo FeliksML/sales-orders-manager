@@ -256,8 +256,8 @@ echo -e "  ${YELLOW}\"Evolution is constant - even for databases\"${NC}"
 echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Run notification dedup migration (prevents duplicate notifications)
-echo -e "  🔔 Running notification dedup migration..."
-if docker compose -f docker-compose.prod.yml run --rm backend python migrate_notification_dedup.py 2>&1 | grep -q "successfully\|already exists"; then
+echo -e "  🔔 Running notification deliviry migration..."
+if docker compose -f docker-compose.prod.yml run --rm backend python migrate_notification_deliviry.py 2>&1 | grep -q "successfully\|already exists"; then
     echo -e "  ${GREEN}✅ Notification dedup migration${NC} - No more duplicates! 🎯"
 else
     echo -e "  ${YELLOW}⚠️  Notification migration had issues (may already be applied)${NC}"
