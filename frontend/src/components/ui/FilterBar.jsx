@@ -30,7 +30,13 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
       installed: false,
       pending: false,
       today: false
-    }
+    },
+    mobileActivation: {
+      activated: false,
+      pendingActivation: false,
+      fullyActivated: false
+    },
+    hasGig: false
   })
 
   // Separate state for search input with debouncing
@@ -117,6 +123,23 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     }))
   }
 
+  const handleMobileActivationToggle = (status) => {
+    setFilters(prev => ({
+      ...prev,
+      mobileActivation: {
+        ...prev.mobileActivation,
+        [status]: !prev.mobileActivation[status]
+      }
+    }))
+  }
+
+  const handleGigToggle = () => {
+    setFilters(prev => ({
+      ...prev,
+      hasGig: !prev.hasGig
+    }))
+  }
+
   const clearAllFilters = () => {
     const emptyFilters = {
       search: '',
@@ -134,7 +157,13 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
         installed: false,
         pending: false,
         today: false
-      }
+      },
+      mobileActivation: {
+        activated: false,
+        pendingActivation: false,
+        fullyActivated: false
+      },
+      hasGig: false
     }
     setSearchInput('') // Clear search input state
     setFilters(emptyFilters)
@@ -175,6 +204,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     if (filters.dateFrom || filters.dateTo) count++
     if (Object.values(filters.productTypes).some(v => v)) count++
     if (Object.values(filters.installStatus).some(v => v)) count++
+    if (Object.values(filters.mobileActivation).some(v => v)) count++
+    if (filters.hasGig) count++
     return count
   }
 
@@ -312,6 +343,62 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               />
               <AlertCircle size={18} className="text-yellow-600" />
               <span className="text-sm font-medium text-gray-900 flex-1">Pending</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Mobile Activation Filter */}
+        <div>
+          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
+            <Smartphone size={18} className="text-green-600" />
+            Mobile Activation
+          </label>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+              <CustomCheckbox
+                checked={filters.mobileActivation.activated}
+                onChange={() => handleMobileActivationToggle('activated')}
+                color="green"
+              />
+              <CheckCircle size={18} className="text-green-600" />
+              <span className="text-sm font-medium text-gray-900 flex-1">Has Activated</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+              <CustomCheckbox
+                checked={filters.mobileActivation.pendingActivation}
+                onChange={() => handleMobileActivationToggle('pendingActivation')}
+                color="yellow"
+              />
+              <Clock size={18} className="text-yellow-600" />
+              <span className="text-sm font-medium text-gray-900 flex-1">Pending Activation</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+              <CustomCheckbox
+                checked={filters.mobileActivation.fullyActivated}
+                onChange={() => handleMobileActivationToggle('fullyActivated')}
+                color="blue"
+              />
+              <CheckCircle size={18} className="text-blue-600" />
+              <span className="text-sm font-medium text-gray-900 flex-1">Fully Activated</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Special Products Filter */}
+        <div>
+          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
+            <Wifi size={18} className="text-cyan-600" />
+            Special Products
+          </label>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+              <CustomCheckbox
+                checked={filters.hasGig}
+                onChange={handleGigToggle}
+                color="blue"
+              />
+              <Wifi size={18} className="text-cyan-600" />
+              <span className="text-sm font-medium text-gray-900 flex-1">Gig Internet Only</span>
             </label>
           </div>
         </div>
@@ -527,6 +614,35 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   </button>
                 </div>
               )}
+              {Object.values(filters.mobileActivation).some(v => v) && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-medium border border-emerald-200 shadow-sm">
+                  <Smartphone size={14} />
+                  <span className="font-semibold">Activation</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilters(prev => ({
+                      ...prev,
+                      mobileActivation: Object.fromEntries(Object.keys(prev.mobileActivation).map(k => [k, false]))
+                    }))}
+                    className="hover:bg-emerald-200 rounded-full p-0.5 transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+              {filters.hasGig && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-100 text-cyan-800 rounded-lg text-xs font-medium border border-cyan-200 shadow-sm">
+                  <Wifi size={14} />
+                  <span className="font-semibold">Gig</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilters(prev => ({ ...prev, hasGig: false }))}
+                    className="hover:bg-cyan-200 rounded-full p-0.5 transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
             </div>
             </div>
           )}
@@ -541,7 +657,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
             />
             <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-slideUp">
               {/* Bottom sheet header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 rounded-t-2xl">
+              <div className="sticky top-0 bg-white border-b border-gray-200 rounded-t-2xl z-10">
                 {/* Grab handle */}
                 <div className="flex justify-center pt-3 pb-2">
                   <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
@@ -584,7 +700,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               </div>
 
               {/* Bottom sheet footer */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3">
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 z-10">
                 <button
                   type="button"
                   onClick={() => setShowFilters(false)}
@@ -769,6 +885,38 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 </button>
               </div>
             ) : null
+          )}
+          {Object.entries(filters.mobileActivation).map(([status, enabled]) =>
+            enabled ? (
+              <div key={status} className="flex items-center gap-2 px-3 py-2 bg-emerald-100 text-emerald-800 rounded-lg text-sm font-medium shadow-sm border border-emerald-200 animate-fadeIn">
+                <Smartphone size={16} />
+                <span className="font-semibold">
+                  {status === 'activated' ? 'Has Activated' : status === 'pendingActivation' ? 'Pending Activation' : 'Fully Activated'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleMobileActivationToggle(status)}
+                  className="ml-1 p-1 hover:bg-emerald-200 rounded-full transition-colors"
+                  title="Remove filter"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : null
+          )}
+          {filters.hasGig && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-cyan-100 text-cyan-800 rounded-lg text-sm font-medium shadow-sm border border-cyan-200 animate-fadeIn">
+              <Wifi size={16} />
+              <span className="font-semibold">Gig Internet</span>
+              <button
+                type="button"
+                onClick={() => setFilters(prev => ({ ...prev, hasGig: false }))}
+                className="ml-1 p-1 hover:bg-cyan-200 rounded-full transition-colors"
+                title="Remove filter"
+              >
+                <X size={14} />
+              </button>
+            </div>
           )}
         </div>
         </div>

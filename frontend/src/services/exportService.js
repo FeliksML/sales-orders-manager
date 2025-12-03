@@ -63,6 +63,8 @@ export const exportService = {
     if (params.date_to) requestBody.date_to = params.date_to
     if (params.product_types) requestBody.product_types = params.product_types
     if (params.install_status) requestBody.install_status = params.install_status
+    if (params.mobile_activation) requestBody.mobile_activation = params.mobile_activation
+    if (params.has_gig) requestBody.has_gig = params.has_gig
 
     const response = await apiClient.post('/api/orders/export/email', requestBody)
 
@@ -101,6 +103,24 @@ function buildExportParams(filters, columns) {
     .map(([status, _]) => status)
   if (activeStatuses.length > 0) {
     params.install_status = activeStatuses.join(',')
+  }
+
+  // Add mobile activation parameter
+  const activationStatusMap = {
+    activated: 'activated',
+    pendingActivation: 'pending',
+    fullyActivated: 'fully'
+  }
+  const activeActivations = Object.entries(filters.mobileActivation || {})
+    .filter(([_, enabled]) => enabled)
+    .map(([status, _]) => activationStatusMap[status])
+  if (activeActivations.length > 0) {
+    params.mobile_activation = activeActivations.join(',')
+  }
+
+  // Add Gig internet parameter
+  if (filters.hasGig) {
+    params.has_gig = true
   }
 
   // Add columns parameter

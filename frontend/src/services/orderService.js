@@ -34,6 +34,24 @@ export const orderService = {
       params.install_status = activeStatuses.join(',')
     }
 
+    // Add mobile activation parameter
+    const activationStatusMap = {
+      activated: 'activated',
+      pendingActivation: 'pending',
+      fullyActivated: 'fully'
+    }
+    const activeActivations = Object.entries(filters.mobileActivation || {})
+      .filter(([_, enabled]) => enabled)
+      .map(([status, _]) => activationStatusMap[status])
+    if (activeActivations.length > 0) {
+      params.mobile_activation = activeActivations.join(',')
+    }
+
+    // Add Gig internet parameter
+    if (filters.hasGig) {
+      params.has_gig = true
+    }
+
     const response = await apiClient.get('/api/orders/', { params })
     return response.data
   },

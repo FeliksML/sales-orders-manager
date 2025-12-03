@@ -76,14 +76,16 @@ def build_filtered_orders_query(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     product_types: Optional[str] = None,
-    install_status: Optional[str] = None
+    install_status: Optional[str] = None,
+    mobile_activation: Optional[str] = None,
+    has_gig: Optional[bool] = None
 ):
     """
     Build a filtered query for orders based on common filter parameters.
-    
+
     This helper function is used by get_orders, export endpoints, and email_export
     to avoid duplicating filter logic.
-    
+
     Args:
         db: Database session
         user_id: The user ID to filter orders by
@@ -92,7 +94,9 @@ def build_filtered_orders_query(
         date_to: Filter orders with install_date <= date_to
         product_types: Comma-separated product types (internet, tv, mobile, voice, wib, sbc)
         install_status: Comma-separated install statuses (installed, pending, today)
-    
+        mobile_activation: Comma-separated activation statuses (activated, pending, fully)
+        has_gig: Filter for Gig internet orders only
+
     Returns:
         SQLAlchemy query object with applied filters
     """
@@ -152,6 +156,34 @@ def build_filtered_orders_query(
 
         if status_conditions:
             query = query.filter(or_(*status_conditions))
+
+    # Mobile activation filter
+    if mobile_activation:
+        activation_list = [a.strip().lower() for a in mobile_activation.split(',')]
+        activation_conditions = []
+
+        if 'activated' in activation_list:
+            # Has at least one activated mobile line
+            activation_conditions.append(Order.mobile_activated > 0)
+        if 'pending' in activation_list:
+            # Has mobile lines but not all are activated
+            activation_conditions.append(and_(
+                Order.has_mobile > 0,
+                Order.mobile_activated < Order.has_mobile
+            ))
+        if 'fully' in activation_list:
+            # All mobile lines are activated
+            activation_conditions.append(and_(
+                Order.has_mobile > 0,
+                Order.mobile_activated == Order.has_mobile
+            ))
+
+        if activation_conditions:
+            query = query.filter(or_(*activation_conditions))
+
+    # Gig internet filter
+    if has_gig is True:
+        query = query.filter(Order.has_gig == True)
 
     return query
 
@@ -220,6 +252,8 @@ class EmailExportRequest(BaseModel):
     date_to: Optional[date] = None
     product_types: Optional[str] = None
     install_status: Optional[str] = None
+    mobile_activation: Optional[str] = None
+    has_gig: Optional[bool] = None
 
 class BulkMarkInstalledRequest(BaseModel):
     order_ids: List[int]
@@ -278,6 +312,8 @@ def get_orders(
     date_to: Optional[date] = Query(None, description="Filter by install date to"),
     product_types: Optional[str] = Query(None, description="Comma-separated product types: internet,tv,mobile,voice,wib,sbc"),
     install_status: Optional[str] = Query(None, description="Filter by install status: installed,pending,today"),
+    mobile_activation: Optional[str] = Query(None, description="Filter by mobile activation: activated,pending,fully"),
+    has_gig: Optional[bool] = Query(None, description="Filter by Gig internet orders"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -290,7 +326,9 @@ def get_orders(
         date_from=date_from,
         date_to=date_to,
         product_types=product_types,
-        install_status=install_status
+        install_status=install_status,
+        mobile_activation=mobile_activation,
+        has_gig=has_gig
     )
 
     # Get total count before pagination
@@ -1224,6 +1262,8 @@ def export_orders_excel(
     date_to: Optional[date] = Query(None, description="Filter by install date to"),
     product_types: Optional[str] = Query(None, description="Comma-separated product types: internet,tv,mobile,voice,wib,sbc"),
     install_status: Optional[str] = Query(None, description="Filter by install status: installed,pending,today"),
+    mobile_activation: Optional[str] = Query(None, description="Filter by mobile activation: activated,pending,fully"),
+    has_gig: Optional[bool] = Query(None, description="Filter by Gig internet orders"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1236,7 +1276,9 @@ def export_orders_excel(
         date_from=date_from,
         date_to=date_to,
         product_types=product_types,
-        install_status=install_status
+        install_status=install_status,
+        mobile_activation=mobile_activation,
+        has_gig=has_gig
     )
 
     # Get all matching orders
@@ -1270,6 +1312,8 @@ def export_orders_csv(
     date_to: Optional[date] = Query(None, description="Filter by install date to"),
     product_types: Optional[str] = Query(None, description="Comma-separated product types: internet,tv,mobile,voice,wib,sbc"),
     install_status: Optional[str] = Query(None, description="Filter by install status: installed,pending,today"),
+    mobile_activation: Optional[str] = Query(None, description="Filter by mobile activation: activated,pending,fully"),
+    has_gig: Optional[bool] = Query(None, description="Filter by Gig internet orders"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1282,7 +1326,9 @@ def export_orders_csv(
         date_from=date_from,
         date_to=date_to,
         product_types=product_types,
-        install_status=install_status
+        install_status=install_status,
+        mobile_activation=mobile_activation,
+        has_gig=has_gig
     )
 
     # Get all matching orders
@@ -1421,7 +1467,9 @@ async def email_export(
             date_from=request.date_from,
             date_to=request.date_to,
             product_types=request.product_types,
-            install_status=request.install_status
+            install_status=request.install_status,
+            mobile_activation=request.mobile_activation,
+            has_gig=request.has_gig
         )
 
         # Get all matching orders
