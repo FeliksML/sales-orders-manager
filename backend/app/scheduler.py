@@ -4,15 +4,18 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from typing import Optional, Tuple
 import logging
-import asyncio
 import fcntl
 import os
 import re
 from .database import SessionLocal
 from .models import User, Order, Notification, FollowUp
 from .export_utils import generate_stats_excel
-from .email_service import send_scheduled_report_email
-from .notification_service import send_install_reminder, send_today_install_notification, send_custom_notification
+from .email_service import send_scheduled_report_email_sync
+from .notification_service import (
+    send_install_reminder_sync,
+    send_today_install_notification_sync,
+    send_custom_notification_sync
+)
 from sqlalchemy import func, and_, extract, text
 
 # Configure logging
@@ -197,37 +200,33 @@ def get_user_stats(db: Session, user_id: int) -> dict:
     }
 
 def send_report_job(user_id: int, user_email: str, user_name: str, schedule_type: str):
-    """Job to send scheduled report"""
-    import asyncio
-
+    """Job to send scheduled report (runs synchronously in scheduler thread)"""
     logger.info(f"Running scheduled {schedule_type} report for user {user_id}")
 
-    db = SessionLocal()
-    try:
-        # Get stats
-        stats = get_user_stats(db, user_id)
+    with SessionLocal() as db:
+        try:
+            # Get stats
+            stats = get_user_stats(db, user_id)
 
-        # Get recent orders
-        orders = db.query(Order).filter(Order.userid == user_id).limit(100).all()
+            # Get recent orders
+            orders = db.query(Order).filter(Order.userid == user_id).limit(100).all()
 
-        # Generate Excel
-        excel_data = generate_stats_excel(stats, orders)
+            # Generate Excel
+            excel_data = generate_stats_excel(stats, orders)
 
-        # Send email using asyncio.run for background job
-        asyncio.run(send_scheduled_report_email(
-            user_email=user_email,
-            user_name=user_name,
-            schedule_type=schedule_type,
-            stats=stats,
-            excel_data=excel_data
-        ))
+            # Send email synchronously (with retry)
+            send_scheduled_report_email_sync(
+                user_email=user_email,
+                user_name=user_name,
+                schedule_type=schedule_type,
+                stats=stats,
+                excel_data=excel_data
+            )
 
-        logger.info(f"Successfully sent {schedule_type} report to {user_email}")
+            logger.info(f"Successfully sent {schedule_type} report to {user_email}")
 
-    except Exception as e:
-        logger.error(f"Failed to send scheduled report for user {user_id}: {str(e)}")
-    finally:
-        db.close()
+        except Exception as e:
+            logger.error(f"Failed to send scheduled report for user {user_id}: {str(e)}")
 
 def add_scheduled_report(
     user_id: int,
@@ -299,82 +298,83 @@ def check_installation_reminders():
 
     Fixed logic: Only sends reminder when we're within 23-25 hours of the
     actual install time, not just when install_date == tomorrow.
+
+    Note: Uses naive datetimes assuming server is in deployment timezone.
     """
     logger.info("=" * 50)
     logger.info("Running installation reminder check")
-    now = datetime.now()
-    logger.info(f"Current time: {now}")
+    now = datetime.utcnow()
+    logger.info(f"Current time (UTC): {now}")
 
-    db = SessionLocal()
-    try:
-        # Get installations scheduled for tomorrow or day after (to catch edge cases)
-        tomorrow = date.today() + timedelta(days=1)
-        day_after = tomorrow + timedelta(days=1)
-        logger.info(f"Checking for installations on: {tomorrow} and {day_after}")
+    with SessionLocal() as db:
+        try:
+            # Get installations scheduled for tomorrow or day after (to catch edge cases)
+            tomorrow = date.today() + timedelta(days=1)
+            day_after = tomorrow + timedelta(days=1)
+            logger.info(f"Checking for installations on: {tomorrow} and {day_after}")
 
-        # Get all orders scheduled for tomorrow or day after
-        orders = db.query(Order).filter(Order.install_date.in_([tomorrow, day_after])).all()
+            # Get all orders scheduled for tomorrow or day after
+            orders = db.query(Order).filter(Order.install_date.in_([tomorrow, day_after])).all()
 
-        logger.info(f"Found {len(orders)} potential installations to check")
+            logger.info(f"Found {len(orders)} potential installations to check")
 
-        reminders_sent = 0
-        for order in orders:
-            # Parse install_time to build full datetime
-            install_datetime = parse_install_datetime(order.install_date, order.install_time)
-            if install_datetime is None:
-                logger.warning(f"Could not parse install time for order {order.orderid}: {order.install_time}")
-                continue
+            reminders_sent = 0
+            for order in orders:
+                # Parse install_time to build full datetime
+                install_datetime = parse_install_datetime(order.install_date, order.install_time)
+                if install_datetime is None:
+                    logger.warning(f"Could not parse install time for order {order.orderid}: {order.install_time}")
+                    continue
 
-            # Calculate hours until install
-            hours_until_install = (install_datetime - now).total_seconds() / 3600
+                # Calculate hours until install
+                hours_until_install = (install_datetime - now).total_seconds() / 3600
 
-            # Only send reminder if within 23-25 hour window (1 hour tolerance for scheduler interval)
-            if not (23 <= hours_until_install <= 25):
-                logger.debug(f"Order {order.orderid}: {hours_until_install:.1f} hours until install, outside 23-25h window")
-                continue
+                # Only send reminder if within 23-25 hour window (1 hour tolerance for scheduler interval)
+                if not (23 <= hours_until_install <= 25):
+                    logger.debug(f"Order {order.orderid}: {hours_until_install:.1f} hours until install, outside 23-25h window")
+                    continue
 
-            logger.info(f"Order {order.orderid}: {hours_until_install:.1f} hours until install at {install_datetime}")
+                logger.info(f"Order {order.orderid}: {hours_until_install:.1f} hours until install at {install_datetime}")
 
-            # Get user
-            user = db.query(User).filter(User.userid == order.userid).first()
-            if not user:
-                logger.warning(f"User not found for order {order.orderid}")
-                continue
+                # Get user
+                user = db.query(User).filter(User.userid == order.userid).first()
+                if not user:
+                    logger.warning(f"User not found for order {order.orderid}")
+                    continue
 
-            logger.info(f"Processing order {order.orderid} for user {user.email}")
+                logger.info(f"Processing order {order.orderid} for user {user.email}")
 
-            # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
-            existing = db.execute(
-                text("""
-                    SELECT notificationid FROM notifications
-                    WHERE userid = :userid
-                    AND orderid = :orderid
-                    AND notification_type = 'install_reminder_24h'
-                    AND DATE(created_at) = :today
-                    FOR UPDATE SKIP LOCKED
-                """),
-                {"userid": user.userid, "orderid": order.orderid, "today": date.today()}
-            ).fetchone()
+                # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
+                existing = db.execute(
+                    text("""
+                        SELECT notificationid FROM notifications
+                        WHERE userid = :userid
+                        AND orderid = :orderid
+                        AND notification_type = 'install_reminder_24h'
+                        AND DATE(created_at) = :today
+                        FOR UPDATE SKIP LOCKED
+                    """),
+                    {"userid": user.userid, "orderid": order.orderid, "today": date.today()}
+                ).fetchone()
 
-            if existing:
-                logger.info(f"Reminder already sent today for order {order.orderid}")
-                continue
+                if existing:
+                    logger.info(f"Reminder already sent today for order {order.orderid}")
+                    continue
 
-            # Check if user wants notifications
-            if user.email_notifications or user.sms_notifications or user.browser_notifications:
-                logger.info(f"Sending 24h reminder to {user.email} for order {order.orderid}")
-                asyncio.run(send_install_reminder(db, user, order, hours_before=24))
-                reminders_sent += 1
-            else:
-                logger.info(f"User {user.email} has all notifications disabled")
+                # Check if user wants notifications
+                if user.email_notifications or user.sms_notifications or user.browser_notifications:
+                    logger.info(f"Sending 24h reminder to {user.email} for order {order.orderid}")
+                    send_install_reminder_sync(db, user, order, hours_before=24, commit=True)
+                    reminders_sent += 1
+                else:
+                    logger.info(f"User {user.email} has all notifications disabled")
 
-        logger.info(f"Sent {reminders_sent} new reminders")
-        logger.info("=" * 50)
+            logger.info(f"Sent {reminders_sent} new reminders")
+            logger.info("=" * 50)
 
-    except Exception as e:
-        logger.error(f"Failed to send installation reminders: {str(e)}", exc_info=True)
-    finally:
-        db.close()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to send installation reminders: {str(e)}", exc_info=True)
 
 
 def check_today_installations():
@@ -384,134 +384,147 @@ def check_today_installations():
     """
     logger.info("=" * 50)
     logger.info("Running today's installation check")
-    logger.info(f"Current time: {datetime.now()}")
+    logger.info(f"Current time (UTC): {datetime.utcnow()}")
 
-    db = SessionLocal()
-    try:
-        # Get installations scheduled for today
-        today = date.today()
-        logger.info(f"Checking for installations on: {today}")
+    with SessionLocal() as db:
+        try:
+            # Get installations scheduled for today
+            today = date.today()
+            logger.info(f"Checking for installations on: {today}")
 
-        # Get all orders scheduled for today
-        orders = db.query(Order).filter(Order.install_date == today).all()
+            # Get all orders scheduled for today
+            orders = db.query(Order).filter(Order.install_date == today).all()
 
-        logger.info(f"Found {len(orders)} total installations scheduled for today")
+            logger.info(f"Found {len(orders)} total installations scheduled for today")
 
-        notifications_sent = 0
-        for order in orders:
-            # Get user
-            user = db.query(User).filter(User.userid == order.userid).first()
-            if not user:
-                logger.warning(f"User not found for order {order.orderid}")
-                continue
+            notifications_sent = 0
+            for order in orders:
+                # Get user
+                user = db.query(User).filter(User.userid == order.userid).first()
+                if not user:
+                    logger.warning(f"User not found for order {order.orderid}")
+                    continue
 
-            logger.info(f"Processing order {order.orderid} for user {user.email}")
+                logger.info(f"Processing order {order.orderid} for user {user.email}")
 
-            # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
-            existing = db.execute(
-                text("""
-                    SELECT notificationid FROM notifications
-                    WHERE userid = :userid
-                    AND orderid = :orderid
-                    AND notification_type = 'today_install'
-                    AND DATE(created_at) = :today
-                    FOR UPDATE SKIP LOCKED
-                """),
-                {"userid": user.userid, "orderid": order.orderid, "today": today}
-            ).fetchone()
+                # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
+                existing = db.execute(
+                    text("""
+                        SELECT notificationid FROM notifications
+                        WHERE userid = :userid
+                        AND orderid = :orderid
+                        AND notification_type = 'today_install'
+                        AND DATE(created_at) = :today
+                        FOR UPDATE SKIP LOCKED
+                    """),
+                    {"userid": user.userid, "orderid": order.orderid, "today": today}
+                ).fetchone()
 
-            if existing:
-                logger.info(f"Today notification already sent for order {order.orderid}")
-                continue
+                if existing:
+                    logger.info(f"Today notification already sent for order {order.orderid}")
+                    continue
 
-            # Check if user wants notifications
-            if user.email_notifications or user.sms_notifications or user.browser_notifications:
-                logger.info(f"Sending today notification to {user.email} for order {order.orderid}")
-                asyncio.run(send_today_install_notification(db, user, order))
-                notifications_sent += 1
-            else:
-                logger.info(f"User {user.email} has all notifications disabled")
+                # Check if user wants notifications
+                if user.email_notifications or user.sms_notifications or user.browser_notifications:
+                    logger.info(f"Sending today notification to {user.email} for order {order.orderid}")
+                    send_today_install_notification_sync(db, user, order, commit=True)
+                    notifications_sent += 1
+                else:
+                    logger.info(f"User {user.email} has all notifications disabled")
 
-        logger.info(f"Sent {notifications_sent} new today notifications")
-        logger.info("=" * 50)
+            logger.info(f"Sent {notifications_sent} new today notifications")
+            logger.info("=" * 50)
 
-    except Exception as e:
-        logger.error(f"Failed to send today installation notifications: {str(e)}", exc_info=True)
-    finally:
-        db.close()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to send today installation notifications: {str(e)}", exc_info=True)
 
 
 def check_due_followups():
-    """Check and send notifications for due follow-up reminders"""
+    """Check and send notifications for due follow-up reminders.
+
+    Uses atomic flag-before-send pattern to prevent duplicate notifications
+    if process crashes during send.
+    """
     logger.info("=" * 50)
     logger.info("Running follow-up reminder check")
-    logger.info(f"Current time: {datetime.now()}")
+    logger.info(f"Current time (UTC): {datetime.utcnow()}")
 
-    db = SessionLocal()
-    try:
-        now = datetime.utcnow()
-        # Check for follow-ups due within the next hour that haven't been notified
-        one_hour_from_now = now + timedelta(hours=1)
-        
-        # Get pending follow-ups that are due and haven't been notified
-        followups = db.query(FollowUp).filter(
-            and_(
-                FollowUp.status == 'pending',
-                FollowUp.due_date <= one_hour_from_now,
-                FollowUp.notification_sent == False
-            )
-        ).all()
+    with SessionLocal() as db:
+        try:
+            now = datetime.utcnow()
+            # Check for follow-ups due within the next hour that haven't been notified
+            one_hour_from_now = now + timedelta(hours=1)
 
-        logger.info(f"Found {len(followups)} follow-ups due for notification")
+            # Get pending follow-ups that are due and haven't been notified
+            followups = db.query(FollowUp).filter(
+                and_(
+                    FollowUp.status == 'pending',
+                    FollowUp.due_date <= one_hour_from_now,
+                    FollowUp.notification_sent == False
+                )
+            ).all()
 
-        notifications_sent = 0
-        for followup in followups:
-            # Get user
-            user = db.query(User).filter(User.userid == followup.user_id).first()
-            if not user:
-                logger.warning(f"User not found for follow-up {followup.id}")
-                continue
+            logger.info(f"Found {len(followups)} follow-ups due for notification")
 
-            # Get order
-            order = db.query(Order).filter(Order.orderid == followup.order_id).first()
-            if not order:
-                logger.warning(f"Order not found for follow-up {followup.id}")
-                continue
+            notifications_sent = 0
+            for followup in followups:
+                # Get user
+                user = db.query(User).filter(User.userid == followup.user_id).first()
+                if not user:
+                    logger.warning(f"User not found for follow-up {followup.id}")
+                    continue
 
-            logger.info(f"Processing follow-up {followup.id} for user {user.email}")
+                # Get order
+                order = db.query(Order).filter(Order.orderid == followup.order_id).first()
+                if not order:
+                    logger.warning(f"Order not found for follow-up {followup.id}")
+                    continue
 
-            # Check if user wants notifications
-            if user.email_notifications or user.sms_notifications or user.browser_notifications:
-                # Build notification message
-                note_text = f" Note: {followup.note}" if followup.note else ""
-                title = "Follow-Up Reminder"
-                message = f"Time to follow up with {order.customer_name} at {order.business_name}.{note_text}"
+                logger.info(f"Processing follow-up {followup.id} for user {user.email}")
 
-                logger.info(f"Sending follow-up notification to {user.email} for order {order.orderid}")
-                asyncio.run(send_custom_notification(
-                    db=db,
-                    user=user,
-                    notification_type='followup_due',
-                    title=title,
-                    message=message,
-                    order=order
-                ))
-                
-                # Mark as notified
-                followup.notification_sent = True
-                db.commit()
-                
-                notifications_sent += 1
-            else:
-                logger.info(f"User {user.email} has all notifications disabled")
+                # Check if user wants notifications
+                if user.email_notifications or user.sms_notifications or user.browser_notifications:
+                    # Build notification message
+                    note_text = f" Note: {followup.note}" if followup.note else ""
+                    title = "Follow-Up Reminder"
+                    message = f"Time to follow up with {order.customer_name} at {order.business_name}.{note_text}"
 
-        logger.info(f"Sent {notifications_sent} follow-up notifications")
-        logger.info("=" * 50)
+                    # Mark as notified BEFORE sending to prevent duplicates on crash
+                    followup.notification_sent = True
+                    db.flush()  # Write to DB but don't commit yet
 
-    except Exception as e:
-        logger.error(f"Failed to send follow-up notifications: {str(e)}", exc_info=True)
-    finally:
-        db.close()
+                    try:
+                        logger.info(f"Sending follow-up notification to {user.email} for order {order.orderid}")
+                        send_custom_notification_sync(
+                            db=db,
+                            user=user,
+                            notification_type='followup_due',
+                            title=title,
+                            message=message,
+                            order=order,
+                            commit=False  # We'll commit after success
+                        )
+                        db.commit()
+                        notifications_sent += 1
+                    except Exception as e:
+                        # Rollback if send fails - allows retry on next run
+                        db.rollback()
+                        logger.error(f"Failed to send follow-up notification for {followup.id}: {e}")
+                        # Re-query the followup since we rolled back
+                        followup = db.query(FollowUp).filter(FollowUp.id == followup.id).first()
+                        if followup:
+                            followup.notification_sent = False
+                            db.commit()
+                else:
+                    logger.info(f"User {user.email} has all notifications disabled")
+
+            logger.info(f"Sent {notifications_sent} follow-up notifications")
+            logger.info("=" * 50)
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to send follow-up notifications: {str(e)}", exc_info=True)
 
 
 def start_scheduler(run_initial_checks: bool = True):

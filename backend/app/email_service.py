@@ -4,10 +4,11 @@ Uses Resend API
 """
 from datetime import datetime
 import base64
-import asyncio
 import tempfile
 import os
 import logging
+import time
+from functools import wraps
 import resend
 
 # Get Resend configuration
@@ -316,3 +317,199 @@ async def send_export_email(
     except Exception as e:
         logger.error(f"❌ Failed to send export email to {user_email}: {str(e)}")
         raise
+
+
+# =============================================================================
+# Synchronous Functions (for scheduler jobs)
+# =============================================================================
+
+def _with_retry(max_attempts: int = 3, base_delay: float = 1.0, max_delay: float = 30.0):
+    """Retry decorator with exponential backoff for email sending."""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    error_str = str(e).lower()
+                    # Don't retry on client errors
+                    if any(code in error_str for code in ['400', '401', '403', '404', '422']):
+                        logger.error(f"{func.__name__} failed with client error: {e}")
+                        raise
+                    if attempt < max_attempts - 1:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        logger.warning(f"{func.__name__} attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
+            raise last_exception
+        return wrapper
+    return decorator
+
+
+@_with_retry(max_attempts=3, base_delay=1.0)
+def send_scheduled_report_email_sync(
+    user_email: str,
+    user_name: str,
+    schedule_type: str,
+    stats: dict,
+    excel_data: bytes
+):
+    """
+    Synchronous scheduled report email with retry.
+    Used by scheduler jobs running in thread context.
+    """
+    logger.info(f"📧 Starting scheduled report email to {user_email} (type: {schedule_type})")
+
+    if not RESEND_API_KEY:
+        raise Exception("Resend API key not configured")
+
+    # Create HTML body
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }}
+            .header {{
+                background: linear-gradient(135deg, #1e40af 0%, #059669 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 10px 10px 0 0;
+                text-align: center;
+            }}
+            .content {{
+                background: #f8f9fa;
+                padding: 30px;
+                border-radius: 0 0 10px 10px;
+            }}
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                margin: 20px 0;
+            }}
+            .stat-card {{
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            .stat-label {{
+                font-size: 14px;
+                color: #6b7280;
+                margin-bottom: 5px;
+            }}
+            .stat-value {{
+                font-size: 28px;
+                font-weight: bold;
+                color: #1e40af;
+            }}
+            .footer {{
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 2px solid #e5e7eb;
+                text-align: center;
+                color: #6b7280;
+                font-size: 14px;
+            }}
+            .button {{
+                display: inline-block;
+                background: #1e40af;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 6px;
+                text-decoration: none;
+                margin: 10px 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>📊 Your {schedule_type.capitalize()} Sales Report</h1>
+            <p>Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+        </div>
+        <div class="content">
+            <p>Hi {user_name},</p>
+            <p>Here's your {schedule_type} sales performance summary:</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Orders</div>
+                    <div class="stat-value">{stats['total_orders']}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">This Week</div>
+                    <div class="stat-value">{stats['this_week']}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">This Month</div>
+                    <div class="stat-value">{stats['this_month']}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pending Installs</div>
+                    <div class="stat-value">{stats['pending_installs']}</div>
+                </div>
+            </div>
+
+            <h3>Product Summary</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Internet</div>
+                    <div class="stat-value">{stats['total_internet']}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">TV</div>
+                    <div class="stat-value">{stats['total_tv']}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Mobile Lines</div>
+                    <div class="stat-value">{stats['total_mobile']}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Voice Lines</div>
+                    <div class="stat-value">{stats['total_voice']}</div>
+                </div>
+            </div>
+
+            <p>📎 Please find your detailed report attached as an Excel file.</p>
+
+            <div class="footer">
+                <p>This is an automated {schedule_type} report from Sales Order Manager.</p>
+                <p>To manage your scheduled reports, please log in to your dashboard.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    filename = f'sales_report_{schedule_type}_{datetime.now().strftime("%Y%m%d")}.xlsx'
+
+    # Create params with attachment
+    params: resend.Emails.SendParams = {
+        "from": MAIL_FROM,
+        "to": [user_email],
+        "reply_to": MAIL_REPLY_TO,
+        "subject": f"Your {schedule_type.capitalize()} Sales Report - {datetime.now().strftime('%B %d, %Y')}",
+        "html": html_body,
+        "attachments": [
+            {
+                "filename": filename,
+                "content": list(excel_data),
+            }
+        ],
+    }
+
+    # Send email
+    logger.info(f"📤 Sending scheduled report email to {user_email}")
+    response = resend.Emails.send(params)
+    logger.info(f"✅ Successfully sent scheduled report email to {user_email} (id: {response.get('id', 'N/A')})")

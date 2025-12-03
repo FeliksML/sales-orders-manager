@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Optional, Tuple
 import os
 import logging
+import time
+from functools import wraps
 import resend
 from .models import User, Order, Notification, Subscription, SMSUsage
 from sqlalchemy.orm import Session
@@ -40,6 +42,47 @@ if TELNYX_API_KEY:
         logger.info("Telnyx client initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize Telnyx client: {str(e)}")
+
+
+# =============================================================================
+# Retry Helper
+# =============================================================================
+
+def with_retry(max_attempts: int = 3, base_delay: float = 1.0, max_delay: float = 30.0):
+    """
+    Decorator for retry with exponential backoff.
+
+    Args:
+        max_attempts: Maximum number of attempts (default 3)
+        base_delay: Initial delay in seconds (default 1.0)
+        max_delay: Maximum delay cap in seconds (default 30.0)
+
+    Only retries on connection/server errors, not client errors (4xx).
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(max_attempts):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    error_str = str(e).lower()
+                    # Don't retry on client errors (invalid input, auth, etc.)
+                    if any(code in error_str for code in ['400', '401', '403', '404', '422']):
+                        logger.error(f"{func.__name__} failed with client error: {e}")
+                        raise
+                    # Retry on connection/server errors
+                    if attempt < max_attempts - 1:
+                        delay = min(base_delay * (2 ** attempt), max_delay)
+                        logger.warning(f"{func.__name__} attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                        time.sleep(delay)
+                    else:
+                        logger.error(f"{func.__name__} failed after {max_attempts} attempts: {e}")
+            raise last_exception
+        return wrapper
+    return decorator
 
 
 def can_send_sms(db: Session, user_id: int) -> Tuple[bool, str, int, int]:
@@ -731,3 +774,326 @@ def send_order_rescheduled_sms(
         logger.info(f"Reschedule SMS not sent for user {user.userid}: {reason}")
 
     return success
+
+
+# =============================================================================
+# Synchronous Notification Functions (for scheduler jobs)
+# =============================================================================
+
+@with_retry(max_attempts=3, base_delay=1.0)
+def send_email_notification_sync(
+    user_email: str,
+    user_name: str,
+    subject: str,
+    title: str,
+    message: str,
+    order: Optional[Order] = None
+) -> bool:
+    """
+    Synchronous email notification with retry.
+    Used by scheduler jobs running in thread context.
+    """
+    if not RESEND_API_KEY:
+        logger.error("Resend API key not configured")
+        return False
+
+    # Build order details if order is provided
+    order_details = ""
+    if order:
+        order_details = f"""
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin: 20px 0;">
+            <h3 style="color: #1e40af; margin-top: 0;">Installation Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Customer:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.customer_name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Business:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.business_name}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Address:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.customer_address or 'N/A'}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Install Date:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.install_date.strftime('%B %d, %Y')}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Install Time:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.install_time}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Phone:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.customer_phone}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Spectrum Reference:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.spectrum_reference}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0; color: #6b7280;">Job Number:</td>
+                    <td style="padding: 8px 0; font-weight: bold;">{order.job_number or 'N/A'}</td>
+                </tr>
+            </table>
+        </div>
+        """
+
+    html_body = f"""
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+            }}
+            .header {{
+                background: linear-gradient(135deg, #1e40af 0%, #059669 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 10px 10px 0 0;
+                text-align: center;
+            }}
+            .content {{
+                background: #f8f9fa;
+                padding: 30px;
+                border-radius: 0 0 10px 10px;
+            }}
+            .footer {{
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 2px solid #e5e7eb;
+                text-align: center;
+                color: #6b7280;
+                font-size: 14px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>{title}</h1>
+            <p>{datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+        </div>
+        <div class="content">
+            <p>Hi {user_name},</p>
+            <p>{message}</p>
+
+            {order_details}
+
+            <div class="footer">
+                <p>Questions? Reply to this email or contact support@salesordermanager.us</p>
+                <p>To manage your notifications, please log in to your dashboard.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    params: resend.Emails.SendParams = {
+        "from": MAIL_FROM,
+        "to": [user_email],
+        "reply_to": MAIL_REPLY_TO,
+        "subject": subject,
+        "html": html_body,
+    }
+
+    response = resend.Emails.send(params)
+    logger.info(f"Email notification sent to {user_email} (id: {response.get('id', 'N/A')})")
+    return True
+
+
+def send_install_reminder_sync(
+    db: Session,
+    user: User,
+    order: Order,
+    hours_before: int = 24,
+    commit: bool = True
+) -> Notification:
+    """
+    Synchronous install reminder for scheduler jobs.
+
+    Args:
+        db: Database session
+        user: User to notify
+        order: Order for the reminder
+        hours_before: Hours before installation
+        commit: Whether to commit the transaction (default True)
+    """
+    notification_type = f"install_reminder_{hours_before}h"
+    title = f"Installation Reminder - {hours_before} Hours"
+    message = f"This is a reminder that you have an installation scheduled for tomorrow at {order.install_time}."
+
+    # Create notification record
+    notification = Notification(
+        userid=user.userid,
+        orderid=order.orderid,
+        notification_type=notification_type,
+        title=title,
+        message=message
+    )
+
+    # Send via email if enabled
+    if user.email_notifications:
+        try:
+            email_sent = send_email_notification_sync(
+                user_email=user.email,
+                user_name=user.name,
+                subject=f"Installation Reminder - {order.business_name}",
+                title=title,
+                message=message,
+                order=order
+            )
+            notification.sent_via_email = email_sent
+        except Exception as e:
+            logger.error(f"Email failed for install reminder: {e}")
+            notification.sent_via_email = False
+
+    # Send via SMS if enabled (with subscription gating)
+    if user.sms_notifications and user.phone_number:
+        sms_message = f"Hi {user.name}, reminder: Installation for {order.business_name} tomorrow at {order.install_time}. Customer: {order.customer_name}, {order.customer_phone}"
+        sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
+        notification.sent_via_sms = sms_sent
+
+    # Browser notifications handled by frontend
+    if user.browser_notifications:
+        notification.sent_via_browser = True
+
+    # Save notification to database
+    db.add(notification)
+    if commit:
+        db.commit()
+
+    logger.info(f"Install reminder sent for order {order.orderid} to user {user.userid}")
+    return notification
+
+
+def send_today_install_notification_sync(
+    db: Session,
+    user: User,
+    order: Order,
+    commit: bool = True
+) -> Notification:
+    """
+    Synchronous today's install notification for scheduler jobs.
+
+    Args:
+        db: Database session
+        user: User to notify
+        order: Order for the notification
+        commit: Whether to commit the transaction (default True)
+    """
+    notification_type = "today_install"
+    title = "Installation Today"
+    message = f"You have an installation scheduled for today at {order.install_time}."
+
+    # Create notification record
+    notification = Notification(
+        userid=user.userid,
+        orderid=order.orderid,
+        notification_type=notification_type,
+        title=title,
+        message=message
+    )
+
+    # Send via email if enabled
+    if user.email_notifications:
+        try:
+            email_sent = send_email_notification_sync(
+                user_email=user.email,
+                user_name=user.name,
+                subject=f"Installation Today - {order.business_name}",
+                title=title,
+                message=message,
+                order=order
+            )
+            notification.sent_via_email = email_sent
+        except Exception as e:
+            logger.error(f"Email failed for today install notification: {e}")
+            notification.sent_via_email = False
+
+    # Send via SMS if enabled (with subscription gating)
+    if user.sms_notifications and user.phone_number:
+        sms_message = f"Hi {user.name}, installation TODAY at {order.install_time} for {order.business_name}. Customer: {order.customer_name}, {order.customer_phone}"
+        sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
+        notification.sent_via_sms = sms_sent
+
+    # Browser notifications
+    if user.browser_notifications:
+        notification.sent_via_browser = True
+
+    # Save notification
+    db.add(notification)
+    if commit:
+        db.commit()
+
+    logger.info(f"Today install notification sent for order {order.orderid} to user {user.userid}")
+    return notification
+
+
+def send_custom_notification_sync(
+    db: Session,
+    user: User,
+    notification_type: str,
+    title: str,
+    message: str,
+    order: Optional[Order] = None,
+    commit: bool = True
+) -> Notification:
+    """
+    Synchronous custom notification for scheduler jobs.
+
+    Args:
+        db: Database session
+        user: User to notify
+        notification_type: Type of notification
+        title: Notification title
+        message: Notification message
+        order: Optional order reference
+        commit: Whether to commit the transaction (default True)
+    """
+    # Create notification record
+    notification = Notification(
+        userid=user.userid,
+        orderid=order.orderid if order else None,
+        notification_type=notification_type,
+        title=title,
+        message=message
+    )
+
+    # Send via configured channels
+    if user.email_notifications:
+        try:
+            email_sent = send_email_notification_sync(
+                user_email=user.email,
+                user_name=user.name,
+                subject=title,
+                title=title,
+                message=message,
+                order=order
+            )
+            notification.sent_via_email = email_sent
+        except Exception as e:
+            logger.error(f"Email failed for custom notification: {e}")
+            notification.sent_via_email = False
+
+    if user.sms_notifications and user.phone_number:
+        sms_message = f"{title}: {message}"
+        if order:
+            sms_message += f" - {order.business_name}"
+        sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
+        notification.sent_via_sms = sms_sent
+
+    if user.browser_notifications:
+        notification.sent_via_browser = True
+
+    # Save notification
+    db.add(notification)
+    if commit:
+        db.commit()
+
+    return notification
