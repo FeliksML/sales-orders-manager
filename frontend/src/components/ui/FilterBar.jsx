@@ -67,9 +67,9 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  // Lock body scroll when filter modal is open (iOS Safari compatible)
+  // Lock body scroll when filter modal is open on mobile (iOS Safari compatible)
   useEffect(() => {
-    if (showFilters) {
+    if (showFilters && isMobile) {
       const originalOverflow = document.body.style.overflow
       const originalPosition = document.body.style.position
       const originalTop = document.body.style.top
@@ -89,7 +89,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
         window.scrollTo(0, scrollY)
       }
     }
-  }, [showFilters])
+  }, [showFilters, isMobile])
 
   // Load saved presets from localStorage
   useEffect(() => {
