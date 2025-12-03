@@ -248,6 +248,35 @@ fi
 echo ""
 
 ###############################################################################
+# STEP 5.5: RUN MIGRATIONS (Keeping the database fresh 🔄)
+###############################################################################
+echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "  ${CYAN}🔄 STEP 5.5/9: Running Database Migrations${NC}"
+echo -e "  ${YELLOW}\"Evolution is constant - even for databases\"${NC}"
+echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Run notification dedup migration (prevents duplicate notifications)
+echo -e "  🔔 Running notification dedup migration..."
+if docker compose -f docker-compose.prod.yml run --rm backend python migrate_notification_dedup.py 2>&1 | grep -q "successfully\|already exists"; then
+    echo -e "  ${GREEN}✅ Notification dedup migration${NC} - No more duplicates! 🎯"
+else
+    echo -e "  ${YELLOW}⚠️  Notification migration had issues (may already be applied)${NC}"
+fi
+
+# Run subscriptions migration if it exists
+if [ -f "backend/migrate_subscriptions.py" ]; then
+    echo -e "  💳 Running subscriptions migration..."
+    if docker compose -f docker-compose.prod.yml run --rm backend python migrate_subscriptions.py 2>&1 | grep -q "successfully\|already exists"; then
+        echo -e "  ${GREEN}✅ Subscriptions migration${NC} - Billing tables ready! 💰"
+    else
+        echo -e "  ${YELLOW}⚠️  Subscriptions migration had issues (may already be applied)${NC}"
+    fi
+fi
+
+echo -e "  ${GREEN}✅ All migrations complete!${NC} Database is up to date! 📊"
+echo ""
+
+###############################################################################
 # STEP 6: LAUNCH ALL SERVICES (3... 2... 1... LIFTOFF! 🚀)
 ###############################################################################
 echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
