@@ -719,7 +719,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 </div>
 
                 {/* Modal Content - Scrollable */}
-                <div className="flex-1 overflow-y-auto py-4 min-h-0">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 min-h-0">
                   <div className="bg-white/5 rounded-xl p-4">
                     <FiltersContent />
                   </div>
