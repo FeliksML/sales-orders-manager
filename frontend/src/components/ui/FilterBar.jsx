@@ -45,6 +45,17 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
   // Date range validation error
   const [dateRangeError, setDateRangeError] = useState('')
 
+  // Date formatting utilities for text input (MM/DD/YYYY display format)
+  const formatDateForDisplay = (isoDate) => {
+    if (!isoDate) return ''
+    const [year, month, day] = isoDate.split('-')
+    return `${month}/${day}/${year}`
+  }
+
+  // Display state for date inputs (MM/DD/YYYY format)
+  const [dateFromDisplay, setDateFromDisplay] = useState('')
+  const [dateToDisplay, setDateToDisplay] = useState('')
+
   // Detect mobile screen size
   useEffect(() => {
     const checkMobile = () => {
@@ -190,6 +201,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
       hasGig: false
     }
     setSearchInput('') // Clear search input state
+    setDateFromDisplay('') // Clear date display states
+    setDateToDisplay('')
     setFilters(emptyFilters)
     onClearFilters()
   }
@@ -212,6 +225,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
 
   const loadPreset = (preset) => {
     setFilters(preset.filters)
+    setDateFromDisplay(formatDateForDisplay(preset.filters.dateFrom))
+    setDateToDisplay(formatDateForDisplay(preset.filters.dateTo))
     setShowPresets(false)
   }
 
@@ -235,6 +250,45 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
 
   const activeCount = activeFilterCount()
 
+  // Parse display format (MM/DD/YYYY) to ISO format (YYYY-MM-DD)
+  const formatDateForState = (displayDate) => {
+    const cleaned = displayDate.replace(/[^\d/]/g, '')
+    const parts = cleaned.split('/')
+    if (parts.length === 3 && parts[0].length === 2 && parts[1].length === 2 && parts[2].length === 4) {
+      const [month, day, year] = parts
+      const date = new Date(year, month - 1, day)
+      if (date.getFullYear() == year && date.getMonth() == month - 1 && date.getDate() == day) {
+        return `${year}-${month}-${day}`
+      }
+    }
+    return null
+  }
+
+  // Handle date input with auto-formatting
+  const handleDateInputChange = (field, value) => {
+    let formatted = value.replace(/[^\d]/g, '')
+    if (formatted.length > 2) {
+      formatted = formatted.slice(0, 2) + '/' + formatted.slice(2)
+    }
+    if (formatted.length > 5) {
+      formatted = formatted.slice(0, 5) + '/' + formatted.slice(5)
+    }
+    formatted = formatted.slice(0, 10)
+
+    if (field === 'dateFrom') {
+      setDateFromDisplay(formatted)
+    } else {
+      setDateToDisplay(formatted)
+    }
+
+    const isoDate = formatDateForState(formatted)
+    if (isoDate) {
+      handleDateChange(field, isoDate)
+    } else if (formatted === '') {
+      handleDateChange(field, '')
+    }
+  }
+
   // Filters content component (reused for both desktop and mobile)
   const FiltersContent = () => (
     <>
@@ -247,22 +301,24 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
           </label>
           <div className="space-y-3">
             <input
-              type="date"
-              value={filters.dateFrom}
-              onChange={(e) => handleDateChange('dateFrom', e.target.value)}
+              type="text"
+              inputMode="numeric"
+              value={dateFromDisplay}
+              onChange={(e) => handleDateInputChange('dateFrom', e.target.value)}
               className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
                 dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
-              placeholder="From"
+              placeholder="MM/DD/YYYY"
             />
             <input
-              type="date"
-              value={filters.dateTo}
-              onChange={(e) => handleDateChange('dateTo', e.target.value)}
+              type="text"
+              inputMode="numeric"
+              value={dateToDisplay}
+              onChange={(e) => handleDateInputChange('dateTo', e.target.value)}
               className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
                 dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
-              placeholder="To"
+              placeholder="MM/DD/YYYY"
             />
             {dateRangeError && (
               <p className="text-red-400 text-sm">{dateRangeError}</p>
