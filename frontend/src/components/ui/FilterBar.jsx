@@ -56,6 +56,30 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Lock body scroll when filter modal is open (iOS Safari compatible)
+  useEffect(() => {
+    if (showFilters) {
+      const originalOverflow = document.body.style.overflow
+      const originalPosition = document.body.style.position
+      const originalTop = document.body.style.top
+      const originalWidth = document.body.style.width
+      const scrollY = window.scrollY
+
+      document.body.style.overflow = 'hidden'
+      document.body.style.position = 'fixed'
+      document.body.style.top = `-${scrollY}px`
+      document.body.style.width = '100%'
+
+      return () => {
+        document.body.style.overflow = originalOverflow
+        document.body.style.position = originalPosition
+        document.body.style.top = originalTop
+        document.body.style.width = originalWidth
+        window.scrollTo(0, scrollY)
+      }
+    }
+  }, [showFilters])
+
   // Load saved presets from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('filterPresets')
@@ -217,8 +241,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Date Range Filter */}
         <div>
-          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
-            <Calendar size={18} className="text-blue-600" />
+          <label className="flex items-center gap-2 text-base font-bold text-white mb-4">
+            <Calendar size={18} className="text-blue-400" />
             Install Date Range
           </label>
           <div className="space-y-3">
@@ -226,8 +250,8 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               type="date"
               value={filters.dateFrom}
               onChange={(e) => handleDateChange('dateFrom', e.target.value)}
-              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors ${
-                dateRangeError ? 'border-red-400' : 'border-gray-300'
+              className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
+                dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
               placeholder="From"
             />
@@ -235,186 +259,186 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               type="date"
               value={filters.dateTo}
               onChange={(e) => handleDateChange('dateTo', e.target.value)}
-              className={`w-full px-4 py-2.5 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors ${
-                dateRangeError ? 'border-red-400' : 'border-gray-300'
+              className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
+                dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
               placeholder="To"
             />
             {dateRangeError && (
-              <p className="text-red-500 text-sm">{dateRangeError}</p>
+              <p className="text-red-400 text-sm">{dateRangeError}</p>
             )}
           </div>
         </div>
 
         {/* Product Type Filter */}
         <div>
-          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
-            <Filter size={18} className="text-blue-600" />
+          <label className="flex items-center gap-2 text-base font-bold text-white mb-4">
+            <Filter size={18} className="text-blue-400" />
             Product Types
           </label>
           <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.productTypes.internet}
                 onChange={() => handleProductToggle('internet')}
                 color="blue"
               />
-              <Wifi size={18} className="text-blue-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Internet</span>
+              <Wifi size={18} className="text-blue-400" />
+              <span className="text-sm font-medium text-white flex-1">Internet</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.productTypes.tv}
                 onChange={() => handleProductToggle('tv')}
                 color="purple"
               />
-              <Tv size={18} className="text-purple-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">TV</span>
+              <Tv size={18} className="text-purple-400" />
+              <span className="text-sm font-medium text-white flex-1">TV</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.productTypes.mobile}
                 onChange={() => handleProductToggle('mobile')}
                 color="green"
               />
-              <Smartphone size={18} className="text-green-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Mobile</span>
+              <Smartphone size={18} className="text-green-400" />
+              <span className="text-sm font-medium text-white flex-1">Mobile</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.productTypes.voice}
                 onChange={() => handleProductToggle('voice')}
                 color="orange"
               />
-              <Phone size={18} className="text-orange-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Voice</span>
+              <Phone size={18} className="text-orange-400" />
+              <span className="text-sm font-medium text-white flex-1">Voice</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.productTypes.wib}
                 onChange={() => handleProductToggle('wib')}
                 color="indigo"
               />
-              <Radio size={18} className="text-indigo-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">WIB</span>
+              <Radio size={18} className="text-indigo-400" />
+              <span className="text-sm font-medium text-white flex-1">WIB</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.productTypes.sbc}
                 onChange={() => handleProductToggle('sbc')}
                 color="pink"
               />
-              <Server size={18} className="text-pink-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">SBC</span>
+              <Server size={18} className="text-pink-400" />
+              <span className="text-sm font-medium text-white flex-1">SBC</span>
             </label>
           </div>
         </div>
 
         {/* Install Status Filter */}
         <div>
-          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
-            <AlertCircle size={18} className="text-blue-600" />
+          <label className="flex items-center gap-2 text-base font-bold text-white mb-4">
+            <AlertCircle size={18} className="text-blue-400" />
             Install Status
           </label>
           <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.installStatus.installed}
                 onChange={() => handleStatusToggle('installed')}
                 color="green"
               />
-              <CheckCircle size={18} className="text-green-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Installed</span>
+              <CheckCircle size={18} className="text-green-400" />
+              <span className="text-sm font-medium text-white flex-1">Installed</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.installStatus.today}
                 onChange={() => handleStatusToggle('today')}
                 color="blue"
               />
-              <Clock size={18} className="text-blue-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Today</span>
+              <Clock size={18} className="text-blue-400" />
+              <span className="text-sm font-medium text-white flex-1">Today</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.installStatus.pending}
                 onChange={() => handleStatusToggle('pending')}
                 color="yellow"
               />
-              <AlertCircle size={18} className="text-yellow-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Pending</span>
+              <AlertCircle size={18} className="text-yellow-400" />
+              <span className="text-sm font-medium text-white flex-1">Pending</span>
             </label>
           </div>
         </div>
 
         {/* Mobile Activation Filter */}
         <div>
-          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
-            <Smartphone size={18} className="text-green-600" />
+          <label className="flex items-center gap-2 text-base font-bold text-white mb-4">
+            <Smartphone size={18} className="text-green-400" />
             Mobile Activation
           </label>
           <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.mobileActivation.activated}
                 onChange={() => handleMobileActivationToggle('activated')}
                 color="green"
               />
-              <CheckCircle size={18} className="text-green-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Has Activated</span>
+              <CheckCircle size={18} className="text-green-400" />
+              <span className="text-sm font-medium text-white flex-1">Has Activated</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.mobileActivation.pendingActivation}
                 onChange={() => handleMobileActivationToggle('pendingActivation')}
                 color="yellow"
               />
-              <Clock size={18} className="text-yellow-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Pending Activation</span>
+              <Clock size={18} className="text-yellow-400" />
+              <span className="text-sm font-medium text-white flex-1">Pending Activation</span>
             </label>
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.mobileActivation.fullyActivated}
                 onChange={() => handleMobileActivationToggle('fullyActivated')}
                 color="blue"
               />
-              <CheckCircle size={18} className="text-blue-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Fully Activated</span>
+              <CheckCircle size={18} className="text-blue-400" />
+              <span className="text-sm font-medium text-white flex-1">Fully Activated</span>
             </label>
           </div>
         </div>
 
         {/* Special Products Filter */}
         <div>
-          <label className="flex items-center gap-2 text-base font-bold text-gray-900 mb-4">
-            <Wifi size={18} className="text-cyan-600" />
+          <label className="flex items-center gap-2 text-base font-bold text-white mb-4">
+            <Wifi size={18} className="text-cyan-400" />
             Special Products
           </label>
           <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+            <label className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-lg transition-colors">
               <CustomCheckbox
                 checked={filters.hasGig}
                 onChange={handleGigToggle}
                 color="blue"
               />
-              <Wifi size={18} className="text-cyan-600" />
-              <span className="text-sm font-medium text-gray-900 flex-1">Gig Internet Only</span>
+              <Wifi size={18} className="text-cyan-400" />
+              <span className="text-sm font-medium text-white flex-1">Gig Internet Only</span>
             </label>
           </div>
         </div>
       </div>
 
       {/* Filter Presets */}
-      <div className="mt-8 pt-6 border-t-2 border-gray-200">
+      <div className="mt-8 pt-6 border-t border-white/20">
         <div className="flex items-center justify-between mb-4">
-          <label className="flex items-center gap-2 text-base font-bold text-gray-900">
-            <Save size={18} className="text-blue-600" />
+          <label className="flex items-center gap-2 text-base font-bold text-white">
+            <Save size={18} className="text-purple-400" />
             Filter Presets
           </label>
           <button
             type="button"
             onClick={() => setShowPresets(!showPresets)}
-            className="flex items-center gap-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 font-semibold rounded-lg transition-colors shadow-sm"
+            className="flex items-center gap-1 px-4 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors"
           >
             {showPresets ? 'Hide' : 'Manage Presets'}
             <ChevronDown size={16} className={`transition-transform ${showPresets ? 'rotate-180' : ''}`} />
@@ -431,7 +455,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   value={presetName}
                   onChange={(e)=> setPresetName(e.target.value)}
                   placeholder="Enter preset name..."
-                  className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm text-gray-900 bg-white hover:border-gray-400 transition-colors"
+                  className="flex-1 px-4 py-2.5 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm text-white bg-white/10 placeholder-gray-400 hover:bg-white/15 transition-colors"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && presetName.trim()) {
                       savePreset()
@@ -442,7 +466,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                   type="button"
                   onClick={savePreset}
                   disabled={!presetName.trim()}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-sm font-semibold transition-colors shadow-sm"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-sm font-semibold transition-colors"
                 >
                   <Save size={16} />
                   Save
@@ -456,19 +480,19 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 {savedPresets.map(preset => (
                   <div
                     key={preset.id}
-                    className="flex items-center justify-between p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg hover:from-indigo-100 hover:to-purple-100 transition-all border border-indigo-200 shadow-sm"
+                    className="flex items-center justify-between p-3 bg-white/10 rounded-lg hover:bg-white/15 transition-all border border-white/10"
                   >
                     <button
                       type="button"
                       onClick={() => loadPreset(preset)}
-                      className="flex-1 text-left text-sm font-semibold text-gray-900 hover:text-indigo-700 transition-colors"
+                      className="flex-1 text-left text-sm font-semibold text-white hover:text-purple-300 transition-colors"
                     >
                       {preset.name}
                     </button>
                     <button
                       type="button"
                       onClick={() => deletePreset(preset.id)}
-                      className="ml-2 p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                      className="ml-2 p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
                     >
                       <X size={18} />
                     </button>
@@ -476,12 +500,12 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 ))}
               </div>
             ) : (
-              <div className="text-center py-6 px-4 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 rounded-xl border-2 border-dashed border-blue-300 shadow-inner">
-                <Save size={32} className="mx-auto mb-2 text-blue-400" />
-                <p className="text-sm text-gray-800 font-bold mb-1">
+              <div className="text-center py-6 px-4 bg-white/5 rounded-xl border border-dashed border-white/20">
+                <Save size={32} className="mx-auto mb-2 text-purple-400" />
+                <p className="text-sm text-white font-bold mb-1">
                   No saved presets yet
                 </p>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-400">
                   Apply filters above and save them for quick access
                 </p>
               </div>
@@ -648,69 +672,72 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
           )}
         </div>
 
-        {/* Bottom Sheet Overlay */}
+        {/* Filter Modal - Centered Dialog */}
         {showFilters && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/50 z-40 animate-fadeIn"
-              onClick={() => setShowFilters(false)}
-            />
-            <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[85vh] overflow-y-auto animate-slideUp">
-              {/* Bottom sheet header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 rounded-t-2xl z-10">
-                {/* Grab handle */}
-                <div className="flex justify-center pt-3 pb-2">
-                  <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
-                </div>
-
-                <div className="px-4 pb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Filter size={20} className="text-blue-600" />
-                    <h3 className="text-lg font-bold text-gray-900">Filters</h3>
-                    {activeCount > 0 && (
-                      <span className="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs font-bold rounded-full">
-                        {activeCount}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {activeCount > 0 && (
+          <div
+            className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm overflow-y-auto pb-[72px] sm:pb-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowFilters(false)
+            }}
+          >
+            <div className="w-full max-w-2xl my-auto flex flex-col max-h-[calc(100vh-88px)] sm:max-h-[90vh]">
+              <Card className="relative flex flex-col max-h-full overflow-hidden">
+                {/* Modal Header */}
+                <div className="pb-4 border-b border-white/10 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-500/20 rounded-lg">
+                        <Filter size={20} className="text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-white">Filters</h3>
+                        {activeCount > 0 && (
+                          <p className="text-sm text-gray-400">{activeCount} active filter{activeCount !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {activeCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={clearAllFilters}
+                          className="text-sm text-red-400 font-semibold px-3 py-1.5 hover:bg-red-500/20 rounded-lg transition-colors"
+                        >
+                          Clear All
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={clearAllFilters}
-                        className="text-sm text-red-600 font-semibold px-3 py-1.5 hover:bg-red-50 rounded-lg transition-colors"
+                        onClick={() => setShowFilters(false)}
+                        className="p-2 rounded-lg hover:bg-white/10 transition-colors text-gray-400 hover:text-white"
+                        title="Close"
                       >
-                        Clear All
+                        <X size={20} />
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowFilters(false)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                      <X size={20} />
-                    </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Bottom sheet content */}
-              <div className="p-4">
-                <FiltersContent />
-              </div>
+                {/* Modal Content - Scrollable */}
+                <div className="flex-1 overflow-y-auto py-4 min-h-0">
+                  <div className="bg-white/5 rounded-xl p-4">
+                    <FiltersContent />
+                  </div>
+                </div>
 
-              {/* Bottom sheet footer */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 z-10">
-                <button
-                  type="button"
-                  onClick={() => setShowFilters(false)}
-                  className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700"
-                >
-                  Apply Filters
-                </button>
-              </div>
+                {/* Modal Footer */}
+                <div className="pt-4 border-t border-white/10 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowFilters(false)}
+                    className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </Card>
             </div>
-          </>
+          </div>
         )}
       </>
     )
