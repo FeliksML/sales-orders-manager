@@ -753,3 +753,79 @@ class CheckoutSessionResponse(BaseModel):
 class PortalSessionResponse(BaseModel):
     """Response from create portal session"""
     portal_url: str
+
+
+# Admin Notification Schemas
+class NotificationDeliveryResponse(BaseModel):
+    """Response schema for notification delivery attempts"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    notification_id: int
+    channel: str
+    status: str
+    attempt_number: int
+    sent_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+    response_data: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+
+class AdminNotificationResponse(BaseModel):
+    """Response schema for admin notification listing"""
+    model_config = ConfigDict(from_attributes=True)
+
+    notificationid: int
+    userid: int
+    orderid: Optional[int] = None
+    notification_type: str
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime
+    # Delivery status per channel (computed from deliveries)
+    email_status: Optional[str] = None   # pending/sent/delivered/failed
+    sms_status: Optional[str] = None
+    browser_status: Optional[str] = None
+    # User info (joined)
+    user_email: str
+    user_name: str
+
+
+class UpcomingNotificationResponse(BaseModel):
+    """Response schema for upcoming notifications (predictive view)"""
+    type: str  # 'install_reminder_24h', 'today_install', 'followup_due'
+    expected_send_time: datetime
+    order_id: int
+    user_id: int
+    user_email: str
+    user_name: str
+    business_name: str
+    customer_name: str
+    install_date: Optional[date] = None
+    install_time: Optional[str] = None
+    channels_enabled: List[str]  # ['email', 'sms', 'browser']
+
+
+class PaginatedAdminNotificationResponse(BaseModel):
+    """Paginated response for admin notification listing"""
+    data: List[AdminNotificationResponse]
+    meta: PaginationMeta
+
+
+class NotificationStatsResponse(BaseModel):
+    """Response schema for notification delivery statistics"""
+    total_sent: int
+    total_failed: int
+    email_sent: int
+    email_failed: int
+    sms_sent: int
+    sms_failed: int
+    browser_sent: int
+    browser_failed: int
+    success_rate: float
+
+
+class RetryNotificationRequest(BaseModel):
+    """Request schema for retrying notification delivery"""
+    channel: Optional[str] = None  # If None, retry all failed channels

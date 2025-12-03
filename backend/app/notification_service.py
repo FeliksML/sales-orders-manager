@@ -10,7 +10,7 @@ import logging
 import time
 from functools import wraps
 import resend
-from .models import User, Order, Notification, Subscription, SMSUsage
+from .models import User, Order, Notification, NotificationDelivery, Subscription, SMSUsage
 from sqlalchemy.orm import Session
 
 # Configure logging
@@ -152,6 +152,43 @@ def increment_sms_usage(db: Session, user_id: int) -> int:
 
     db.commit()
     return new_count
+
+
+def log_delivery(
+    db: Session,
+    notification_id: int,
+    channel: str,
+    status: str,
+    error_message: str = None,
+    response_data: dict = None,
+    attempt: int = 1
+) -> NotificationDelivery:
+    """
+    Log a delivery attempt for auditing.
+
+    Args:
+        db: Database session
+        notification_id: ID of the notification
+        channel: 'email', 'sms', or 'browser'
+        status: 'pending', 'sent', 'delivered', 'failed'
+        error_message: Error message if failed
+        response_data: API response data for debugging
+        attempt: Attempt number (for retries)
+
+    Returns:
+        The created NotificationDelivery record
+    """
+    delivery = NotificationDelivery(
+        notification_id=notification_id,
+        channel=channel,
+        status=status,
+        attempt_number=attempt,
+        sent_at=datetime.utcnow() if status in ['sent', 'delivered'] else None,
+        error_message=error_message,
+        response_data=response_data
+    )
+    db.add(delivery)
+    return delivery
 
 
 def get_sms_usage(db: Session, user_id: int) -> Tuple[int, int]:
@@ -937,6 +974,10 @@ def send_install_reminder_sync(
         message=message
     )
 
+    # Add notification to get ID for delivery logging
+    db.add(notification)
+    db.flush()
+
     # Send via email if enabled
     if user.email_notifications:
         try:
@@ -949,22 +990,28 @@ def send_install_reminder_sync(
                 order=order
             )
             notification.sent_via_email = email_sent
+            log_delivery(db, notification.notificationid, 'email',
+                        'sent' if email_sent else 'failed')
         except Exception as e:
             logger.error(f"Email failed for install reminder: {e}")
             notification.sent_via_email = False
+            log_delivery(db, notification.notificationid, 'email', 'failed',
+                        error_message=str(e))
 
     # Send via SMS if enabled (with subscription gating)
     if user.sms_notifications and user.phone_number:
         sms_message = f"Hi {user.name}, reminder: Installation for {order.business_name} tomorrow at {order.install_time}. Customer: {order.customer_name}, {order.customer_phone}"
         sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
         notification.sent_via_sms = sms_sent
+        log_delivery(db, notification.notificationid, 'sms',
+                    'sent' if sms_sent else 'failed',
+                    error_message=None if sms_sent else sms_reason)
 
     # Browser notifications handled by frontend
     if user.browser_notifications:
         notification.sent_via_browser = True
+        log_delivery(db, notification.notificationid, 'browser', 'sent')
 
-    # Save notification to database
-    db.add(notification)
     if commit:
         db.commit()
 
@@ -1000,6 +1047,10 @@ def send_today_install_notification_sync(
         message=message
     )
 
+    # Add notification to get ID for delivery logging
+    db.add(notification)
+    db.flush()
+
     # Send via email if enabled
     if user.email_notifications:
         try:
@@ -1012,22 +1063,28 @@ def send_today_install_notification_sync(
                 order=order
             )
             notification.sent_via_email = email_sent
+            log_delivery(db, notification.notificationid, 'email',
+                        'sent' if email_sent else 'failed')
         except Exception as e:
             logger.error(f"Email failed for today install notification: {e}")
             notification.sent_via_email = False
+            log_delivery(db, notification.notificationid, 'email', 'failed',
+                        error_message=str(e))
 
     # Send via SMS if enabled (with subscription gating)
     if user.sms_notifications and user.phone_number:
         sms_message = f"Hi {user.name}, installation TODAY at {order.install_time} for {order.business_name}. Customer: {order.customer_name}, {order.customer_phone}"
         sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
         notification.sent_via_sms = sms_sent
+        log_delivery(db, notification.notificationid, 'sms',
+                    'sent' if sms_sent else 'failed',
+                    error_message=None if sms_sent else sms_reason)
 
     # Browser notifications
     if user.browser_notifications:
         notification.sent_via_browser = True
+        log_delivery(db, notification.notificationid, 'browser', 'sent')
 
-    # Save notification
-    db.add(notification)
     if commit:
         db.commit()
 
@@ -1065,6 +1122,10 @@ def send_custom_notification_sync(
         message=message
     )
 
+    # Add notification to get ID for delivery logging
+    db.add(notification)
+    db.flush()
+
     # Send via configured channels
     if user.email_notifications:
         try:
@@ -1077,9 +1138,13 @@ def send_custom_notification_sync(
                 order=order
             )
             notification.sent_via_email = email_sent
+            log_delivery(db, notification.notificationid, 'email',
+                        'sent' if email_sent else 'failed')
         except Exception as e:
             logger.error(f"Email failed for custom notification: {e}")
             notification.sent_via_email = False
+            log_delivery(db, notification.notificationid, 'email', 'failed',
+                        error_message=str(e))
 
     if user.sms_notifications and user.phone_number:
         sms_message = f"{title}: {message}"
@@ -1087,12 +1152,14 @@ def send_custom_notification_sync(
             sms_message += f" - {order.business_name}"
         sms_sent, sms_reason = send_sms_with_gating(db, user.userid, user.phone_number, sms_message)
         notification.sent_via_sms = sms_sent
+        log_delivery(db, notification.notificationid, 'sms',
+                    'sent' if sms_sent else 'failed',
+                    error_message=None if sms_sent else sms_reason)
 
     if user.browser_notifications:
         notification.sent_via_browser = True
+        log_delivery(db, notification.notificationid, 'browser', 'sent')
 
-    # Save notification
-    db.add(notification)
     if commit:
         db.commit()
 

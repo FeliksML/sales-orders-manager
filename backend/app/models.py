@@ -99,6 +99,21 @@ class Notification(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     read_at = Column(DateTime, nullable=True)
 
+class NotificationDelivery(Base):
+    """Track individual delivery attempts per channel for a notification."""
+    __tablename__ = 'notification_deliveries'
+
+    id = Column(Integer, primary_key=True)
+    notification_id = Column(Integer, ForeignKey('notifications.notificationid'), nullable=False, index=True)
+    channel = Column(String(20), nullable=False)  # 'email', 'sms', 'browser'
+    status = Column(String(20), nullable=False)   # 'pending', 'sent', 'delivered', 'failed'
+    attempt_number = Column(Integer, default=1)
+    sent_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    response_data = Column(JSON, nullable=True)   # API response details
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class AuditLog(Base):
     __tablename__ = 'audit_logs'
 

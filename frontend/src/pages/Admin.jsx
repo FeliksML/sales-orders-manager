@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { Users, AlertTriangle, Activity, Shield, TrendingUp, UserCheck, UserX, Search, CheckCircle, XCircle } from 'lucide-react'
+import { Users, AlertTriangle, Activity, Shield, TrendingUp, UserCheck, UserX, Search, CheckCircle, XCircle, Bell } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
 import Card from '../components/ui/Card'
@@ -12,6 +12,7 @@ const UsersTable = lazy(() => import('../components/admin/UsersTable'))
 const ErrorLogsTable = lazy(() => import('../components/admin/ErrorLogsTable'))
 const SystemAnalytics = lazy(() => import('../components/admin/SystemAnalytics'))
 const AuditLogViewer = lazy(() => import('../components/admin/AuditLogViewer'))
+const NotificationsTable = lazy(() => import('../components/admin/NotificationsTable'))
 
 import { API_BASE_URL } from '../utils/apiUrl'
 
@@ -58,6 +59,7 @@ function Admin() {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'users', label: 'Users', icon: Users },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'errors', label: 'Error Logs', icon: AlertTriangle },
     { id: 'audit', label: 'Audit Trail', icon: Shield }
   ]
@@ -241,6 +243,7 @@ function Admin() {
           )}
 
           {activeTab === 'users' && <UsersTable onRefresh={fetchAnalytics} />}
+          {activeTab === 'notifications' && <NotificationsTable />}
           {activeTab === 'errors' && <ErrorLogsTable onRefresh={fetchAnalytics} />}
           {activeTab === 'audit' && <AuditLogViewer />}
         </Suspense>

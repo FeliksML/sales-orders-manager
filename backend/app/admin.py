@@ -399,3 +399,422 @@ async def scheduler_status(
 ):
     """Get scheduler status (admin only)."""
     return get_scheduler_status()
+
+
+# =============================================================================
+# Admin Notification Management Endpoints
+# =============================================================================
+
+from .models import Notification, NotificationDelivery, FollowUp
+from .schemas import (
+    AdminNotificationResponse, UpcomingNotificationResponse,
+    NotificationDeliveryResponse, PaginatedAdminNotificationResponse,
+    NotificationStatsResponse, RetryNotificationRequest
+)
+from .notification_service import (
+    send_email_notification_sync, send_sms_with_gating, log_delivery
+)
+
+
+@router.get("/notifications", response_model=PaginatedAdminNotificationResponse)
+@limiter.limit("30/minute")
+async def get_admin_notifications(
+    request: Request,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    notification_type: Optional[str] = None,
+    channel: Optional[str] = None,
+    status: Optional[str] = None,
+    user_id: Optional[int] = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get all notifications with delivery status and filters."""
+    from sqlalchemy.orm import joinedload
+
+    # Build base query
+    query = db.query(Notification).join(User, Notification.userid == User.userid)
+
+    # Apply filters
+    if notification_type:
+        query = query.filter(Notification.notification_type == notification_type)
+
+    if user_id:
+        query = query.filter(Notification.userid == user_id)
+
+    if channel:
+        # Filter by channel (email, sms, browser)
+        if channel == 'email':
+            query = query.filter(Notification.sent_via_email == True)
+        elif channel == 'sms':
+            query = query.filter(Notification.sent_via_sms == True)
+        elif channel == 'browser':
+            query = query.filter(Notification.sent_via_browser == True)
+
+    # Get total count
+    total = query.count()
+
+    # Get notifications with pagination (newest first)
+    notifications = query.order_by(desc(Notification.created_at)).offset(skip).limit(limit).all()
+
+    # Build response with delivery status
+    result = []
+    for notification in notifications:
+        # Get user info
+        user = db.query(User).filter(User.userid == notification.userid).first()
+
+        # Get latest delivery status per channel
+        deliveries = db.query(NotificationDelivery).filter(
+            NotificationDelivery.notification_id == notification.notificationid
+        ).all()
+
+        email_status = None
+        sms_status = None
+        browser_status = None
+
+        for d in deliveries:
+            if d.channel == 'email':
+                email_status = d.status
+            elif d.channel == 'sms':
+                sms_status = d.status
+            elif d.channel == 'browser':
+                browser_status = d.status
+
+        # Apply status filter after fetching delivery status
+        if status:
+            matches_status = False
+            if email_status == status or sms_status == status or browser_status == status:
+                matches_status = True
+            if not matches_status:
+                continue
+
+        result.append(AdminNotificationResponse(
+            notificationid=notification.notificationid,
+            userid=notification.userid,
+            orderid=notification.orderid,
+            notification_type=notification.notification_type,
+            title=notification.title,
+            message=notification.message,
+            is_read=notification.is_read,
+            created_at=notification.created_at,
+            email_status=email_status,
+            sms_status=sms_status,
+            browser_status=browser_status,
+            user_email=user.email if user else 'Unknown',
+            user_name=user.name if user else 'Unknown'
+        ))
+
+    return PaginatedAdminNotificationResponse(
+        data=result,
+        meta=PaginationMeta(
+            total=total,
+            skip=skip,
+            limit=limit,
+            has_more=(skip + limit) < total
+        )
+    )
+
+
+@router.get("/notifications/upcoming", response_model=List[UpcomingNotificationResponse])
+@limiter.limit("30/minute")
+async def get_upcoming_notifications(
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get orders/follow-ups that will trigger notifications soon."""
+    from datetime import timedelta
+
+    now = datetime.now()
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+
+    upcoming = []
+
+    # 1. Tomorrow's installs → will get 24h reminder
+    tomorrow_orders = db.query(Order).join(User, Order.userid == User.userid).filter(
+        Order.install_date == tomorrow
+    ).all()
+
+    for order in tomorrow_orders:
+        user = db.query(User).filter(User.userid == order.userid).first()
+        if not user:
+            continue
+
+        channels = []
+        if user.email_notifications:
+            channels.append('email')
+        if user.sms_notifications and user.phone_number:
+            channels.append('sms')
+        if user.browser_notifications:
+            channels.append('browser')
+
+        # Check if notification already sent today
+        existing = db.query(Notification).filter(
+            Notification.userid == order.userid,
+            Notification.orderid == order.orderid,
+            Notification.notification_type == 'install_reminder_24h',
+            func.date(Notification.created_at) == today
+        ).first()
+
+        if not existing and channels:
+            upcoming.append(UpcomingNotificationResponse(
+                type='install_reminder_24h',
+                expected_send_time=now + timedelta(hours=1),  # Next scheduler run
+                order_id=order.orderid,
+                user_id=user.userid,
+                user_email=user.email,
+                user_name=user.name,
+                business_name=order.business_name,
+                customer_name=order.customer_name,
+                install_date=order.install_date,
+                install_time=order.install_time,
+                channels_enabled=channels
+            ))
+
+    # 2. Today's installs → will get today notification
+    today_orders = db.query(Order).join(User, Order.userid == User.userid).filter(
+        Order.install_date == today
+    ).all()
+
+    for order in today_orders:
+        user = db.query(User).filter(User.userid == order.userid).first()
+        if not user:
+            continue
+
+        channels = []
+        if user.email_notifications:
+            channels.append('email')
+        if user.sms_notifications and user.phone_number:
+            channels.append('sms')
+        if user.browser_notifications:
+            channels.append('browser')
+
+        # Check if notification already sent today
+        existing = db.query(Notification).filter(
+            Notification.userid == order.userid,
+            Notification.orderid == order.orderid,
+            Notification.notification_type == 'today_install',
+            func.date(Notification.created_at) == today
+        ).first()
+
+        if not existing and channels:
+            upcoming.append(UpcomingNotificationResponse(
+                type='today_install',
+                expected_send_time=now + timedelta(hours=2),  # Next scheduler run
+                order_id=order.orderid,
+                user_id=user.userid,
+                user_email=user.email,
+                user_name=user.name,
+                business_name=order.business_name,
+                customer_name=order.customer_name,
+                install_date=order.install_date,
+                install_time=order.install_time,
+                channels_enabled=channels
+            ))
+
+    # 3. Follow-ups due soon
+    due_followups = db.query(FollowUp).join(Order, FollowUp.order_id == Order.orderid).filter(
+        FollowUp.status == 'pending',
+        FollowUp.notification_sent == False,
+        FollowUp.due_date <= now + timedelta(hours=1)
+    ).all()
+
+    for followup in due_followups:
+        order = db.query(Order).filter(Order.orderid == followup.order_id).first()
+        user = db.query(User).filter(User.userid == followup.user_id).first()
+        if not order or not user:
+            continue
+
+        channels = []
+        if user.email_notifications:
+            channels.append('email')
+        if user.sms_notifications and user.phone_number:
+            channels.append('sms')
+        if user.browser_notifications:
+            channels.append('browser')
+
+        if channels:
+            upcoming.append(UpcomingNotificationResponse(
+                type='followup_due',
+                expected_send_time=followup.due_date,
+                order_id=order.orderid,
+                user_id=user.userid,
+                user_email=user.email,
+                user_name=user.name,
+                business_name=order.business_name,
+                customer_name=order.customer_name,
+                install_date=order.install_date,
+                install_time=order.install_time,
+                channels_enabled=channels
+            ))
+
+    # Sort by expected send time
+    upcoming.sort(key=lambda x: x.expected_send_time)
+
+    return upcoming
+
+
+@router.get("/notifications/{notification_id}/deliveries", response_model=List[NotificationDeliveryResponse])
+@limiter.limit("30/minute")
+async def get_notification_deliveries(
+    request: Request,
+    notification_id: int,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get all delivery attempts for a notification."""
+    # Verify notification exists
+    notification = db.query(Notification).filter(
+        Notification.notificationid == notification_id
+    ).first()
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    deliveries = db.query(NotificationDelivery).filter(
+        NotificationDelivery.notification_id == notification_id
+    ).order_by(desc(NotificationDelivery.created_at)).all()
+
+    return [NotificationDeliveryResponse.model_validate(d) for d in deliveries]
+
+
+@router.post("/notifications/{notification_id}/retry")
+@limiter.limit("10/minute")
+async def retry_notification(
+    request: Request,
+    notification_id: int,
+    retry_data: RetryNotificationRequest = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Retry failed notification delivery."""
+    # Get the notification
+    notification = db.query(Notification).filter(
+        Notification.notificationid == notification_id
+    ).first()
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    # Get user and order
+    user = db.query(User).filter(User.userid == notification.userid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    order = None
+    if notification.orderid:
+        order = db.query(Order).filter(Order.orderid == notification.orderid).first()
+
+    channel = retry_data.channel if retry_data else None
+    retried = []
+
+    # Get current attempt numbers
+    max_attempts = {}
+    for d in db.query(NotificationDelivery).filter(
+        NotificationDelivery.notification_id == notification_id
+    ).all():
+        if d.channel not in max_attempts or d.attempt_number > max_attempts[d.channel]:
+            max_attempts[d.channel] = d.attempt_number
+
+    # Retry email if requested or all channels
+    if (channel is None or channel == 'email') and notification.sent_via_email == False:
+        try:
+            email_sent = send_email_notification_sync(
+                user_email=user.email,
+                user_name=user.name,
+                subject=notification.title,
+                title=notification.title,
+                message=notification.message,
+                order=order
+            )
+            attempt = max_attempts.get('email', 0) + 1
+            log_delivery(db, notification_id, 'email',
+                        'sent' if email_sent else 'failed',
+                        attempt=attempt)
+            if email_sent:
+                notification.sent_via_email = True
+                retried.append('email')
+        except Exception as e:
+            attempt = max_attempts.get('email', 0) + 1
+            log_delivery(db, notification_id, 'email', 'failed',
+                        error_message=str(e), attempt=attempt)
+
+    # Retry SMS if requested or all channels
+    if (channel is None or channel == 'sms') and notification.sent_via_sms == False:
+        if user.phone_number:
+            sms_message = f"{notification.title}: {notification.message}"
+            sms_sent, sms_reason = send_sms_with_gating(
+                db, user.userid, user.phone_number, sms_message
+            )
+            attempt = max_attempts.get('sms', 0) + 1
+            log_delivery(db, notification_id, 'sms',
+                        'sent' if sms_sent else 'failed',
+                        error_message=None if sms_sent else sms_reason,
+                        attempt=attempt)
+            if sms_sent:
+                notification.sent_via_sms = True
+                retried.append('sms')
+
+    db.commit()
+
+    if retried:
+        return {"success": True, "message": f"Retried: {', '.join(retried)}"}
+    else:
+        return {"success": False, "message": "No channels to retry or all retries failed"}
+
+
+@router.get("/notifications/stats", response_model=NotificationStatsResponse)
+@limiter.limit("30/minute")
+async def get_notification_stats(
+    request: Request,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Get notification delivery statistics."""
+    # Count by channel and status
+    email_sent = db.query(func.count(NotificationDelivery.id)).filter(
+        NotificationDelivery.channel == 'email',
+        NotificationDelivery.status == 'sent'
+    ).scalar() or 0
+
+    email_failed = db.query(func.count(NotificationDelivery.id)).filter(
+        NotificationDelivery.channel == 'email',
+        NotificationDelivery.status == 'failed'
+    ).scalar() or 0
+
+    sms_sent = db.query(func.count(NotificationDelivery.id)).filter(
+        NotificationDelivery.channel == 'sms',
+        NotificationDelivery.status == 'sent'
+    ).scalar() or 0
+
+    sms_failed = db.query(func.count(NotificationDelivery.id)).filter(
+        NotificationDelivery.channel == 'sms',
+        NotificationDelivery.status == 'failed'
+    ).scalar() or 0
+
+    browser_sent = db.query(func.count(NotificationDelivery.id)).filter(
+        NotificationDelivery.channel == 'browser',
+        NotificationDelivery.status == 'sent'
+    ).scalar() or 0
+
+    browser_failed = db.query(func.count(NotificationDelivery.id)).filter(
+        NotificationDelivery.channel == 'browser',
+        NotificationDelivery.status == 'failed'
+    ).scalar() or 0
+
+    total_sent = email_sent + sms_sent + browser_sent
+    total_failed = email_failed + sms_failed + browser_failed
+    total = total_sent + total_failed
+
+    success_rate = (total_sent / total * 100) if total > 0 else 100.0
+
+    return NotificationStatsResponse(
+        total_sent=total_sent,
+        total_failed=total_failed,
+        email_sent=email_sent,
+        email_failed=email_failed,
+        sms_sent=sms_sent,
+        sms_failed=sms_failed,
+        browser_sent=browser_sent,
+        browser_failed=browser_failed,
+        success_rate=round(success_rate, 1)
+    )
