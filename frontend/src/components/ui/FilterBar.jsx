@@ -305,7 +305,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               inputMode="numeric"
               value={dateFromDisplay}
               onChange={(e) => handleDateInputChange('dateFrom', e.target.value)}
-              className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
+              className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base text-white bg-white/10 hover:bg-white/15 transition-colors ${
                 dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
               placeholder="MM/DD/YYYY"
@@ -315,7 +315,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
               inputMode="numeric"
               value={dateToDisplay}
               onChange={(e) => handleDateInputChange('dateTo', e.target.value)}
-              className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm text-white bg-white/10 hover:bg-white/15 transition-colors ${
+              className={`w-full min-w-0 max-w-full box-border px-2 sm:px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base text-white bg-white/10 hover:bg-white/15 transition-colors ${
                 dateRangeError ? 'border-red-400' : 'border-white/20'
               }`}
               placeholder="MM/DD/YYYY"
@@ -777,7 +777,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
                 {/* Modal Content - Scrollable */}
                 <div className="flex-1 overflow-y-auto overflow-x-hidden py-4 min-h-0">
                   <div className="bg-white/5 rounded-xl p-2 sm:p-4">
-                    <FiltersContent />
+                    {FiltersContent()}
                   </div>
                 </div>
 
@@ -883,7 +883,7 @@ function FilterBar({ onFilterChange, onClearFilters, totalResults = 0, filteredR
       {/* Advanced filters panel */}
       {showFilters && (
         <Card className="p-6 animate-fadeIn shadow-xl">
-          <FiltersContent />
+          {FiltersContent()}
         </Card>
       )}
 
