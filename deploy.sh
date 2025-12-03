@@ -255,13 +255,10 @@ echo -e "  ${CYAN}🔄 STEP 5.5/9: Running Database Migrations${NC}"
 echo -e "  ${YELLOW}\"Evolution is constant - even for databases\"${NC}"
 echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# Run notification dedup migration (prevents duplicate notifications)
-echo -e "  🔔 Running notification deliviry migration..."
-if docker compose -f docker-compose.prod.yml run --rm backend python migrate_notification_deliviry.py 2>&1 | grep -q "successfully\|already exists"; then
-    echo -e "  ${GREEN}✅ Notification dedup migration${NC} - No more duplicates! 🎯"
-else
-    echo -e "  ${YELLOW}⚠️  Notification migration had issues (may already be applied)${NC}"
-fi
+# Run notification delivery tracking migration
+echo -e "  🔔 Running notification delivery migration..."
+docker compose -f docker-compose.prod.yml run --rm backend python migrate_notification_delivery.py 2>&1
+echo -e "  ${GREEN}✅ Notification delivery migration complete${NC} - Delivery tracking enabled! 📊"
 
 # Run subscriptions migration if it exists
 if [ -f "backend/migrate_subscriptions.py" ]; then
