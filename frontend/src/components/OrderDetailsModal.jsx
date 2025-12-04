@@ -4,7 +4,7 @@ import {
   CheckCircle, Clock, AlertCircle, Mail, Hash, Shield, FileText,
   Wifi, Tv, Smartphone, PhoneCall, Radio, Check, CalendarClock, Copy, Send, Trash2, DollarSign, Bell
 } from 'lucide-react'
-import { validateEmail, validatePhone } from '@sales-order-manager/shared'
+import { validateEmail, validatePhone, getInstallStatus } from '@sales-order-manager/shared'
 import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 import AuditLog from './AuditLog'
@@ -379,13 +379,12 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
   }
 
-  // Check if installation is complete (past install date)
-  const installDate = formData.install_date ? new Date(formData.install_date + 'T00:00:00') : new Date()
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const isInstalled = installDate < today
-  const isToday = installDate.getTime() === today.getTime()
-  const isPending = installDate > today
+  // Use the shared getInstallStatus function for consistency across the app
+  // Must use order.completed_at (not formData) since completed_at is set by backend
+  const status = getInstallStatus(formData.install_date, order?.completed_at)
+  const isInstalled = status === 'installed'
+  const isToday = status === 'today'
+  const isPending = status === 'pending'
 
   const totalProducts =
     (formData.has_internet ? 1 : 0) +
@@ -445,15 +444,17 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
               <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
                 {!isEditing && !showReschedule && (
                   <>
-                    {/* Schedule Follow-up Button */}
-                    <button
-                      onClick={() => setShowFollowUpModal(true)}
-                      className="px-3 sm:px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 transition-all hover:scale-105 text-amber-300 hover:text-amber-200 text-sm font-medium flex items-center gap-2 shadow-sm"
-                      title="Schedule follow-up reminder"
-                    >
-                      <Bell className="w-4 h-4" />
-                      <span>Follow-Up</span>
-                    </button>
+                    {/* Schedule Follow-up Button - Only show for INSTALLED orders */}
+                    {isInstalled && (
+                      <button
+                        onClick={() => setShowFollowUpModal(true)}
+                        className="px-3 sm:px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 transition-all hover:scale-105 text-amber-300 hover:text-amber-200 text-sm font-medium flex items-center gap-2 shadow-sm"
+                        title="Schedule follow-up reminder"
+                      >
+                        <Bell className="w-4 h-4" />
+                        <span>Follow-Up</span>
+                      </button>
+                    )}
                     {isPending && (
                       <button
                         onClick={() => setShowReschedule(true)}
@@ -549,15 +550,17 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
               <div className="flex items-center gap-3 flex-shrink-0">
                 {!isEditing && !showReschedule && (
                   <>
-                    {/* Schedule Follow-up Button */}
-                    <button
-                      onClick={() => setShowFollowUpModal(true)}
-                      className="px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 transition-all hover:scale-105 text-amber-300 hover:text-amber-200 text-sm font-medium flex items-center gap-2 shadow-sm"
-                      title="Schedule follow-up reminder"
-                    >
-                      <Bell className="w-4 h-4" />
-                      <span>Follow-Up</span>
-                    </button>
+                    {/* Schedule Follow-up Button - Only show for INSTALLED orders */}
+                    {isInstalled && (
+                      <button
+                        onClick={() => setShowFollowUpModal(true)}
+                        className="px-4 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 transition-all hover:scale-105 text-amber-300 hover:text-amber-200 text-sm font-medium flex items-center gap-2 shadow-sm"
+                        title="Schedule follow-up reminder"
+                      >
+                        <Bell className="w-4 h-4" />
+                        <span>Follow-Up</span>
+                      </button>
+                    )}
                     {isPending && (
                       <button
                         onClick={() => setShowReschedule(true)}

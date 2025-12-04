@@ -119,7 +119,12 @@ function OrdersTab() {
       await orderService.updateOrder(orderId, orderData)
       invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh()
-      setSelectedOrder(prev => ({ ...prev, ...orderData }))
+
+      // Refetch the single order to get full updated data including completed_at
+      // This ensures the modal shows the correct status after the update
+      const updatedOrder = await orderService.getOrder(orderId)
+      setSelectedOrder(updatedOrder)
+
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
