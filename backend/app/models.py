@@ -23,6 +23,7 @@ class User(Base):
     email_notifications = Column(Boolean, default=True, nullable=False)
     sms_notifications = Column(Boolean, default=False, nullable=False)
     browser_notifications = Column(Boolean, default=True, nullable=False)
+    timezone = Column(String(50), default='America/Los_Angeles', nullable=False)
 
     # Admin role
     is_admin = Column(Boolean, default=False, nullable=False)

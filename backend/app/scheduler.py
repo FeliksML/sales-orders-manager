@@ -7,6 +7,7 @@ import logging
 import fcntl
 import os
 import re
+from zoneinfo import ZoneInfo
 from .database import SessionLocal
 from .models import User, Order, Notification, FollowUp
 from .export_utils import generate_stats_excel
@@ -299,48 +300,66 @@ def check_installation_reminders():
     Fixed logic: Only sends reminder when we're within 23-25 hours of the
     actual install time, not just when install_date == tomorrow.
 
-    Note: Uses naive datetimes assuming server is in deployment timezone.
+    Uses timezone-aware datetimes to support users across multiple US timezones.
+    Install times are interpreted in the user's configured timezone.
     """
     logger.info("=" * 50)
     logger.info("Running installation reminder check")
-    now = datetime.utcnow()
-    logger.info(f"Current time (UTC): {now}")
+
+    # Use timezone-aware UTC time for consistent calculations
+    now_utc = datetime.now(ZoneInfo('UTC'))
+    today_utc = now_utc.date()
+    logger.info(f"Current time (UTC): {now_utc}")
 
     with SessionLocal() as db:
         try:
-            # Get installations scheduled for tomorrow or day after (to catch edge cases)
-            tomorrow = date.today() + timedelta(days=1)
+            # Get installations scheduled for tomorrow or day after (to catch edge cases across timezones)
+            # Using UTC date as reference, but we'll check actual times per user timezone
+            tomorrow = today_utc + timedelta(days=1)
             day_after = tomorrow + timedelta(days=1)
-            logger.info(f"Checking for installations on: {tomorrow} and {day_after}")
+            # Also check today's date to catch orders for users in timezones ahead of UTC
+            logger.info(f"Checking for installations on: {today_utc}, {tomorrow}, and {day_after}")
 
-            # Get all orders scheduled for tomorrow or day after
-            orders = db.query(Order).filter(Order.install_date.in_([tomorrow, day_after])).all()
+            # Get all orders scheduled for today, tomorrow, or day after
+            orders = db.query(Order).filter(Order.install_date.in_([today_utc, tomorrow, day_after])).all()
 
             logger.info(f"Found {len(orders)} potential installations to check")
 
             reminders_sent = 0
             for order in orders:
-                # Parse install_time to build full datetime
-                install_datetime = parse_install_datetime(order.install_date, order.install_time)
-                if install_datetime is None:
+                # Get user first to get their timezone
+                user = db.query(User).filter(User.userid == order.userid).first()
+                if not user:
+                    logger.warning(f"User not found for order {order.orderid}")
+                    continue
+
+                # Get user's timezone (default to Pacific if not set)
+                user_tz_str = getattr(user, 'timezone', None) or 'America/Los_Angeles'
+                try:
+                    user_tz = ZoneInfo(user_tz_str)
+                except Exception:
+                    logger.warning(f"Invalid timezone '{user_tz_str}' for user {user.userid}, using Pacific")
+                    user_tz = ZoneInfo('America/Los_Angeles')
+
+                # Parse install_time to build full datetime in user's timezone
+                install_datetime_naive = parse_install_datetime(order.install_date, order.install_time)
+                if install_datetime_naive is None:
                     logger.warning(f"Could not parse install time for order {order.orderid}: {order.install_time}")
                     continue
 
-                # Calculate hours until install
-                hours_until_install = (install_datetime - now).total_seconds() / 3600
+                # Make the install datetime timezone-aware in user's timezone, then convert to UTC
+                install_datetime_local = install_datetime_naive.replace(tzinfo=user_tz)
+                install_datetime_utc = install_datetime_local.astimezone(ZoneInfo('UTC'))
+
+                # Calculate hours until install using UTC times
+                hours_until_install = (install_datetime_utc - now_utc).total_seconds() / 3600
 
                 # Only send reminder if within 23-25 hour window (1 hour tolerance for scheduler interval)
                 if not (23 <= hours_until_install <= 25):
                     logger.debug(f"Order {order.orderid}: {hours_until_install:.1f} hours until install, outside 23-25h window")
                     continue
 
-                logger.info(f"Order {order.orderid}: {hours_until_install:.1f} hours until install at {install_datetime}")
-
-                # Get user
-                user = db.query(User).filter(User.userid == order.userid).first()
-                if not user:
-                    logger.warning(f"User not found for order {order.orderid}")
-                    continue
+                logger.info(f"Order {order.orderid}: {hours_until_install:.1f} hours until install at {install_datetime_local} ({user_tz_str})")
 
                 logger.info(f"Processing order {order.orderid} for user {user.email}")
 
@@ -354,7 +373,7 @@ def check_installation_reminders():
                         AND DATE(created_at) = :today
                         FOR UPDATE SKIP LOCKED
                     """),
-                    {"userid": user.userid, "orderid": order.orderid, "today": date.today()}
+                    {"userid": user.userid, "orderid": order.orderid, "today": today_utc}
                 ).fetchone()
 
                 if existing:
@@ -381,21 +400,28 @@ def check_today_installations():
     """Check and send notifications for today's installations.
 
     Uses atomic deduplication to prevent duplicate notifications.
+    Uses timezone-aware logic to determine "today" based on each user's timezone.
     """
     logger.info("=" * 50)
     logger.info("Running today's installation check")
-    logger.info(f"Current time (UTC): {datetime.utcnow()}")
+
+    # Use timezone-aware UTC time
+    now_utc = datetime.now(ZoneInfo('UTC'))
+    today_utc = now_utc.date()
+    logger.info(f"Current time (UTC): {now_utc}")
 
     with SessionLocal() as db:
         try:
-            # Get installations scheduled for today
-            today = date.today()
-            logger.info(f"Checking for installations on: {today}")
+            # Get installations scheduled for today or tomorrow (UTC) to handle timezone differences
+            # A user in Hawaii might have "today" when it's "tomorrow" in UTC
+            tomorrow_utc = today_utc + timedelta(days=1)
+            yesterday_utc = today_utc - timedelta(days=1)
+            logger.info(f"Checking for installations on: {yesterday_utc}, {today_utc}, and {tomorrow_utc}")
 
-            # Get all orders scheduled for today
-            orders = db.query(Order).filter(Order.install_date == today).all()
+            # Get all orders scheduled for yesterday, today, or tomorrow (UTC)
+            orders = db.query(Order).filter(Order.install_date.in_([yesterday_utc, today_utc, tomorrow_utc])).all()
 
-            logger.info(f"Found {len(orders)} total installations scheduled for today")
+            logger.info(f"Found {len(orders)} potential installations to check")
 
             notifications_sent = 0
             for order in orders:
@@ -405,7 +431,24 @@ def check_today_installations():
                     logger.warning(f"User not found for order {order.orderid}")
                     continue
 
-                logger.info(f"Processing order {order.orderid} for user {user.email}")
+                # Get user's timezone (default to Pacific if not set)
+                user_tz_str = getattr(user, 'timezone', None) or 'America/Los_Angeles'
+                try:
+                    user_tz = ZoneInfo(user_tz_str)
+                except Exception:
+                    logger.warning(f"Invalid timezone '{user_tz_str}' for user {user.userid}, using Pacific")
+                    user_tz = ZoneInfo('America/Los_Angeles')
+
+                # Get current date in user's timezone
+                now_user_tz = now_utc.astimezone(user_tz)
+                today_user = now_user_tz.date()
+
+                # Only process if the order is for "today" in the user's timezone
+                if order.install_date != today_user:
+                    logger.debug(f"Order {order.orderid}: install_date {order.install_date} != user's today {today_user}")
+                    continue
+
+                logger.info(f"Processing order {order.orderid} for user {user.email} (today in {user_tz_str})")
 
                 # Atomic duplicate check using SELECT FOR UPDATE SKIP LOCKED
                 existing = db.execute(
@@ -417,7 +460,7 @@ def check_today_installations():
                         AND DATE(created_at) = :today
                         FOR UPDATE SKIP LOCKED
                     """),
-                    {"userid": user.userid, "orderid": order.orderid, "today": today}
+                    {"userid": user.userid, "orderid": order.orderid, "today": today_utc}
                 ).fetchone()
 
                 if existing:
@@ -448,11 +491,15 @@ def check_due_followups():
     """
     logger.info("=" * 50)
     logger.info("Running follow-up reminder check")
-    logger.info(f"Current time (UTC): {datetime.utcnow()}")
+
+    # Use timezone-aware UTC time
+    now_utc = datetime.now(ZoneInfo('UTC'))
+    # Convert to naive datetime for comparison with existing naive datetime columns
+    now = now_utc.replace(tzinfo=None)
+    logger.info(f"Current time (UTC): {now_utc}")
 
     with SessionLocal() as db:
         try:
-            now = datetime.utcnow()
             # Check for follow-ups due within the next hour that haven't been notified
             one_hour_from_now = now + timedelta(hours=1)
 

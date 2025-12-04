@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from .database import get_db
-from .models import User, Notification
+from .models import User, Notification, Order
 from .auth import get_current_user
 import logging
 
@@ -14,17 +14,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# Valid US timezones for notification scheduling
+US_TIMEZONES = [
+    'America/New_York',      # Eastern Time
+    'America/Chicago',       # Central Time
+    'America/Denver',        # Mountain Time
+    'America/Los_Angeles',   # Pacific Time
+    'America/Anchorage',     # Alaska Time
+    'America/Phoenix',       # Arizona (no DST)
+    'Pacific/Honolulu',      # Hawaii Time
+]
+
+
 # Pydantic schemas
 class NotificationPreferences(BaseModel):
     phone_number: Optional[str] = None
     email_notifications: bool = True
     sms_notifications: bool = False
     browser_notifications: bool = True
+    timezone: str = 'America/Los_Angeles'
 
 
 class NotificationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     notificationid: int
     notification_type: str
     title: str
@@ -36,6 +49,7 @@ class NotificationResponse(BaseModel):
     created_at: datetime
     read_at: Optional[datetime]
     orderid: Optional[int]
+    account_name: Optional[str] = None  # Business name from associated order
 
 
 class NotificationUpdate(BaseModel):
@@ -57,7 +71,8 @@ def get_notification_preferences(
         "phone_number": current_user.phone_number,
         "email_notifications": current_user.email_notifications,
         "sms_notifications": current_user.sms_notifications,
-        "browser_notifications": current_user.browser_notifications
+        "browser_notifications": current_user.browser_notifications,
+        "timezone": current_user.timezone or 'America/Los_Angeles'
     }
 
 
@@ -77,6 +92,15 @@ def update_notification_preferences(
     current_user.sms_notifications = preferences.sms_notifications
     current_user.browser_notifications = preferences.browser_notifications
 
+    # Validate and update timezone
+    if preferences.timezone and preferences.timezone in US_TIMEZONES:
+        current_user.timezone = preferences.timezone
+    elif preferences.timezone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid timezone. Must be one of: {', '.join(US_TIMEZONES)}"
+        )
+
     db.commit()
     db.refresh(current_user)
 
@@ -86,7 +110,8 @@ def update_notification_preferences(
             "phone_number": current_user.phone_number,
             "email_notifications": current_user.email_notifications,
             "sms_notifications": current_user.sms_notifications,
-            "browser_notifications": current_user.browser_notifications
+            "browser_notifications": current_user.browser_notifications,
+            "timezone": current_user.timezone
         }
     }
 
@@ -100,7 +125,7 @@ def get_notifications(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get user's notifications"""
+    """Get user's notifications with account names from associated orders"""
 
     query = db.query(Notification).filter(Notification.userid == current_user.userid)
 
@@ -109,7 +134,33 @@ def get_notifications(
 
     notifications = query.order_by(desc(Notification.created_at)).offset(skip).limit(limit).all()
 
-    return notifications
+    # Enrich notifications with account_name from associated orders
+    result = []
+    for notification in notifications:
+        notification_dict = {
+            "notificationid": notification.notificationid,
+            "notification_type": notification.notification_type,
+            "title": notification.title,
+            "message": notification.message,
+            "sent_via_email": notification.sent_via_email,
+            "sent_via_sms": notification.sent_via_sms,
+            "sent_via_browser": notification.sent_via_browser,
+            "is_read": notification.is_read,
+            "created_at": notification.created_at,
+            "read_at": notification.read_at,
+            "orderid": notification.orderid,
+            "account_name": None
+        }
+
+        # Get account name from associated order if exists
+        if notification.orderid:
+            order = db.query(Order).filter(Order.orderid == notification.orderid).first()
+            if order:
+                notification_dict["account_name"] = order.business_name
+
+        result.append(notification_dict)
+
+    return result
 
 
 @router.get("/unread-count", response_model=UnreadCountResponse)

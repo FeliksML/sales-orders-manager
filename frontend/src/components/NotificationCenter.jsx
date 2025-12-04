@@ -240,6 +240,13 @@ const NotificationCenter = ({ isOpen, onClose }) => {
                         )}
                       </div>
 
+                      {/* Account Name */}
+                      {notification.account_name && (
+                        <p className="text-xs font-medium text-blue-600 mt-0.5">
+                          {notification.account_name}
+                        </p>
+                      )}
+
                       <p className="text-sm text-gray-600 mt-1">
                         {notification.message}
                       </p>

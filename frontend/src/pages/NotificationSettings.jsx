@@ -1,9 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Mail, Smartphone, Globe, Bell, CreditCard, Zap } from 'lucide-react';
+import { ArrowLeft, Mail, Smartphone, Globe, Bell, CreditCard, Zap, Clock } from 'lucide-react';
 import notificationService from '../services/notificationService';
 import billingService from '../services/billingService';
 import { formatErrorMessage } from '../utils/errorHandler';
+
+// US Timezone options
+const US_TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'America/Phoenix', label: 'Arizona (no DST)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+];
 
 const NotificationSettings = () => {
   const navigate = useNavigate();
@@ -15,7 +26,8 @@ const NotificationSettings = () => {
     phone_number: '',
     email_notifications: true,
     sms_notifications: false,
-    browser_notifications: true
+    browser_notifications: true,
+    timezone: 'America/Los_Angeles'
   });
   const [billingStatus, setBillingStatus] = useState({
     subscription_status: 'free',
@@ -466,7 +478,7 @@ const NotificationSettings = () => {
           </div>
 
           {/* Browser Notifications */}
-          <div className="mb-6">
+          <div className="mb-6 pb-6" style={{ borderBottom: '1px solid rgba(0, 200, 255, 0.2)' }}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
@@ -570,6 +582,48 @@ const NotificationSettings = () => {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Timezone Setting */}
+          <div className="mb-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div
+                className="p-2 rounded-lg"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.3) 0%, rgba(234, 88, 12, 0.3) 100%)',
+                }}
+              >
+                <Clock className="w-5 h-5 text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white mb-1">
+                  Your Timezone
+                </h3>
+                <p className="text-sm text-gray-300 mb-3">
+                  Set your timezone for accurate notification timing. Installation reminders will be sent based on your local time.
+                </p>
+                <select
+                  value={preferences.timezone}
+                  onChange={(e) =>
+                    setPreferences({
+                      ...preferences,
+                      timezone: e.target.value
+                    })
+                  }
+                  className="w-full max-w-md px-4 py-2 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 cursor-pointer"
+                  style={{
+                    backgroundColor: 'rgba(0, 15, 33, 0.4)',
+                    border: '1px solid rgba(0, 200, 255, 0.3)',
+                  }}
+                >
+                  {US_TIMEZONES.map((tz) => (
+                    <option key={tz.value} value={tz.value} className="bg-gray-800">
+                      {tz.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Info Box */}
