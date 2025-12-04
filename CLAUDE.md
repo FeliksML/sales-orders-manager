@@ -37,18 +37,77 @@ pytest backend/tests/ --cov=app
 
 # Frontend
 cd frontend && npm run dev    # http://localhost:5173
-
-# Docker
-docker-compose up -d
 ```
 
 ## Deployment
 **Important**: This app runs on a VM server, not locally. For deployment:
 1. Commit changes with a descriptive message
 2. Push to origin/main
-3. App auto-deploys on the VM server
+3. Rebuild the Docker container (see Docker Operations below)
 
-Do NOT run local npm build/test to verify - just commit and push.
+---
+
+## Docker Operations (CRITICAL - READ CAREFULLY)
+
+### Container Architecture
+- **Two compose files**:
+  - `docker-compose.yml` = Development (DO NOT USE ON SERVER)
+  - `docker-compose.prod.yml` = Production (ALWAYS USE THIS)
+- **Container names in production**: `sales-order-backend-prod`, `sales-order-frontend-prod`, `sales-order-database-prod`
+- **Backend code is BAKED into the image** - NOT volume mounted. Changes require REBUILD.
+- **Frontend src/ IS volume mounted** - hot reloads automatically
+
+### Common Mistakes (DO NOT DO THESE)
+```bash
+# ❌ WRONG - just restarts old container with old code
+docker compose restart backend
+
+# ❌ WRONG - uses development config, will crash on production server
+docker compose up -d --build backend
+
+# ❌ WRONG - wrong container name
+docker exec sales-order-backend ...
+```
+
+### Correct Commands for Production
+```bash
+# ✅ Rebuild and restart backend (after code changes)
+docker compose -f docker-compose.prod.yml up -d --build backend
+
+# ✅ Rebuild and restart frontend
+docker compose -f docker-compose.prod.yml up -d --build frontend
+
+# ✅ Rebuild everything
+docker compose -f docker-compose.prod.yml up -d --build
+
+# ✅ View backend logs
+docker logs sales-order-backend-prod --tail 100
+
+# ✅ View frontend logs
+docker logs sales-order-frontend-prod --tail 100
+
+# ✅ Check container status
+docker compose -f docker-compose.prod.yml ps
+
+# ✅ Execute command in backend container
+docker exec sales-order-backend-prod <command>
+
+# ✅ Verify code is deployed (check a specific line)
+docker exec sales-order-backend-prod cat /app/app/orders.py | grep -A 5 "search term"
+```
+
+### After Making Backend Code Changes
+1. Edit the Python file
+2. Commit: `git add . && git commit -m "message"`
+3. Push: `GIT_SSH_COMMAND="ssh -i ~/.ssh/github_actions -o IdentitiesOnly=yes" git push`
+4. **REBUILD**: `docker compose -f docker-compose.prod.yml up -d --build backend`
+5. **VERIFY**: Check logs and confirm code is in container
+
+### Troubleshooting
+- **Backend shows "unhealthy"**: Check logs with `docker logs sales-order-backend-prod --tail 50`
+- **SECRET_KEY error**: You used dev config instead of prod. Rebuild with `-f docker-compose.prod.yml`
+- **Code changes not working**: You forgot to rebuild. `restart` ≠ `rebuild`
+- **Wrong container name**: Production containers have `-prod` suffix
 
 ## Code Style
 
