@@ -111,7 +111,7 @@ function App() {
                     </ProtectedRoute>
                   }
                 >
-                  <Route index element={<Navigate to="orders" replace />} />
+                  <Route index element={<Navigate to="earnings" replace />} />
                   <Route path="orders" element={<OrdersTab />} />
                   <Route path="earnings" element={<EarningsTab />} />
                   <Route path="analytics" element={<AnalyticsTab />} />
