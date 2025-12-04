@@ -3,7 +3,8 @@ from fastapi.responses import Response, StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, or_, case
 from typing import List, Optional
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
+from zoneinfo import ZoneInfo
 import io
 from .database import get_db
 from .models import Order, User, Notification, DeletedOrder, IdempotencyKey, FollowUp
@@ -142,17 +143,33 @@ def build_filtered_orders_query(
             query = query.filter(or_(*product_conditions))
 
     # Install status filter
+    # Status is DERIVED from completed_at and install_date (matches frontend getInstallStatus logic):
+    # - installed: completed_at IS NOT NULL, OR (completed_at IS NULL AND install_date < today)
+    # - today: completed_at IS NULL AND install_date == today
+    # - pending: completed_at IS NULL AND install_date > today
     if install_status:
         today = date.today()
         status_list = [s.strip().lower() for s in install_status.split(',')]
         status_conditions = []
 
         if 'installed' in status_list:
-            status_conditions.append(Order.install_date < today)
+            # Installed = explicitly completed OR past date without completion
+            status_conditions.append(
+                or_(
+                    Order.completed_at != None,
+                    and_(Order.completed_at == None, Order.install_date < today)
+                )
+            )
         if 'today' in status_list:
-            status_conditions.append(Order.install_date == today)
+            # Today = scheduled for today and not yet completed
+            status_conditions.append(
+                and_(Order.completed_at == None, Order.install_date == today)
+            )
         if 'pending' in status_list:
-            status_conditions.append(Order.install_date > today)
+            # Pending = future date and not yet completed
+            status_conditions.append(
+                and_(Order.completed_at == None, Order.install_date > today)
+            )
 
         if status_conditions:
             query = query.filter(or_(*status_conditions))
@@ -1543,16 +1560,20 @@ def bulk_mark_installed(
             detail="Some orders not found or don't belong to you"
         )
 
-    # Update all orders - mark as completed with today's date and current time
-    today = date.today()
-    now = datetime.utcnow()
-    current_time = now.strftime("%I:%M %p").lstrip('0')  # e.g., "2:30 PM"
+    # Update all orders - mark as completed with user's local date and time
+    # Use user's timezone for the install date/time (what they see)
+    # Store completed_at as naive UTC timestamp
+    now_utc = datetime.now(timezone.utc)
+    user_tz = ZoneInfo(current_user.timezone or 'America/Los_Angeles')
+    now_local = now_utc.astimezone(user_tz)
+    user_date = now_local.date()
+    current_time = now_local.strftime("%I:%M %p").lstrip('0')  # e.g., "2:30 PM"
 
     for order in orders:
-        # Set completed_at timestamp to mark as installed
-        order.completed_at = now
-        # Always set to today (the actual install date) and current time
-        order.install_date = today
+        # Set completed_at timestamp to mark as installed (naive UTC)
+        order.completed_at = now_utc.replace(tzinfo=None)
+        # Set install date/time to user's local date/time
+        order.install_date = user_date
         order.install_time = current_time
 
     # Log bulk operation
@@ -1562,7 +1583,7 @@ def bulk_mark_installed(
         entity_type='order',
         entity_ids=request.order_ids,
         user=current_user,
-        field_changes={'completed_at': str(now), 'install_date': str(today), 'install_time': current_time},
+        field_changes={'completed_at': str(now_utc), 'install_date': str(user_date), 'install_time': current_time},
         ip_address=None,
         reason="Bulk mark as installed"
     )

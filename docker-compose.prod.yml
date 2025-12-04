@@ -43,6 +43,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      - TZ=UTC
       - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY}
       - FRONTEND_URL=${FRONTEND_URL}

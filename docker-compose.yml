@@ -29,6 +29,7 @@ services:
       target: development  # Use development stage
     container_name: sales-order-backend
     environment:
+      - TZ=UTC
       - DATABASE_URL=postgresql://salesorder:salesorder_dev_password@database:5432/spectrum_orders
       - SECRET_KEY=development-secret-key-change-in-production-abcdef123456
       - FRONTEND_URL=http://localhost:5173

@@ -1,4 +1,5 @@
-import { useState, useCallback, lazy, Suspense } from 'react'
+import { useState, useCallback, lazy, Suspense, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Package, TrendingUp, Calendar, Wifi, Tv, Smartphone, Phone, Download, FileBarChart, Clock, CalendarDays, List, Plus, WifiOff } from 'lucide-react'
 import DashboardHeader from '../components/DashboardHeader'
 import StatCard from '../components/ui/StatCard'
@@ -33,6 +34,7 @@ const PerformanceInsights = lazy(() => import('../components/PerformanceInsights
 
 function Dashboard() {
   const [filters, setFilters] = useState({})
+  const [searchParams, setSearchParams] = useSearchParams()
   const isOnline = useOnlineStatus()
   const { showToast } = useToast()
 
@@ -80,6 +82,29 @@ function Dashboard() {
   const [isBulkRescheduleModalOpen, setIsBulkRescheduleModalOpen] = useState(false)
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
+
+  // Handle viewOrder URL param (for opening order from notification click)
+  useEffect(() => {
+    const viewOrderId = searchParams.get('viewOrder')
+    if (viewOrderId) {
+      // Fetch the order and open the modal
+      orderService.getOrder(viewOrderId)
+        .then(order => {
+          setSelectedOrder(order)
+          setIsDetailsModalOpen(true)
+          // Clear the URL param
+          searchParams.delete('viewOrder')
+          setSearchParams(searchParams, { replace: true })
+        })
+        .catch(error => {
+          console.error('Failed to load order from notification:', error)
+          showToast('Could not load order details', 'error')
+          // Clear the URL param even on error
+          searchParams.delete('viewOrder')
+          setSearchParams(searchParams, { replace: true })
+        })
+    }
+  }, [searchParams, setSearchParams, showToast])
 
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters)

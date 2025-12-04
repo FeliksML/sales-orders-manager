@@ -1,11 +1,27 @@
 import { useState, useEffect } from 'react';
 import notificationService from '../services/notificationService';
 
-const NotificationCenter = ({ isOpen, onClose }) => {
+const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' or 'unread'
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Handle clicking on a notification to view the associated order
+  const handleNotificationClick = async (notification) => {
+    if (notification.orderid && onViewOrder) {
+      // Mark as read when viewing
+      if (!notification.is_read) {
+        try {
+          await notificationService.updateNotification(notification.notificationid, true);
+        } catch (error) {
+          console.error('Failed to mark notification as read:', error);
+        }
+      }
+      onViewOrder(notification.orderid);
+      onClose();
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -213,9 +229,10 @@ const NotificationCenter = ({ isOpen, onClose }) => {
               {notifications.map((notification) => (
                 <div
                   key={notification.notificationid}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`p-4 hover:bg-white/50 transition-all backdrop-blur-md rounded-2xl mx-3 my-1.5 ${
                     !notification.is_read ? 'bg-white/40 border-l-4 border-blue-500 shadow-sm' : 'bg-white/20'
-                  }`}
+                  } ${notification.orderid ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Icon */}
@@ -240,10 +257,11 @@ const NotificationCenter = ({ isOpen, onClose }) => {
                         )}
                       </div>
 
-                      {/* Account Name */}
+                      {/* Account Name - Clickable hint */}
                       {notification.account_name && (
-                        <p className="text-xs font-medium text-blue-600 mt-0.5">
+                        <p className={`text-xs font-medium mt-0.5 ${notification.orderid ? 'text-blue-600 hover:underline' : 'text-blue-600'}`}>
                           {notification.account_name}
+                          {notification.orderid && <span className="ml-1 text-gray-400">→ View order</span>}
                         </p>
                       )}
 
@@ -278,12 +296,13 @@ const NotificationCenter = ({ isOpen, onClose }) => {
 
                         <div className="flex gap-2">
                           <button
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleMarkAsRead(
                                 notification.notificationid,
                                 notification.is_read
-                              )
-                            }
+                              );
+                            }}
                             className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:bg-blue-50/50 px-2 py-1 rounded-md transition-all"
                           >
                             {notification.is_read
@@ -292,9 +311,10 @@ const NotificationCenter = ({ isOpen, onClose }) => {
                           </button>
                           <span className="text-gray-300">|</span>
                           <button
-                            onClick={() =>
-                              handleDelete(notification.notificationid)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(notification.notificationid);
+                            }}
                             className="text-xs text-red-600 hover:text-red-800 font-medium hover:bg-red-50/50 px-2 py-1 rounded-md transition-all"
                           >
                             Delete

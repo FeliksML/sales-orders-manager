@@ -56,4 +56,4 @@ docker-compose.override.yml
 # SSL Certificates (if testing locally)
 *.pem
 *.key
-*.crt
+*.crtbackend/.env.bak

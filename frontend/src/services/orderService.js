@@ -95,9 +95,11 @@ export const orderService = {
   },
 
   // Bulk operations
+  // All bulk operations include idempotency keys for safe retries
   bulkMarkInstalled: async (orderIds) => {
     const response = await apiClient.post('/api/orders/bulk/mark-installed', {
-      order_ids: orderIds
+      order_ids: orderIds,
+      idempotency_key: crypto.randomUUID()
     })
     return response.data
   },
@@ -105,14 +107,18 @@ export const orderService = {
   bulkReschedule: async (orderIds, newDate) => {
     const response = await apiClient.post('/api/orders/bulk/reschedule', {
       order_ids: orderIds,
-      new_date: newDate
+      new_date: newDate,
+      idempotency_key: crypto.randomUUID()
     })
     return response.data
   },
 
   bulkDelete: async (orderIds) => {
     const response = await apiClient.delete('/api/orders/bulk/delete', {
-      data: { order_ids: orderIds }
+      data: {
+        order_ids: orderIds,
+        idempotency_key: crypto.randomUUID()
+      }
     })
     return response.data
   },

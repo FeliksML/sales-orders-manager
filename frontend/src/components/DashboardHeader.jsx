@@ -244,6 +244,12 @@ function DashboardHeader({ onReportsClick, onExportClick }) {
           setIsNotificationCenterOpen(false)
           loadUnreadCount()
         }}
+        onViewOrder={(orderId) => {
+          // Navigate to dashboard with viewOrder param to open the order modal
+          navigate(`/dashboard?viewOrder=${orderId}`)
+          setIsNotificationCenterOpen(false)
+          loadUnreadCount()
+        }}
       />
 
     </header>

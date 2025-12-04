@@ -67,7 +67,15 @@ docker compose up -d --build backend
 
 # ❌ WRONG - wrong container name
 docker exec sales-order-backend ...
+
+# ❌ WRONG - NEVER run npm install/pip install locally
+# Dependencies are managed INSIDE Docker containers
+npm install          # DO NOT DO THIS
+pip install ...      # DO NOT DO THIS
+cd frontend && npm run build  # DO NOT DO THIS locally
 ```
+
+**IMPORTANT FOR AGENTS**: This project runs entirely in Docker containers. NEVER run `npm install`, `pip install`, or build commands locally. All dependencies are installed inside the containers. To test code changes, rebuild the relevant container using the commands below.
 
 ### Correct Commands for Production
 ```bash

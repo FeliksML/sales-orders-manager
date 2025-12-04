@@ -22,6 +22,7 @@ const CalendarView = lazy(() => import('../../components/CalendarView'))
 const BulkRescheduleModal = lazy(() => import('../../components/BulkRescheduleModal'))
 const BulkDeleteModal = lazy(() => import('../../components/BulkDeleteModal'))
 const BulkExportModal = lazy(() => import('../../components/BulkExportModal'))
+const BulkMarkInstalledModal = lazy(() => import('../../components/BulkMarkInstalledModal'))
 
 function OrdersTab() {
   const [filters, setFilters] = useState({})
@@ -63,6 +64,7 @@ function OrdersTab() {
   const [isBulkRescheduleModalOpen, setIsBulkRescheduleModalOpen] = useState(false)
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false)
   const [isBulkExportModalOpen, setIsBulkExportModalOpen] = useState(false)
+  const [isBulkMarkInstalledModalOpen, setIsBulkMarkInstalledModalOpen] = useState(false)
 
   // Track last processed trigger to prevent re-opening on tab switch
   const lastProcessedTrigger = useRef(0)
@@ -195,6 +197,7 @@ function OrdersTab() {
       invalidate(['performanceInsights'])  // Mark analytics cache as stale
       await refresh({ orders: true, stats: true })
       setSelectedOrders([])
+      setIsBulkMarkInstalledModalOpen(false)
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {
@@ -403,7 +406,7 @@ function OrdersTab() {
         {viewMode === 'table' && (
           <BulkActionsToolbar
             selectedCount={selectedOrders.length}
-            onMarkInstalled={handleBulkMarkInstalled}
+            onMarkInstalled={() => setIsBulkMarkInstalledModalOpen(true)}
             onReschedule={() => setIsBulkRescheduleModalOpen(true)}
             onDelete={() => setIsBulkDeleteModalOpen(true)}
             onExport={() => setIsBulkExportModalOpen(true)}
@@ -435,6 +438,15 @@ function OrdersTab() {
             isOpen={isBulkExportModalOpen}
             onClose={() => setIsBulkExportModalOpen(false)}
             onExport={handleBulkExport}
+            selectedCount={selectedOrders.length}
+          />
+        </Suspense>
+
+        <Suspense fallback={null}>
+          <BulkMarkInstalledModal
+            isOpen={isBulkMarkInstalledModalOpen}
+            onClose={() => setIsBulkMarkInstalledModalOpen(false)}
+            onConfirm={handleBulkMarkInstalled}
             selectedCount={selectedOrders.length}
           />
         </Suspense>

@@ -23,8 +23,9 @@ from sqlalchemy import func, and_, extract, text
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize scheduler
-scheduler = BackgroundScheduler()
+# Initialize scheduler with explicit UTC timezone
+# This ensures consistent behavior regardless of container/host timezone
+scheduler = BackgroundScheduler(timezone=ZoneInfo('UTC'))
 
 # Scheduler lock to prevent multiple workers from running scheduler
 SCHEDULER_LOCK_FILE = "/tmp/sales_order_scheduler.lock"
@@ -312,13 +313,13 @@ def add_scheduled_report(
     # Remove existing job if any
     remove_scheduled_report(job_id)
 
-    # Determine trigger
+    # Determine trigger (always use UTC for consistency)
     if schedule_type == 'weekly':
-        # Every Monday at 9 AM
-        trigger = CronTrigger(day_of_week='mon', hour=9, minute=0)
+        # Every Monday at 9 AM UTC
+        trigger = CronTrigger(day_of_week='mon', hour=9, minute=0, timezone=ZoneInfo('UTC'))
     elif schedule_type == 'monthly':
-        # First day of month at 9 AM
-        trigger = CronTrigger(day=1, hour=9, minute=0)
+        # First day of month at 9 AM UTC
+        trigger = CronTrigger(day=1, hour=9, minute=0, timezone=ZoneInfo('UTC'))
     else:
         raise ValueError(f"Invalid schedule type: {schedule_type}")
 
@@ -728,10 +729,17 @@ def start_scheduler(run_initial_checks: bool = True):
         logger.info(f"This worker (PID: {os.getpid()}) owns the scheduler")
         logger.info("=" * 70)
 
+        # Log timezone configuration for debugging
+        import time
+        logger.info(f"Scheduler timezone: {scheduler.timezone}")
+        logger.info(f"System TZ env: {os.environ.get('TZ', 'NOT SET')}")
+        logger.info(f"System localtime: {time.strftime('%Z %z')}")
+        logger.info(f"Current UTC: {datetime.now(ZoneInfo('UTC')).isoformat()}")
+
         # Add installation reminder job (runs every hour to continuously check)
         scheduler.add_job(
             check_installation_reminders,
-            trigger=CronTrigger(hour='*', minute=0),  # Every hour
+            trigger=CronTrigger(hour='*', minute=0, timezone=ZoneInfo('UTC')),  # Every hour (UTC)
             id='installation_reminders',
             replace_existing=True
         )
@@ -740,7 +748,7 @@ def start_scheduler(run_initial_checks: bool = True):
         # Add today's installation notification job (runs every 2 hours)
         scheduler.add_job(
             check_today_installations,
-            trigger=CronTrigger(hour='*/2', minute=0),  # Every 2 hours
+            trigger=CronTrigger(hour='*/2', minute=0, timezone=ZoneInfo('UTC')),  # Every 2 hours (UTC)
             id='today_installations',
             replace_existing=True
         )
@@ -749,7 +757,7 @@ def start_scheduler(run_initial_checks: bool = True):
         # Add follow-up reminder job (runs every 30 minutes)
         scheduler.add_job(
             check_due_followups,
-            trigger=CronTrigger(minute='0,30'),  # Every 30 minutes
+            trigger=CronTrigger(minute='0,30', timezone=ZoneInfo('UTC')),  # Every 30 minutes (UTC)
             id='followup_reminders',
             replace_existing=True
         )
@@ -758,7 +766,7 @@ def start_scheduler(run_initial_checks: bool = True):
         # Add auto-complete installation job (runs every 30 minutes)
         scheduler.add_job(
             check_auto_complete_installations,
-            trigger=CronTrigger(minute='15,45'),  # Every 30 minutes, offset from follow-ups
+            trigger=CronTrigger(minute='15,45', timezone=ZoneInfo('UTC')),  # Every 30 minutes (UTC)
             id='auto_complete_installations',
             replace_existing=True
         )
@@ -791,11 +799,21 @@ def shutdown_scheduler():
 
 def get_scheduler_status() -> dict:
     """Get current scheduler status and job information."""
+    import time
+
+    timezone_info = {
+        "scheduler_timezone": str(scheduler.timezone) if scheduler.timezone else None,
+        "system_tz_env": os.environ.get('TZ', 'NOT SET'),
+        "system_localtime": time.strftime('%Z %z'),
+        "current_utc": datetime.now(ZoneInfo('UTC')).isoformat()
+    }
+
     if not scheduler.running:
         return {
             "running": False,
             "jobs": [],
-            "scheduled_reports_count": len(scheduled_reports)
+            "scheduled_reports_count": len(scheduled_reports),
+            "timezone_info": timezone_info
         }
 
     jobs = []
@@ -809,5 +827,6 @@ def get_scheduler_status() -> dict:
     return {
         "running": True,
         "jobs": jobs,
-        "scheduled_reports_count": len(scheduled_reports)
+        "scheduled_reports_count": len(scheduled_reports),
+        "timezone_info": timezone_info
     }
