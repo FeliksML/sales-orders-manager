@@ -384,11 +384,12 @@ def get_order_stats(
         )
     ).scalar() or 0
 
-    # Pending installs (future dates)
+    # Pending installs (future dates, excluding completed orders)
     pending_installs = db.query(func.count(Order.orderid)).filter(
         and_(
             Order.userid == user_id,
-            Order.install_date >= today
+            Order.install_date >= today,
+            Order.completed_at == None  # Exclude orders marked as installed
         )
     ).scalar() or 0
 

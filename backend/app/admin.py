@@ -153,7 +153,10 @@ async def get_system_analytics(
     ).scalar() or 0
 
     pending_installs = db.query(func.count(Order.orderid)).filter(
-        Order.install_date >= now.date()
+        and_(
+            Order.install_date >= now.date(),
+            Order.completed_at == None  # Exclude orders marked as installed
+        )
     ).scalar() or 0
 
     # Product stats
