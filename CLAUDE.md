@@ -160,3 +160,175 @@ Use these phrases for complex tasks:
 - "think hard" → deeper analysis
 - "think harder" → complex architecture decisions
 - "ultrathink" → maximum reasoning for critical problems
+
+---
+
+## Order Status System (CRITICAL)
+
+**Status is CALCULATED, not stored.** There is no `status` column in the database.
+
+### How Status is Determined
+```python
+# backend/app/orders.py lines 145-158
+if install_date < today:        → "installed"
+elif install_date == today:     → "today"
+else:                           → "pending"
+```
+
+### The `completed_at` Field
+| Value | Meaning |
+|-------|---------|
+| `NULL` | Order not yet marked as installed |
+| `timestamp` | Order was marked installed (manually or auto-completed) |
+
+**Important**: `completed_at` is used for:
+1. Tracking when installation actually happened
+2. Excluding from "pending installs" analytics count
+3. Auto-completion logic (scheduler sets this after install window ends)
+
+### Mark as Installed Flow
+- **Individual**: Click "Mark Done" → sets `install_date=today`, `install_time=now`, `completed_at=now`
+- **Bulk**: Select orders → Mark Installed → same behavior for all selected
+
+---
+
+## Scheduler Jobs
+
+**File**: `backend/app/scheduler.py`
+
+| Job ID | Trigger | Purpose |
+|--------|---------|---------|
+| `installation_reminders` | Every hour (:00) | Send 24-hour reminders before install |
+| `today_installations` | Every 2 hours | Notify about today's scheduled installs |
+| `followup_reminders` | Every 30 min (:00, :30) | Alert on due follow-ups |
+| `auto_complete_installations` | Every 30 min (:15, :45) | Auto-mark orders as installed after window ends |
+
+### Auto-Complete Logic
+1. Parses END time from `install_time` (e.g., "10:00 AM - 11:00 AM" → 11:00 AM)
+2. Converts to user's timezone (from `user.timezone` field)
+3. If end time has passed → sets `completed_at = now`
+
+### Scheduler Lock
+- Only ONE gunicorn worker runs the scheduler
+- Lock file: `/tmp/sales_order_scheduler.lock`
+- Prevents duplicate notifications in multi-worker deployments
+
+---
+
+## Key Patterns for Agents
+
+### Timezone Handling
+```python
+# Always convert user's local time to UTC for comparisons
+from zoneinfo import ZoneInfo
+
+user_tz = ZoneInfo(user.timezone)  # e.g., 'America/New_York'
+install_local = install_naive.replace(tzinfo=user_tz)
+install_utc = install_local.astimezone(ZoneInfo('UTC'))
+```
+- Default timezone: `America/Los_Angeles`
+- Store/compare in UTC, display in user's timezone
+
+### Audit Logging
+```python
+# backend/app/audit_service.py
+audit_service.log_order_update(db, order, old_values, new_values, user, ip, reason)
+```
+- Each field change = separate audit log entry
+- Full snapshots stored for create/delete/revert
+- Supports undo via `revert_order_to_timestamp()`
+
+### Idempotency Keys
+```python
+# Bulk operations support idempotency
+POST /api/orders/bulk/mark-installed
+{
+  "order_ids": [1, 2, 3],
+  "idempotency_key": "uuid-123"  # Same key = same response
+}
+```
+- Keys expire after 24 hours
+- User-scoped (your key won't match another user's)
+
+### Bulk Operations Reference
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/orders/bulk/mark-installed` | POST | Mark multiple orders installed |
+| `/api/orders/bulk/reschedule` | POST | Change install date for multiple |
+| `/api/orders/bulk/delete` | DELETE | Delete multiple orders |
+
+---
+
+## Common Mistakes (AVOID THESE)
+
+### Docker Deployment
+```bash
+# ❌ WRONG - doesn't rebuild, just restarts old code
+docker compose restart backend
+
+# ✅ CORRECT - rebuilds image with new code
+docker compose -f docker-compose.prod.yml up -d --build backend
+```
+
+### Status Field Misconception
+```python
+# ❌ WRONG - there is no status column
+order.status = "installed"
+
+# ✅ CORRECT - status is calculated from dates
+if order.completed_at:
+    status = "installed"
+elif order.install_date == today:
+    status = "today"
+# etc.
+```
+
+### Timezone Comparison
+```python
+# ❌ WRONG - comparing naive datetimes across timezones
+if install_datetime < datetime.now():
+
+# ✅ CORRECT - convert both to UTC first
+install_utc = install_local.astimezone(ZoneInfo('UTC'))
+now_utc = datetime.now(ZoneInfo('UTC'))
+if install_utc < now_utc:
+```
+
+### Analytics Queries
+```python
+# ❌ WRONG - includes completed orders in pending count
+pending = Order.install_date >= today
+
+# ✅ CORRECT - exclude completed orders
+pending = and_(Order.install_date >= today, Order.completed_at == None)
+```
+
+---
+
+## Quick Reference
+
+### Git Push Command
+```bash
+GIT_SSH_COMMAND="ssh -i ~/.ssh/github_actions -o IdentitiesOnly=yes" git push
+```
+
+### Verify Deployment
+```bash
+# Check container is healthy
+docker compose -f docker-compose.prod.yml ps
+
+# View recent logs
+docker logs sales-order-backend-prod --tail 50
+
+# Verify code is deployed
+docker exec sales-order-backend-prod grep "search_term" /app/app/orders.py
+```
+
+### Key Files by Feature
+| Feature | Backend | Frontend |
+|---------|---------|----------|
+| Order CRUD | `orders.py` | `OrderDetailsModal.jsx` |
+| Bulk Operations | `orders.py:1513-1789` | `BulkActionsToolbar.jsx` |
+| Scheduler | `scheduler.py` | N/A |
+| Status Display | `orders.py:145-158` | `dateUtils.js:getInstallStatus()` |
+| Audit Trail | `audit_service.py` | N/A |
