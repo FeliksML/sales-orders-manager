@@ -140,6 +140,77 @@ def parse_install_datetime(install_date: date, install_time: str) -> Optional[da
     logger.warning(f"Could not parse install_time '{install_time}', defaulting to 9 AM")
     return datetime.combine(install_date, datetime.min.time().replace(hour=9))
 
+
+def parse_install_end_time(install_date: date, install_time: str) -> Optional[datetime]:
+    """
+    Parse install_time string to get the END time of the installation window.
+    E.g., "10:00 AM - 11:00 AM" returns datetime with 11:00 AM.
+    Used for auto-completion: order auto-completes after end time passes.
+    """
+    if not install_time:
+        # Default to 11 AM (9 AM start + 2 hours)
+        return datetime.combine(install_date, datetime.min.time().replace(hour=11))
+
+    time_str = install_time.strip().upper()
+
+    # Pattern 1: "9:00 AM - 11:00 AM" or "9:00AM-11:00AM" (range with full times)
+    match = re.search(r'[-–]\s*(\d{1,2}):(\d{2})\s*(AM|PM)?', time_str)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+        ampm = match.group(3)
+        # If no AM/PM on end time, infer from context or default to PM for afternoon slots
+        if not ampm:
+            # Check if there's an AM/PM at the very end of the string
+            end_match = re.search(r'(AM|PM)\s*$', time_str)
+            ampm = end_match.group(1) if end_match else 'PM'
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour, minute=minute))
+        except ValueError:
+            pass
+
+    # Pattern 2: "9AM-12PM" or "9-12PM" (range with end time hour only)
+    match = re.search(r'[-–]\s*(\d{1,2})\s*(AM|PM)', time_str)
+    if match:
+        hour = int(match.group(1))
+        ampm = match.group(2)
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour))
+        except ValueError:
+            pass
+
+    # Pattern 3: "8-10AM" (range with AM/PM at end only)
+    match = re.match(r'^(\d{1,2})\s*[-–]\s*(\d{1,2})\s*(AM|PM)', time_str)
+    if match:
+        hour = int(match.group(2))  # Take the second (end) time
+        ampm = match.group(3)
+        if ampm == 'PM' and hour != 12:
+            hour += 12
+        elif ampm == 'AM' and hour == 12:
+            hour = 0
+        try:
+            return datetime.combine(install_date, datetime.min.time().replace(hour=hour))
+        except ValueError:
+            pass
+
+    # Fallback: use start time + 2 hours
+    start = parse_install_datetime(install_date, install_time)
+    if start:
+        return start + timedelta(hours=2)
+
+    # Ultimate fallback: 11 AM
+    logger.warning(f"Could not parse end time from '{install_time}', defaulting to 11 AM")
+    return datetime.combine(install_date, datetime.min.time().replace(hour=11))
+
+
 # In-memory storage for scheduled reports (in production, use database)
 scheduled_reports = {}
 
@@ -483,6 +554,71 @@ def check_today_installations():
             logger.error(f"Failed to send today installation notifications: {str(e)}", exc_info=True)
 
 
+def check_auto_complete_installations():
+    """
+    Auto-complete orders where the scheduled install time window has passed.
+    Uses timezone-aware logic to support users across different US timezones.
+    Runs every 30 minutes via scheduler.
+    """
+    logger.info("=" * 50)
+    logger.info("Running auto-complete installation check")
+
+    now_utc = datetime.now(ZoneInfo('UTC'))
+    today_utc = now_utc.date()
+    logger.info(f"Current time (UTC): {now_utc}")
+
+    with SessionLocal() as db:
+        try:
+            # Get orders scheduled for today or past that haven't been completed yet
+            orders = db.query(Order).filter(
+                and_(
+                    Order.install_date <= today_utc,
+                    Order.completed_at == None
+                )
+            ).all()
+
+            logger.info(f"Found {len(orders)} uncompleted orders with past/today install dates")
+
+            auto_completed = 0
+            for order in orders:
+                # Get user and their timezone
+                user = db.query(User).filter(User.userid == order.userid).first()
+                if not user:
+                    logger.warning(f"User not found for order {order.orderid}")
+                    continue
+
+                user_tz_str = getattr(user, 'timezone', None) or 'America/Los_Angeles'
+                try:
+                    user_tz = ZoneInfo(user_tz_str)
+                except Exception:
+                    logger.warning(f"Invalid timezone '{user_tz_str}' for user {user.userid}, using Pacific")
+                    user_tz = ZoneInfo('America/Los_Angeles')
+
+                # Parse install END time (e.g., 11:00 AM from "10:00 AM - 11:00 AM")
+                install_end_naive = parse_install_end_time(order.install_date, order.install_time)
+                if install_end_naive is None:
+                    logger.warning(f"Could not parse install time for order {order.orderid}: {order.install_time}")
+                    continue
+
+                # Convert to UTC for comparison
+                install_end_local = install_end_naive.replace(tzinfo=user_tz)
+                install_end_utc = install_end_local.astimezone(ZoneInfo('UTC'))
+
+                # If install end time has passed, auto-complete the order
+                if install_end_utc < now_utc:
+                    logger.info(f"Auto-completing order {order.orderid} - install window ended at {install_end_local} ({user_tz_str})")
+                    order.completed_at = now_utc.replace(tzinfo=None)  # Store as naive UTC
+                    auto_completed += 1
+
+            db.commit()
+            logger.info(f"Auto-completed {auto_completed} orders")
+            logger.info("=" * 50)
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to auto-complete installations: {str(e)}", exc_info=True)
+
+
 def check_due_followups():
     """Check and send notifications for due follow-up reminders.
 
@@ -619,6 +755,15 @@ def start_scheduler(run_initial_checks: bool = True):
         )
         logger.info("✓ Added follow-up reminder job (runs every 30 minutes)")
 
+        # Add auto-complete installation job (runs every 30 minutes)
+        scheduler.add_job(
+            check_auto_complete_installations,
+            trigger=CronTrigger(minute='15,45'),  # Every 30 minutes, offset from follow-ups
+            id='auto_complete_installations',
+            replace_existing=True
+        )
+        logger.info("✓ Added auto-complete installation job (runs every 30 minutes)")
+
         scheduler.start()
         logger.info("✓ Scheduler started successfully")
         logger.info("=" * 70)
@@ -630,6 +775,7 @@ def start_scheduler(run_initial_checks: bool = True):
                 check_installation_reminders()
                 check_today_installations()
                 check_due_followups()
+                check_auto_complete_installations()
             except Exception as e:
                 logger.error(f"Failed to run initial checks: {str(e)}")
     else:

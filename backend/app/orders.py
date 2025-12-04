@@ -1543,16 +1543,17 @@ def bulk_mark_installed(
             detail="Some orders not found or don't belong to you"
         )
 
-    # Update all orders - mark as completed and adjust install_date if needed
+    # Update all orders - mark as completed with today's date and current time
     today = date.today()
     now = datetime.utcnow()
+    current_time = now.strftime("%I:%M %p").lstrip('0')  # e.g., "2:30 PM"
+
     for order in orders:
         # Set completed_at timestamp to mark as installed
         order.completed_at = now
-        # If scheduled for future, move to today (the actual install date)
-        if order.install_date > today:
-            order.install_date = today
-        # If today or past, keep original date
+        # Always set to today (the actual install date) and current time
+        order.install_date = today
+        order.install_time = current_time
 
     # Log bulk operation
     audit_service.log_bulk_operation(
@@ -1561,7 +1562,7 @@ def bulk_mark_installed(
         entity_type='order',
         entity_ids=request.order_ids,
         user=current_user,
-        field_changes={'completed_at': str(now), 'install_date': 'adjusted if future'},
+        field_changes={'completed_at': str(now), 'install_date': str(today), 'install_time': current_time},
         ip_address=None,
         reason="Bulk mark as installed"
     )
@@ -1848,10 +1849,19 @@ def update_order(
     old_values = {}
     new_values = {}
 
+    # Handle mark_as_installed flag (not a DB column)
+    mark_as_installed = update_data.pop('mark_as_installed', None)
+
     for key, value in update_data.items():
         old_values[key] = getattr(db_order, key)
         new_values[key] = value
         setattr(db_order, key, value)
+
+    # If marking as installed, set completed_at timestamp
+    if mark_as_installed:
+        old_values['completed_at'] = db_order.completed_at
+        db_order.completed_at = datetime.utcnow()
+        new_values['completed_at'] = db_order.completed_at
 
     db.commit()
     db.refresh(db_order)

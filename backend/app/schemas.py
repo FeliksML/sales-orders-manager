@@ -146,6 +146,7 @@ class OrderUpdate(BaseModel):
     monthly_total: Optional[float] = Field(None, ge=0)
     initial_payment: Optional[float] = Field(None, ge=0)
     notes: Optional[str] = Field(None, max_length=2000)
+    mark_as_installed: Optional[bool] = Field(None, description="Set to true to mark order as installed with completed_at timestamp")
 
     @field_validator('customer_phone')
     @classmethod

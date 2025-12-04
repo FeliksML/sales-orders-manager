@@ -181,14 +181,15 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
 
   const handleMarkAsInstalled = async () => {
     const now = new Date()
-    // Set to 2 days ago to ensure it shows as "Installed" not "Today"
-    const twoDaysAgo = new Date(now)
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+    // Use today's date and current time (actual install moment)
+    const today = now.toISOString().split('T')[0]
+    const currentTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 
     const updatedData = {
       ...formData,
-      install_date: twoDaysAgo.toISOString().split('T')[0],
-      install_time: now.toTimeString().split(' ')[0].substring(0, 5),
+      install_date: today,
+      install_time: currentTime,
+      mark_as_installed: true,  // Triggers backend to set completed_at
       // Clean up numeric fields
       monthly_total: formData.monthly_total === '' ? null : parseFloat(formData.monthly_total) || null,
       initial_payment: formData.initial_payment === '' ? null : parseFloat(formData.initial_payment) || null,
