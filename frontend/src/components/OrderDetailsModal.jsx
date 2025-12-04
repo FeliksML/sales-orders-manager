@@ -379,9 +379,18 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
   }
 
-  // Use the shared getInstallStatus function for consistency across the app
-  // Must use order.completed_at (not formData) since completed_at is set by backend
-  const status = getInstallStatus(formData.install_date, order?.completed_at)
+  // Smart status calculation for the modal that considers user edits
+  // If user has edited the date to a FUTURE date, ignore completed_at and show pending
+  // This makes the UI responsive to form changes before saving
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const editedDate = formData.install_date ? new Date(formData.install_date + 'T00:00:00') : null
+  const isDateInFuture = editedDate && editedDate > today
+
+  // If date is in future, treat as pending regardless of completed_at
+  // If date is in past, treat as installed regardless of completed_at
+  const effectiveCompletedAt = isDateInFuture ? null : order?.completed_at
+  const status = getInstallStatus(formData.install_date, effectiveCompletedAt)
   const isInstalled = status === 'installed'
   const isToday = status === 'today'
   const isPending = status === 'pending'

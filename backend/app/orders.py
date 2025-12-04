@@ -302,6 +302,12 @@ def create_order(
         created_by=current_user.userid,
         **order.model_dump()
     )
+
+    # If install_date is in the past, auto-set completed_at
+    # (User is adding a forgotten order that was already installed)
+    if order.install_date < date.today():
+        db_order.completed_at = datetime.utcnow()
+
     db.add(db_order)
     db.commit()
     db.refresh(db_order)
@@ -1883,6 +1889,22 @@ def update_order(
         old_values['completed_at'] = db_order.completed_at
         db_order.completed_at = datetime.utcnow()
         new_values['completed_at'] = db_order.completed_at
+
+    # Auto-manage completed_at based on install_date changes
+    # (Same logic as bulk reschedule - let date determine status)
+    if 'install_date' in update_data and not mark_as_installed:
+        new_install_date = update_data['install_date']
+        today = date.today()
+        if new_install_date > today and db_order.completed_at is not None:
+            # Future date - clear completed_at (order is now pending)
+            old_values['completed_at'] = db_order.completed_at
+            db_order.completed_at = None
+            new_values['completed_at'] = None
+        elif new_install_date < today and db_order.completed_at is None:
+            # Past date - auto-set completed_at (order was already installed)
+            old_values['completed_at'] = db_order.completed_at
+            db_order.completed_at = datetime.utcnow()
+            new_values['completed_at'] = db_order.completed_at
 
     db.commit()
     db.refresh(db_order)
