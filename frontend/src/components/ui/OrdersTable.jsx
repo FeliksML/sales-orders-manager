@@ -9,6 +9,7 @@ import Card from './Card'
 import CustomCheckbox from './CustomCheckbox'
 import OrderCard from './OrderCard'
 import { estimateOrderCommission, formatCommission, getTierLabel } from '../../utils/commissionUtils'
+import { getInstallStatus } from '@sales-order-manager/shared'
 
 function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelectionChange, currentInternetCount = 0, userSettings = {} }) {
   const [isMobile, setIsMobile] = useState(false)
@@ -136,18 +137,6 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
       day: 'numeric',
       year: 'numeric'
     })
-  }
-
-  const getInstallStatus = (dateString) => {
-    // Parse as LOCAL time, not UTC
-    const [year, month, day] = dateString.split('-').map(Number)
-    const installDate = new Date(year, month - 1, day)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    if (installDate < today) return 'installed'
-    if (installDate.getTime() === today.getTime()) return 'today'
-    return 'pending'
   }
 
   const ProductBadge = ({ icon: Icon, label, count, color }) => {
@@ -434,7 +423,7 @@ function OrdersTable({ orders = [], onOrderClick, selectedOrders = [], onSelecti
           </thead>
           <tbody>
             {sortedOrders.map((order) => {
-              const status = getInstallStatus(order.install_date)
+              const status = getInstallStatus(order.install_date, order.completed_at)
               const isSelected = selectedOrders.includes(order.orderid)
               return (
                 <tr

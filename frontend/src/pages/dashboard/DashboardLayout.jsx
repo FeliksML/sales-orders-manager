@@ -40,19 +40,21 @@ function DashboardLayout() {
     }
   }, [location.pathname])
 
-  // Scroll to top on tab change with smooth animation
-  // This fires AFTER navigation completes (unlike onClick which fires before)
+  // Scroll to top on tab change - iOS Safari compatible
+  // Uses double requestAnimationFrame instead of setTimeout for reliable execution
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (window.scrollY > 0) {
-        window.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        })
-      }
-    }, 50) // Small delay ensures browser scroll restoration has completed
+    // Disable browser's automatic scroll restoration (fixes iOS Safari)
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual'
+    }
 
-    return () => clearTimeout(timer)
+    // Double requestAnimationFrame ensures we're after browser's layout/paint
+    // This is more reliable than setTimeout on iOS Safari
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0)
+      })
+    })
   }, [location.pathname])
 
   // Desktop: Render full Dashboard (unchanged behavior)

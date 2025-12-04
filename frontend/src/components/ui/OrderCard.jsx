@@ -5,7 +5,7 @@ import CustomCheckbox from './CustomCheckbox'
 import { estimateOrderCommission, formatCommission, getTierLabel } from '../../utils/commissionUtils'
 
 function OrderCard({ order, onOrderClick, isSelected, onSelectionChange, currentInternetCount = 0, userSettings = {} }) {
-  const status = getInstallStatus(order.install_date)
+  const status = getInstallStatus(order.install_date, order.completed_at)
   const isPast = isDatePast(order.install_date)
   const isToday = isDateToday(order.install_date)
 

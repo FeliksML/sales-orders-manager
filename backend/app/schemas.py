@@ -160,12 +160,13 @@ class OrderUpdate(BaseModel):
 
 class OrderResponse(OrderBase):
     model_config = ConfigDict(from_attributes=True)
-    
+
     orderid: int
     userid: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     created_by: Optional[int] = None
+    completed_at: Optional[datetime] = None  # When order was marked as installed
 
 class OrderStats(BaseModel):
     total_orders: int

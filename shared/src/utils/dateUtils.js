@@ -73,12 +73,16 @@ export const isDateFuture = (date) => {
 }
 
 /**
- * Get install status based on date
+ * Get install status based on date and completion status
  * @param {string|Date} installDate - Installation date
+ * @param {string|Date|null} completedAt - When order was marked as installed (optional)
  * @returns {string} Status: 'installed', 'today', or 'pending'
  */
-export const getInstallStatus = (installDate) => {
+export const getInstallStatus = (installDate, completedAt = null) => {
   if (!installDate) return 'pending'
+
+  // If explicitly marked as completed, always show installed
+  if (completedAt) return 'installed'
 
   if (isDateToday(installDate)) return 'today'
   if (isDatePast(installDate)) return 'installed'

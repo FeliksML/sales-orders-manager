@@ -1542,14 +1542,16 @@ def bulk_mark_installed(
             detail="Some orders not found or don't belong to you"
         )
 
-    # Update all orders - set to yesterday if date is today or in future
+    # Update all orders - mark as completed and adjust install_date if needed
     today = date.today()
-    yesterday = today - timedelta(days=1)
+    now = datetime.utcnow()
     for order in orders:
-        # If order is scheduled for today or in the future, set to yesterday
-        if order.install_date >= today:
-            order.install_date = yesterday
-        # If already in the past, keep the original date
+        # Set completed_at timestamp to mark as installed
+        order.completed_at = now
+        # If scheduled for future, move to today (the actual install date)
+        if order.install_date > today:
+            order.install_date = today
+        # If today or past, keep original date
 
     # Log bulk operation
     audit_service.log_bulk_operation(
@@ -1558,7 +1560,7 @@ def bulk_mark_installed(
         entity_type='order',
         entity_ids=request.order_ids,
         user=current_user,
-        field_changes={'install_date': str(yesterday)},
+        field_changes={'completed_at': str(now), 'install_date': 'adjusted if future'},
         ip_address=None,
         reason="Bulk mark as installed"
     )

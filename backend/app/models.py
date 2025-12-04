@@ -78,6 +78,9 @@ class Order(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     created_by = Column(Integer, ForeignKey('users.userid'), nullable=True)
 
+    # When order was marked as installed/completed (null = not yet completed)
+    completed_at = Column(DateTime, nullable=True)
+
 class Notification(Base):
     __tablename__ = 'notifications'
 

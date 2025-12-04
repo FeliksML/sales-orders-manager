@@ -26,7 +26,6 @@ function BottomNav() {
           <NavLink
             key={path}
             to={path}
-            onClick={() => window.scrollTo({ top: 0, behavior: 'instant' })}
             className={({ isActive }) => `
               flex flex-col items-center justify-center flex-1 h-full
               transition-colors duration-200
