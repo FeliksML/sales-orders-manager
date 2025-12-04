@@ -1613,6 +1613,8 @@ def bulk_reschedule(
     old_dates = {order.orderid: order.install_date for order in orders}
     for order in orders:
         order.install_date = request.new_date
+        # Always clear completed_at when rescheduling - let date logic determine status
+        order.completed_at = None
 
     # Log bulk operation
     audit_service.log_bulk_operation(
