@@ -40,21 +40,40 @@ function DashboardLayout() {
     }
   }, [location.pathname])
 
-  // Scroll to top on tab change - iOS Safari compatible
-  // Uses double requestAnimationFrame instead of setTimeout for reliable execution
+  // Scroll to top on tab change - iOS Safari momentum scroll fix
+  // Small scrolls persist due to -webkit-overflow-scrolling GPU cache
   useEffect(() => {
-    // Disable browser's automatic scroll restoration (fixes iOS Safari)
+    // Disable browser's automatic scroll restoration
     if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual'
     }
 
-    // Double requestAnimationFrame ensures we're after browser's layout/paint
-    // This is more reliable than setTimeout on iOS Safari
+    // Nuclear scroll reset for iOS Safari
+    // Must reset ALL scroll contexts to defeat momentum cache
+    const resetScroll = () => {
+      // Reset all possible scroll targets
+      window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+
+      // Force layout recalculation to clear GPU cache
+      void document.documentElement.offsetHeight
+    }
+
+    // Execute immediately
+    resetScroll()
+
+    // Also execute after paint (catches momentum scroll)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        window.scrollTo(0, 0)
+        resetScroll()
       })
     })
+
+    // Final safety net after iOS momentum settles
+    const timeout = setTimeout(resetScroll, 100)
+
+    return () => clearTimeout(timeout)
   }, [location.pathname])
 
   // Desktop: Render full Dashboard (unchanged behavior)
