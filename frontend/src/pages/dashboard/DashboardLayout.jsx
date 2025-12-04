@@ -40,6 +40,21 @@ function DashboardLayout() {
     }
   }, [location.pathname])
 
+  // Scroll to top on tab change with smooth animation
+  // This fires AFTER navigation completes (unlike onClick which fires before)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (window.scrollY > 0) {
+        window.scrollTo({
+          top: 0,
+          behavior: 'smooth'
+        })
+      }
+    }, 50) // Small delay ensures browser scroll restoration has completed
+
+    return () => clearTimeout(timer)
+  }, [location.pathname])
+
   // Desktop: Render full Dashboard (unchanged behavior)
   if (!isMobile) {
     return (
