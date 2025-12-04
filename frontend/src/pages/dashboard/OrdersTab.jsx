@@ -198,11 +198,21 @@ function OrdersTab() {
   // Bulk operations handlers
   const handleBulkMarkInstalled = async () => {
     try {
+      const count = selectedOrders.length
       await orderService.bulkMarkInstalled(selectedOrders)
-      invalidate(['performanceInsights'])  // Mark analytics cache as stale
-      await refresh({ orders: true, stats: true })
+
+      // Clear selection and close modal immediately for responsive UI
       setSelectedOrders([])
       setIsBulkMarkInstalledModalOpen(false)
+
+      // Invalidate all caches to ensure fresh data
+      invalidate(['performanceInsights', 'orders', 'stats'])
+
+      // Force immediate data refresh (bypass debounce by refreshing all)
+      await refresh({ orders: true, stats: true, followups: true })
+
+      // Show success feedback
+      showToast(`${count} order${count === 1 ? '' : 's'} marked as installed`, 'success')
       setSubmitSuccess(true)
       setTimeout(() => setSubmitSuccess(false), 3000)
     } catch (error) {

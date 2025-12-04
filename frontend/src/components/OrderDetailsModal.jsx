@@ -9,6 +9,7 @@ import Card from './ui/Card'
 import AddressAutocomplete from './AddressAutocomplete'
 import AuditLog from './AuditLog'
 import FollowUpModal from './FollowUpModal'
+import QuickRescheduleModal from './QuickRescheduleModal'
 import { orderService } from '../services/orderService'
 import { useCreateFollowup } from '../hooks/useFollowups'
 import { formatErrorMessage } from '../utils/errorHandler'
@@ -29,9 +30,9 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
 function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showReschedule, setShowReschedule] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showFollowUpModal, setShowFollowUpModal] = useState(false)
+  const [showQuickRescheduleModal, setShowQuickRescheduleModal] = useState(false)
   const [copiedField, setCopiedField] = useState(null)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [emailMessage, setEmailMessage] = useState(null)
@@ -170,7 +171,6 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
       originalFormDataRef.current = formData
       setIsDirty(false)
       setIsEditing(false)
-      setShowReschedule(false)
     } catch (error) {
       console.error('Failed to update order:', error)
     } finally {
@@ -207,6 +207,45 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     } catch (error) {
       console.error('Failed to mark as installed:', error)
       alert('Failed to mark as installed. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleQuickReschedule = async (newDate, newTime) => {
+    setIsSubmitting(true)
+    try {
+      // Clean up form data
+      const cleanedData = {
+        ...formData,
+        install_date: newDate,
+        install_time: newTime || formData.install_time,
+        monthly_total: formData.monthly_total === '' ? null : parseFloat(formData.monthly_total) || null,
+        initial_payment: formData.initial_payment === '' ? null : parseFloat(formData.initial_payment) || null,
+        internet_tier: formData.internet_tier === '' ? null : formData.internet_tier,
+        customer_security_code: formData.customer_security_code === '' ? null : formData.customer_security_code,
+        job_number: formData.job_number === '' ? null : formData.job_number,
+        notes: formData.notes === '' ? null : formData.notes,
+      }
+
+      await onUpdate(order.orderid, cleanedData)
+
+      // Update local form state
+      setFormData(prev => ({
+        ...prev,
+        install_date: newDate,
+        install_time: newTime || prev.install_time
+      }))
+      originalFormDataRef.current = {
+        ...originalFormDataRef.current,
+        install_date: newDate,
+        install_time: newTime || formData.install_time
+      }
+
+      setShowQuickRescheduleModal(false)
+    } catch (error) {
+      console.error('Failed to reschedule:', error)
+      alert('Failed to reschedule. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -285,7 +324,6 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
       }
       setIsDirty(false)
       setIsEditing(false)
-      setShowReschedule(false)
       setErrors({})
     }
   }
@@ -295,7 +333,6 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
     setIsDirty(false)
     setPendingAction(null)
     setIsEditing(false)
-    setShowReschedule(false)
     setErrors({})
     onClose()
   }
@@ -451,7 +488,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
 
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2 sm:gap-3 flex-wrap">
-                {!isEditing && !showReschedule && (
+                {!isEditing && (
                   <>
                     {/* Schedule Follow-up Button - Only show for INSTALLED orders */}
                     {isInstalled && (
@@ -466,7 +503,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                     )}
                     {isPending && (
                       <button
-                        onClick={() => setShowReschedule(true)}
+                        onClick={() => setShowQuickRescheduleModal(true)}
                         className="px-3 sm:px-4 py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 transition-all hover:scale-105 text-yellow-300 hover:text-yellow-200 text-sm font-medium flex items-center gap-2 shadow-sm"
                         title="Reschedule installation"
                       >
@@ -495,7 +532,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                     </button>
                   </>
                 )}
-                {(isEditing || showReschedule) && (
+                {isEditing && (
                   <>
                     <button
                       onClick={handleCancelAttempt}
@@ -557,7 +594,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
 
               {/* Right: Action Buttons + Close */}
               <div className="flex items-center gap-3 flex-shrink-0">
-                {!isEditing && !showReschedule && (
+                {!isEditing && (
                   <>
                     {/* Schedule Follow-up Button - Only show for INSTALLED orders */}
                     {isInstalled && (
@@ -572,7 +609,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                     )}
                     {isPending && (
                       <button
-                        onClick={() => setShowReschedule(true)}
+                        onClick={() => setShowQuickRescheduleModal(true)}
                         className="px-4 py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/50 transition-all hover:scale-105 text-yellow-300 hover:text-yellow-200 text-sm font-medium flex items-center gap-2 shadow-sm"
                         title="Reschedule installation"
                       >
@@ -601,7 +638,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                     </button>
                   </>
                 )}
-                {(isEditing || showReschedule) && (
+                {isEditing && (
                   <>
                     <button
                       onClick={handleCancelAttempt}
@@ -784,7 +821,7 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
                     <h3 className="text-lg font-semibold text-white">Installation</h3>
                   </div>
 
-                  {(isEditing || showReschedule) ? (
+                  {isEditing ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <EditField
@@ -1175,6 +1212,15 @@ function OrderDetailsModal({ order, isOpen, onClose, onUpdate, onDelete }) {
         onSubmit={createFollowup}
         order={order}
         loading={followupLoading}
+      />
+
+      {/* Quick Reschedule Modal */}
+      <QuickRescheduleModal
+        isOpen={showQuickRescheduleModal}
+        onClose={() => setShowQuickRescheduleModal(false)}
+        onConfirm={handleQuickReschedule}
+        order={order}
+        loading={isSubmitting}
       />
 
       {/* Custom Scrollbar Styles */}
