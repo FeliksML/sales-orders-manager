@@ -489,7 +489,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           
           <div className="flex items-center gap-3">
             {/* Metric Selector */}
-            <div className="flex items-center gap-1 rounded-lg p-1 bg-white/5">
+            <div className="flex items-center gap-1 rounded-lg p-1 bg-white/5 overflow-x-auto">
               {['orders', 'psu', 'revenue'].map((metric) => {
                 const config = METRIC_CONFIG[metric]
                 const Icon = config.icon
@@ -497,7 +497,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                   <button
                     key={metric}
                     onClick={() => setSelectedMetric(metric)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
                       selectedMetric === metric
                         ? 'bg-white/10 text-white'
                         : 'text-gray-400 hover:text-gray-300'
@@ -575,7 +575,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               <button
                 onClick={handleGenerateAI}
                 disabled={aiLoading || aiRemaining === 0 || !aiEnabled}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                   aiLoading || aiRemaining === 0 || !aiEnabled
                     ? 'bg-white/5 text-gray-500 cursor-not-allowed'
                     : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
@@ -606,14 +606,14 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                         key={tone}
                         onClick={() => handleToneChange(tone)}
                         disabled={aiLoading}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                        className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
                           aiTone === tone
                             ? `${config.bg} ${config.color}`
                             : 'text-gray-400 hover:text-gray-300'
                         } ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title={aiMetrics && aiInsights ? `Switch to ${config.label} (free)` : config.label}
                       >
-                        <Icon className="w-3 h-3" />
+                        <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                         <span className="hidden sm:inline">{config.label}</span>
                       </button>
                     )
@@ -691,14 +691,14 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           </h3>
         </div>
         
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 xs:grid-cols-4 gap-3">
           {primaryMetrics.map((metric) => {
             const config = METRIC_CONFIG[metric]
             const changePercent = week_comparison.change_percent[metric]
             const isPositive = changePercent > 0
-            
+
             return (
-              <div 
+              <div
                 key={metric}
                 className="flex items-center justify-between p-3 rounded-lg bg-white/5"
               >
