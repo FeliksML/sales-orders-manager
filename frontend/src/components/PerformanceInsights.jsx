@@ -377,31 +377,6 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       }))
       return
     }
-
-    // Fallback: If we have cached metrics but not all insights (legacy), regenerate for free
-    if (aiMetrics && aiInsights) {
-      setAiLoading(true)
-      setAiError(null)
-      try {
-        const result = await orderService.regenerateAITone(newTone, aiMetrics)
-        setAiInsights(result.insights)
-        setAiResetsAt(result.resets_at)
-        // Note: remaining_today doesn't change (free regeneration)
-
-        // Update localStorage with new tone
-        localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
-          insights: result.insights,
-          tone: newTone,
-          timestamp: new Date().toISOString(),
-          metrics: aiMetrics
-        }))
-      } catch (err) {
-        console.error('Failed to regenerate with new tone:', err)
-        setAiError('Failed to change tone. Try again.')
-      } finally {
-        setAiLoading(false)
-      }
-    }
   }
 
   // Get display data based on view mode
@@ -517,8 +492,8 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                     key={metric}
                     onClick={() => setSelectedMetric(metric)}
                     className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${selectedMetric === metric
-                        ? 'bg-white/10 text-white'
-                        : 'text-gray-400 hover:text-gray-300'
+                      ? 'bg-white/10 text-white'
+                      : 'text-gray-400 hover:text-gray-300'
                       }`}
                   >
                     <Icon className="w-3.5 h-3.5" style={{ color: selectedMetric === metric ? config.color : undefined }} />
@@ -533,8 +508,8 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               <button
                 onClick={() => setViewMode('monthly')}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'monthly'
-                    ? 'bg-white/10 text-white'
-                    : 'text-gray-400 hover:text-gray-300'
+                  ? 'bg-white/10 text-white'
+                  : 'text-gray-400 hover:text-gray-300'
                   }`}
               >
                 Monthly
@@ -542,8 +517,8 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               <button
                 onClick={() => setViewMode('weekly')}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'weekly'
-                    ? 'bg-white/10 text-white'
-                    : 'text-gray-400 hover:text-gray-300'
+                  ? 'bg-white/10 text-white'
+                  : 'text-gray-400 hover:text-gray-300'
                   }`}
               >
                 Weekly
@@ -592,8 +567,8 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                 onClick={handleGenerateAI}
                 disabled={aiLoading || aiRemaining === 0 || !aiEnabled}
                 className={`flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${aiLoading || aiRemaining === 0 || !aiEnabled
-                    ? 'bg-white/5 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
+                  ? 'bg-white/5 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
                   }`}
                 title={!aiEnabled ? 'AI not configured' : aiRemaining === 0 ? `Daily limit reached. Resets ${formatResetTime(aiResetsAt)}` : `Generate AI insights (${aiRemaining}/3 remaining today)`}
               >
@@ -620,12 +595,12 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                       <button
                         key={tone}
                         onClick={() => handleToneChange(tone)}
-                        disabled={aiLoading}
+                        disabled={aiLoading || (!allInsights && aiInsights)}
                         className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${aiTone === tone
-                            ? `${config.bg} ${config.color}`
-                            : 'text-gray-400 hover:text-gray-300'
-                          } ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={aiMetrics && aiInsights ? `Switch to ${config.label} (free)` : config.label}
+                          ? `${config.bg} ${config.color}`
+                          : 'text-gray-400 hover:text-gray-300'
+                          } ${aiLoading || (!allInsights && aiInsights) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={allInsights ? `Switch to ${config.label}` : 'Generate new insights to enable tone switching'}
                       >
                         <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                         <span className="hidden sm:inline">{config.label}</span>
