@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import notificationService from '../../services/notificationService'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
+import bellIcon from '../../assets/bell-icon.png'
 
 function NotificationsTab() {
   const navigate = useNavigate()
@@ -107,7 +108,7 @@ function NotificationsTab() {
       case 'followup_due':
         return '📞'
       default:
-        return '🔔'
+        return <img src={bellIcon} alt="Notification" className="w-6 h-6 object-contain" />
     }
   }
 
@@ -118,21 +119,19 @@ function NotificationsTab() {
         <div className="flex gap-2 mb-4 justify-end md:justify-start">
           <button
             onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg backdrop-blur-md transition-all ${
-              filter === 'all'
-                ? 'bg-white/90 text-blue-700 font-semibold shadow-lg'
-                : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+            className={`px-4 py-2 rounded-lg backdrop-blur-md transition-all ${filter === 'all'
+              ? 'bg-white/90 text-blue-700 font-semibold shadow-lg'
+              : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
           >
             All
           </button>
           <button
             onClick={() => setFilter('unread')}
-            className={`px-4 py-2 rounded-lg backdrop-blur-md transition-all ${
-              filter === 'unread'
-                ? 'bg-white/90 text-blue-700 font-semibold shadow-lg'
-                : 'bg-white/20 text-white hover:bg-white/30'
-            }`}
+            className={`px-4 py-2 rounded-lg backdrop-blur-md transition-all ${filter === 'unread'
+              ? 'bg-white/90 text-blue-700 font-semibold shadow-lg'
+              : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
           >
             Unread
           </button>
@@ -188,7 +187,7 @@ function NotificationsTab() {
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col justify-center items-center py-20 text-gray-400">
-              <div className="text-6xl mb-4">🔔</div>
+              <img src={bellIcon} alt="No notifications" className="w-16 h-16 mb-4 opacity-50" />
               <p className="text-lg text-white/80">No notifications</p>
               <p className="text-sm text-white/50">You're all caught up!</p>
             </div>
@@ -198,11 +197,10 @@ function NotificationsTab() {
                 <div
                   key={notification.notificationid}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 backdrop-blur-md rounded-xl transition-all ${
-                    !notification.is_read
-                      ? 'bg-white/30 border-l-4 border-cyan-400 shadow-lg'
-                      : 'bg-white/15 border border-white/10'
-                  } ${notification.orderid ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+                  className={`p-4 backdrop-blur-md rounded-xl transition-all ${!notification.is_read
+                    ? 'bg-white/30 border-l-4 border-cyan-400 shadow-lg'
+                    : 'bg-white/15 border border-white/10'
+                    } ${notification.orderid ? 'cursor-pointer active:scale-[0.98]' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Icon */}
@@ -214,11 +212,10 @@ function NotificationsTab() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h3
-                          className={`font-semibold text-sm ${
-                            !notification.is_read
-                              ? 'text-white'
-                              : 'text-white/80'
-                          }`}
+                          className={`font-semibold text-sm ${!notification.is_read
+                            ? 'text-white'
+                            : 'text-white/80'
+                            }`}
                         >
                           {notification.title}
                         </h3>
@@ -229,9 +226,8 @@ function NotificationsTab() {
 
                       {/* Business & Customer Name - clickable hint */}
                       {notification.account_name && (
-                        <p className={`text-xs font-medium mt-0.5 ${
-                          notification.orderid ? 'text-cyan-400' : 'text-cyan-400/70'
-                        }`}>
+                        <p className={`text-xs font-medium mt-0.5 ${notification.orderid ? 'text-cyan-400' : 'text-cyan-400/70'
+                          }`}>
                           {notification.account_name}
                           {notification.customer_name && (
                             <span className="text-white/50 font-normal"> · {notification.customer_name}</span>
