@@ -224,58 +224,86 @@ function EarningsCard() {
       />
       
       <div className="relative p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div
-              className="p-2 sm:p-2.5 rounded-xl flex-shrink-0"
-              style={{
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.3) 100%)',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
-              }}
-            >
-              <DollarSign className="w-6 h-6 text-emerald-400" />
+        {/* Header - Two rows on mobile, single row on desktop */}
+        <div className="mb-4 space-y-2 sm:space-y-0">
+          {/* Row 1: Icon + Title + Action Buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div
+                className="p-2 sm:p-2.5 rounded-xl flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.3) 100%)',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                }}
+              >
+                <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-white">Estimated Earnings</h3>
+                {/* Month picker - desktop only in this position */}
+                <div className="hidden sm:block">
+                  <FiscalMonthPicker
+                    selectedMonth={selectedMonth}
+                    onMonthChange={handleMonthChange}
+                    disabled={loading || refreshing}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h3 className="text-lg font-bold text-white">Estimated Earnings</h3>
-              <FiscalMonthPicker
-                selectedMonth={selectedMonth}
-                onMonthChange={handleMonthChange}
-                disabled={loading || refreshing}
-              />
+
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              {/* Back to Current Month button - desktop only in this position */}
+              {isViewingHistorical && (
+                <button
+                  onClick={handleBackToCurrent}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                             bg-emerald-500/20 border border-emerald-500/30
+                             text-emerald-300 text-sm font-medium
+                             hover:bg-emerald-500/30 transition-colors"
+                  title="Back to current fiscal month"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Current</span>
+                </button>
+              )}
+              <button
+                onClick={() => fetchEarnings(selectedMonth)}
+                disabled={refreshing}
+                className="flex items-center justify-center p-1.5 sm:p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
+                title="Refresh"
+              >
+                <RefreshCw className={`w-4 h-4 text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={() => navigate('/commission-settings')}
+                className="flex items-center justify-center p-1.5 sm:p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                title="Commission Settings"
+              >
+                <Settings className="w-4 h-4 text-gray-400" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            {/* Back to Current Month button - shown when viewing historical data */}
+          {/* Row 2: Mobile-only - Month Picker + Back button */}
+          <div className="flex sm:hidden items-center gap-2 pl-9">
+            <FiscalMonthPicker
+              selectedMonth={selectedMonth}
+              onMonthChange={handleMonthChange}
+              disabled={loading || refreshing}
+            />
             {isViewingHistorical && (
               <button
                 onClick={handleBackToCurrent}
-                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg
+                className="flex items-center gap-1 px-2 py-1.5 rounded-lg
                            bg-emerald-500/20 border border-emerald-500/30
-                           text-emerald-300 text-xs sm:text-sm font-medium
+                           text-emerald-300 text-xs font-medium
                            hover:bg-emerald-500/30 transition-colors"
                 title="Back to current fiscal month"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">Current</span>
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Current</span>
               </button>
             )}
-            <button
-              onClick={() => fetchEarnings(selectedMonth)}
-              disabled={refreshing}
-              className="flex items-center justify-center p-1.5 sm:p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <button
-              onClick={() => navigate('/commission-settings')}
-              className="flex items-center justify-center p-1.5 sm:p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-              title="Commission Settings"
-            >
-              <Settings className="w-4 h-4 text-gray-400" />
-            </button>
           </div>
         </div>
 
