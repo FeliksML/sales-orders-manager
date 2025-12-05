@@ -257,10 +257,13 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
                         )}
                       </div>
 
-                      {/* Account Name - Clickable hint */}
+                      {/* Account Name & Customer - Clickable hint */}
                       {notification.account_name && (
                         <p className={`text-xs font-medium mt-0.5 ${notification.orderid ? 'text-blue-600 hover:underline' : 'text-blue-600'}`}>
                           {notification.account_name}
+                          {notification.customer_name && (
+                            <span className="text-gray-500 font-normal"> · {notification.customer_name}</span>
+                          )}
                           {notification.orderid && <span className="ml-1 text-gray-400">→ View order</span>}
                         </p>
                       )}

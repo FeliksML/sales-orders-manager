@@ -30,7 +30,7 @@ function OrdersTab() {
   const { showToast } = useToast()
 
   // Get shared state from layout via outlet context
-  const { ordersViewMode: viewMode, orderModalTrigger } = useOutletContext()
+  const { ordersViewMode: viewMode, orderModalTrigger, viewOrderId, setViewOrderId } = useOutletContext()
 
   const {
     orders,
@@ -77,6 +77,34 @@ function OrdersTab() {
       setIsOrderModalOpen(true)
     }
   }, [orderModalTrigger])
+
+  // Handle viewing order from notification click (cross-tab navigation)
+  useEffect(() => {
+    if (viewOrderId) {
+      const openOrderFromNotification = async () => {
+        // Try to find in current orders first
+        let order = orders.find(o => o.orderid === viewOrderId)
+
+        if (!order) {
+          // Fetch if not in current list
+          try {
+            order = await orderService.getOrder(viewOrderId)
+          } catch (err) {
+            console.error('Failed to fetch order:', err)
+            showToast('Failed to load order details', 'error')
+            setViewOrderId(null)
+            return
+          }
+        }
+
+        setSelectedOrder(order)
+        setIsDetailsModalOpen(true)
+        setViewOrderId(null) // Clear to prevent re-trigger
+      }
+
+      openOrderFromNotification()
+    }
+  }, [viewOrderId, orders, setViewOrderId, showToast])
 
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters)

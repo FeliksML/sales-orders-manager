@@ -50,6 +50,7 @@ class NotificationResponse(BaseModel):
     read_at: Optional[datetime]
     orderid: Optional[int]
     account_name: Optional[str] = None  # Business name from associated order
+    customer_name: Optional[str] = None  # Customer name from associated order
 
 
 class NotificationUpdate(BaseModel):
@@ -149,14 +150,16 @@ def get_notifications(
             "created_at": notification.created_at,
             "read_at": notification.read_at,
             "orderid": notification.orderid,
-            "account_name": None
+            "account_name": None,
+            "customer_name": None
         }
 
-        # Get account name from associated order if exists
+        # Get account name and customer name from associated order if exists
         if notification.orderid:
             order = db.query(Order).filter(Order.orderid == notification.orderid).first()
             if order:
                 notification_dict["account_name"] = order.business_name
+                notification_dict["customer_name"] = order.customer_name
 
         result.append(notification_dict)
 

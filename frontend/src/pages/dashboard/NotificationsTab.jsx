@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useOutletContext, useNavigate } from 'react-router-dom'
 import notificationService from '../../services/notificationService'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 
 function NotificationsTab() {
+  const navigate = useNavigate()
+  const { setViewOrderId } = useOutletContext()
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
@@ -60,6 +63,23 @@ function NotificationsTab() {
       loadNotifications()
     } catch (error) {
       console.error('Failed to clear notifications:', error)
+    }
+  }
+
+  // Handle clicking on a notification to view the associated order
+  const handleNotificationClick = async (notification) => {
+    if (notification.orderid) {
+      // Mark as read when viewing
+      if (!notification.is_read) {
+        try {
+          await notificationService.updateNotification(notification.notificationid, true)
+        } catch (error) {
+          console.error('Failed to mark notification as read:', error)
+        }
+      }
+      // Set order to view and navigate to orders tab
+      setViewOrderId(notification.orderid)
+      navigate('/dashboard/orders')
     }
   }
 
@@ -175,11 +195,12 @@ function NotificationsTab() {
               {notifications.map((notification) => (
                 <div
                   key={notification.notificationid}
+                  onClick={() => handleNotificationClick(notification)}
                   className={`p-4 backdrop-blur-md rounded-xl transition-all ${
                     !notification.is_read
                       ? 'bg-white/30 border-l-4 border-cyan-400 shadow-lg'
                       : 'bg-white/15 border border-white/10'
-                  }`}
+                  } ${notification.orderid ? 'cursor-pointer active:scale-[0.98]' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Icon */}
@@ -203,6 +224,19 @@ function NotificationsTab() {
                           <div className="w-2 h-2 bg-cyan-400 rounded-full flex-shrink-0 mt-1"></div>
                         )}
                       </div>
+
+                      {/* Business & Customer Name - clickable hint */}
+                      {notification.account_name && (
+                        <p className={`text-xs font-medium mt-0.5 ${
+                          notification.orderid ? 'text-cyan-400' : 'text-cyan-400/70'
+                        }`}>
+                          {notification.account_name}
+                          {notification.customer_name && (
+                            <span className="text-white/50 font-normal"> · {notification.customer_name}</span>
+                          )}
+                          {notification.orderid && <span className="ml-1 text-white/40">→ View</span>}
+                        </p>
+                      )}
 
                       <p className="text-sm text-white/70 mt-1">
                         {notification.message}
@@ -235,12 +269,13 @@ function NotificationsTab() {
 
                         <div className="flex gap-2">
                           <button
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation()
                               handleMarkAsRead(
                                 notification.notificationid,
                                 notification.is_read
                               )
-                            }
+                            }}
                             className="text-xs text-cyan-400 hover:text-cyan-300 font-medium px-2 py-1 rounded-md transition-all"
                           >
                             {notification.is_read
@@ -249,9 +284,10 @@ function NotificationsTab() {
                           </button>
                           <span className="text-white/30">|</span>
                           <button
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation()
                               handleDelete(notification.notificationid)
-                            }
+                            }}
                             className="text-xs text-red-400 hover:text-red-300 font-medium px-2 py-1 rounded-md transition-all"
                           >
                             Delete

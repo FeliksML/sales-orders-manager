@@ -25,6 +25,7 @@ function DashboardLayout() {
   // OrdersTab specific state (lifted for header actions)
   const [ordersViewMode, setOrdersViewMode] = useState('table')
   const [orderModalTrigger, setOrderModalTrigger] = useState(0) // Increment to trigger modal in OrdersTab
+  const [viewOrderId, setViewOrderId] = useState(null) // For viewing order from notification click
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768)
@@ -191,6 +192,9 @@ function DashboardLayout() {
             ordersViewMode,
             setOrdersViewMode,
             orderModalTrigger,
+            // Cross-tab order viewing (from notifications)
+            viewOrderId,
+            setViewOrderId,
           }} />
         </Suspense>
       </main>

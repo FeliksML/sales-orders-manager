@@ -416,7 +416,7 @@ async def send_install_reminder(
 
     notification_type = f"install_reminder_{hours_before}h"
     title = f"Installation Reminder - {hours_before} Hours"
-    message = f"This is a reminder that you have an installation scheduled for tomorrow at {order.install_time}."
+    message = f"Installation for {order.business_name} is scheduled for tomorrow at {order.install_time}."
 
     # Create notification record
     notification = Notification(
@@ -466,7 +466,7 @@ async def send_today_install_notification(
 
     notification_type = "today_install"
     title = "Installation Today"
-    message = f"You have an installation scheduled for today at {order.install_time}."
+    message = f"Installation for {order.business_name} is today at {order.install_time}."
 
     # Create notification record
     notification = Notification(
@@ -963,7 +963,7 @@ def send_install_reminder_sync(
     """
     notification_type = f"install_reminder_{hours_before}h"
     title = f"Installation Reminder - {hours_before} Hours"
-    message = f"This is a reminder that you have an installation scheduled for tomorrow at {order.install_time}."
+    message = f"Installation for {order.business_name} is scheduled for tomorrow at {order.install_time}."
 
     # Create notification record
     notification = Notification(
@@ -1036,7 +1036,7 @@ def send_today_install_notification_sync(
     """
     notification_type = "today_install"
     title = "Installation Today"
-    message = f"You have an installation scheduled for today at {order.install_time}."
+    message = f"Installation for {order.business_name} is today at {order.install_time}."
 
     # Create notification record
     notification = Notification(
