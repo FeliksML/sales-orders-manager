@@ -11,6 +11,7 @@ import PullToRefresh from '../components/ui/PullToRefresh'
 import EarningsCard from '../components/EarningsCard'
 import GoalProgress from '../components/GoalProgress'
 import { useDashboardData } from '../hooks/useDashboardData'
+import { usePerformanceInsights } from '../hooks/usePerformanceInsights'
 import { useCommissionSettings } from '../hooks/useCommission'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useToast } from '../contexts/ToastContext'
@@ -52,6 +53,14 @@ function Dashboard() {
     error: ordersError,
     refresh
   } = useDashboardData(filters)
+
+  // Fetch performance insights separately (not included in useDashboardData)
+  const {
+    insights: performanceInsights,
+    loading: performanceInsightsLoading,
+    error: performanceError,
+    refetch: refetchPerformance
+  } = usePerformanceInsights()
 
   // Derive statsError from ordersError for backwards compatibility
   const statsError = ordersError
@@ -498,7 +507,12 @@ function Dashboard() {
               <LoadingSpinner />
             </div>
           }>
-            <PerformanceInsights />
+            <PerformanceInsights
+              insights={performanceInsights}
+              loading={performanceInsightsLoading}
+              error={performanceError}
+              onRefresh={refetchPerformance}
+            />
           </Suspense>
         </section>
 

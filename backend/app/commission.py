@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, extract, or_
 from typing import Optional
@@ -132,20 +132,54 @@ def get_previous_fiscal_month(start_dt: datetime, end_dt: datetime) -> tuple:
     """Get the previous fiscal month boundaries given current fiscal month."""
     # Previous fiscal month ends where current one starts
     prev_end_dt = start_dt
-    
+
     # Previous fiscal month starts one month before that
     if prev_end_dt.month == 1:
         prev_start_dt = datetime(prev_end_dt.year - 1, 12, 28, 18, 0, 0)
     else:
         prev_start_dt = datetime(prev_end_dt.year, prev_end_dt.month - 1, 28, 18, 0, 0)
-    
+
     # Label for previous fiscal month
     if prev_end_dt.month == 1:
         label = f"January {prev_end_dt.year}"
     else:
         label = datetime(prev_end_dt.year, prev_end_dt.month, 1).strftime("%B %Y")
-    
+
     return prev_start_dt, prev_end_dt, label
+
+
+def get_fiscal_month_from_label(year_month: str) -> tuple:
+    """Convert YYYY-MM label to fiscal month boundaries.
+
+    The label represents the END month of the fiscal period.
+    For example, "2025-11" = Oct 28 6pm -> Nov 28 6pm
+
+    Args:
+        year_month: String in YYYY-MM format (e.g., "2025-11")
+
+    Returns:
+        (start_dt, end_dt, label) tuple for the fiscal month
+
+    Raises:
+        ValueError if format is invalid
+    """
+    try:
+        year, month = map(int, year_month.split('-'))
+        if month < 1 or month > 12:
+            raise ValueError("Month must be between 1 and 12")
+        # Create a date in the middle of the target fiscal month
+        # The 15th of the target month is always within that fiscal month
+        reference_date = date(year, month, 15)
+        return get_fiscal_month_boundaries(reference_date)
+    except (ValueError, AttributeError) as e:
+        raise ValueError(f"Invalid month format: {year_month}. Expected YYYY-MM") from e
+
+
+def get_current_fiscal_month_label() -> str:
+    """Get the current fiscal month label in YYYY-MM format."""
+    today = date.today()
+    _, end_dt, _ = get_fiscal_month_boundaries(today)
+    return f"{end_dt.year:04d}-{end_dt.month:02d}"
 
 
 def get_install_datetime(order) -> datetime:
@@ -513,18 +547,50 @@ def clear_value_overrides(
 def get_earnings(
     request: Request,
     response: Response,
+    month: Optional[str] = Query(
+        None,
+        regex=r"^\d{4}-(0[1-9]|1[0-2])$",
+        description="Fiscal month in YYYY-MM format (e.g., 2025-11 for November 2025 fiscal month)"
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Calculate monthly commission earnings with breakdown.
-    
+
     Fiscal month: 28th 6pm of prev month → 28th 6pm of current month
+
+    Args:
+        month: Optional YYYY-MM string to view historical months.
+               If omitted, returns current fiscal month.
     """
     settings = get_or_create_settings(db, current_user.userid)
-    
-    # Get current fiscal month boundaries
-    today = date.today()
-    start_dt, end_dt, period_label = get_fiscal_month_boundaries(today)
+
+    # Get current fiscal month label for comparison
+    current_fiscal_month = get_current_fiscal_month_label()
+
+    # Determine which fiscal month to calculate
+    if month:
+        # Validate: cannot view future months
+        if month > current_fiscal_month:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot view earnings for future fiscal months"
+            )
+        try:
+            start_dt, end_dt, period_label = get_fiscal_month_from_label(month)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(e)
+            )
+        is_current_month = (month == current_fiscal_month)
+        requested_month = month
+    else:
+        # Default to current fiscal month
+        today = date.today()
+        start_dt, end_dt, period_label = get_fiscal_month_boundaries(today)
+        is_current_month = True
+        requested_month = current_fiscal_month
     
     # Get previous fiscal month for comparison
     prev_start_dt, prev_end_dt, prev_label = get_previous_fiscal_month(start_dt, end_dt)
@@ -669,7 +735,9 @@ def get_earnings(
         total_orders_this_month=total_orders_this_month,
         current_tier=tier_str,
         sae_eligible=sae_eligible,
-        tax_breakdown=tax_breakdown
+        tax_breakdown=tax_breakdown,
+        is_current_month=is_current_month,
+        requested_month=requested_month
     )
 
 

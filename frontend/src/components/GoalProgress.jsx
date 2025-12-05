@@ -419,7 +419,7 @@ function GoalProgress({ onSettingsClick }) {
           {/* Settings button */}
           <button
             onClick={onSettingsClick}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+            className="flex items-center justify-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
             title="Goal Settings"
           >
             <Settings className="w-4 h-4 text-gray-400" />

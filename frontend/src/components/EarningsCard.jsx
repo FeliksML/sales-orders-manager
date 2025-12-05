@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
-import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw, ChevronDown, Receipt, Building2, Landmark, Shield, Heart, Zap, Target, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { DollarSign, TrendingUp, TrendingDown, Settings, Wifi, Smartphone, Phone, Tv, Radio, Package, ChevronRight, RefreshCw, ChevronDown, Receipt, Building2, Landmark, Shield, Heart, Zap, Target, ArrowRight, ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { commissionService } from '../services/commissionService'
 import { useOptionalDashboardDataContext } from '../contexts/DashboardDataContext'
 import { getStateByCode } from '../utils/stateTaxRates'
 import { getNextTierInfo } from '../utils/commissionUtils'
+import FiscalMonthPicker from './ui/FiscalMonthPicker'
 
 function EarningsCard() {
   const navigate = useNavigate()
@@ -21,13 +22,34 @@ function EarningsCard() {
   const [error, setError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showTaxBreakdown, setShowTaxBreakdown] = useState(false)
+  const [selectedMonth, setSelectedMonth] = useState(null) // null = current month
 
-  // Use cached earnings if available, otherwise use local state
-  const earnings = cachedEarnings || localEarnings
+  // When viewing historical month, always use localEarnings (freshly fetched data)
+  // Only use cachedEarnings for current month view (cachedEarnings is always current month)
+  const earnings = selectedMonth ? localEarnings : (cachedEarnings || localEarnings)
 
-  const fetchEarnings = async () => {
-    // If we have context, use it for refresh
-    if (contextRefresh) {
+  // Fetch earnings with optional month parameter
+  const fetchEarnings = useCallback(async (month = null) => {
+    // When viewing historical data, always fetch directly (don't use context cache)
+    // Context cache is only for current month
+    if (month) {
+      try {
+        setRefreshing(true)
+        const data = await commissionService.getEarnings(month)
+        setLocalEarnings(data)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to fetch earnings:', err)
+        setError('Failed to load earnings')
+      } finally {
+        setLoading(false)
+        setRefreshing(false)
+      }
+      return
+    }
+
+    // For current month, use context if available
+    if (contextRefresh && !month) {
       try {
         setRefreshing(true)
         await contextRefresh({ earnings: true })
@@ -40,7 +62,7 @@ function EarningsCard() {
     // Otherwise, fetch independently
     try {
       setRefreshing(true)
-      const data = await commissionService.getEarnings()
+      const data = await commissionService.getEarnings(month)
       setLocalEarnings(data)
       setError(null)
     } catch (err) {
@@ -50,16 +72,42 @@ function EarningsCard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [contextRefresh])
 
   // Initial fetch only if not using context or context data is missing
   useEffect(() => {
+    // If selectedMonth is set, always fetch directly
+    if (selectedMonth) {
+      fetchEarnings(selectedMonth)
+      return
+    }
+    // For current month, use context if available
     if (cachedEarnings) {
       setLoading(false)
       return
     }
     fetchEarnings()
-  }, [cachedEarnings])
+  }, [cachedEarnings, selectedMonth, fetchEarnings])
+
+  // Handle month change from picker
+  const handleMonthChange = useCallback((month) => {
+    setSelectedMonth(month)
+    // Clear local earnings to show loading state
+    if (month !== selectedMonth) {
+      setLocalEarnings(null)
+      setLoading(true)
+    }
+  }, [selectedMonth])
+
+  // Handle "Back to Current Month" button
+  const handleBackToCurrent = useCallback(() => {
+    setSelectedMonth(null)
+    setLocalEarnings(null)
+    setLoading(true)
+  }, [])
+
+  // Determine if viewing historical data
+  const isViewingHistorical = selectedMonth !== null
 
   const formatCurrency = (val) => {
     if (val === 0) return '$0'
@@ -178,9 +226,9 @@ function EarningsCard() {
       <div className="relative p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div 
-              className="p-2.5 rounded-xl"
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div
+              className="p-2 sm:p-2.5 rounded-xl flex-shrink-0"
               style={{
                 background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(5, 150, 105, 0.3) 100%)',
                 boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
@@ -188,24 +236,42 @@ function EarningsCard() {
             >
               <DollarSign className="w-6 h-6 text-emerald-400" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-lg font-bold text-white">Estimated Earnings</h3>
-              <p className="text-sm text-gray-400">{earnings.period}</p>
+              <FiscalMonthPicker
+                selectedMonth={selectedMonth}
+                onMonthChange={handleMonthChange}
+                disabled={loading || refreshing}
+              />
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Back to Current Month button - shown when viewing historical data */}
+            {isViewingHistorical && (
+              <button
+                onClick={handleBackToCurrent}
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg
+                           bg-emerald-500/20 border border-emerald-500/30
+                           text-emerald-300 text-xs sm:text-sm font-medium
+                           hover:bg-emerald-500/30 transition-colors"
+                title="Back to current fiscal month"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">Current</span>
+              </button>
+            )}
             <button
-              onClick={fetchEarnings}
+              onClick={() => fetchEarnings(selectedMonth)}
               disabled={refreshing}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
+              className="flex items-center justify-center p-1.5 sm:p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
               title="Refresh"
             >
               <RefreshCw className={`w-4 h-4 text-gray-400 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => navigate('/commission-settings')}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+              className="flex items-center justify-center p-1.5 sm:p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
               title="Commission Settings"
             >
               <Settings className="w-4 h-4 text-gray-400" />

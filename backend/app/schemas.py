@@ -438,6 +438,10 @@ class EarningsResponse(BaseModel):
     # Tax breakdown (optional - included when user has tax settings)
     tax_breakdown: Optional[TaxBreakdown] = None
 
+    # Historical navigation fields
+    is_current_month: bool = True  # True if viewing current fiscal month
+    requested_month: Optional[str] = None  # The month parameter in YYYY-MM format
+
 
 class RateTier(BaseModel):
     """Rate tier for commission calculation"""

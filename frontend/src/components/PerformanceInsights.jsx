@@ -304,7 +304,24 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       setAiResetsAt(aiStatus.resets_at)
     }
   }, [aiStatus])
-  
+
+  // Fetch AI status on mount if not provided via props
+  useEffect(() => {
+    const fetchAIStatus = async () => {
+      if (aiStatus === undefined) {
+        try {
+          const status = await orderService.getAIInsightsStatus()
+          setAiRemaining(status.remaining_today)
+          setAiEnabled(status.ai_enabled)
+          setAiResetsAt(status.resets_at)
+        } catch (err) {
+          console.error('Failed to fetch AI status:', err)
+        }
+      }
+    }
+    fetchAIStatus()
+  }, [aiStatus])
+
   // Generate AI insights handler
   const handleGenerateAI = async () => {
     setAiLoading(true)

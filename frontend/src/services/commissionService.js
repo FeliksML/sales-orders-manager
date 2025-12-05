@@ -38,8 +38,10 @@ export const commissionService = {
   },
 
   // Get monthly earnings with breakdown
-  getEarnings: async () => {
-    const response = await apiClient.get('/api/commission/earnings')
+  // Optional month param in YYYY-MM format for historical months
+  getEarnings: async (month = null) => {
+    const params = month ? { month } : {}
+    const response = await apiClient.get('/api/commission/earnings', { params })
     return response.data
   },
 

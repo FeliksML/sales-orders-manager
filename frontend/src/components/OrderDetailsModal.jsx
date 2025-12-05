@@ -1277,7 +1277,7 @@ function InfoRow({ icon: Icon, label, value, highlight, onCopy, isCopied }) {
       {value && onCopy && (
         <button
           onClick={() => onCopy(value, label)}
-          className={`p-1.5 rounded transition-all flex-shrink-0 ${
+          className={`flex items-center justify-center p-1.5 rounded transition-all flex-shrink-0 ${
             isCopied
               ? 'bg-green-500/20 text-green-400 scale-110'
               : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300'
