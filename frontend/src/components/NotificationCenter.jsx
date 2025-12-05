@@ -112,11 +112,11 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'install_reminder_24h':
-        return '⏰';
+        return <span className="text-2xl">⏰</span>;
       case 'today_install':
-        return '📅';
+        return <span className="text-2xl">📅</span>;
       case 'followup_due':
-        return '📞';
+        return <span className="text-2xl">📞</span>;
       default:
         return <img src={bellIcon} alt="Notification" className="w-12 h-12 object-contain" />;
     }
@@ -236,7 +236,7 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
                 >
                   <div className="flex items-start gap-3">
                     {/* Icon */}
-                    <div className="text-2xl flex-shrink-0">
+                    <div className="flex-shrink-0">
                       {getNotificationIcon(notification.notification_type)}
                     </div>
 
