@@ -108,7 +108,7 @@ function NotificationsTab() {
       case 'followup_due':
         return '📞'
       default:
-        return <img src={bellIcon} alt="Notification" className="w-48 h-48 object-contain" />
+        return <img src={bellIcon} alt="Notification" className="w-24 h-24 object-contain" />
     }
   }
 
