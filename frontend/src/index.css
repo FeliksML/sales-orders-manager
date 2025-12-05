@@ -163,12 +163,19 @@ body {
 @media (max-width: 768px) {
   button,
   a,
-  input,
+  input:not([type="checkbox"]):not([type="radio"]),
   select,
   [role="button"] {
     min-height: 44px;
     min-width: 44px;
   }
+}
+
+/* Keep form controls large on mobile without blowing up checkboxes/radios */
+input[type="checkbox"],
+input[type="radio"] {
+  min-height: auto;
+  min-width: auto;
 }
 
 /* Active state ripple effect */
