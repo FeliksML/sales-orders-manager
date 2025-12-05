@@ -146,7 +146,7 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-end md:justify-start">
             <button
               onClick={() => setFilter('all')}
               className={`px-4 py-1 rounded-full backdrop-blur-md transition-all ${
@@ -171,46 +171,48 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
         </div>
 
         {/* Actions / Confirmation */}
-        <div className="border-b border-white/20 p-3 backdrop-blur-md bg-white/30">
-          {showClearConfirm ? (
-            // Inline Confirmation
-            <div className="flex items-center justify-between gap-2 animate-fade-in">
-              <span className="text-sm text-gray-700 font-medium">
-                Delete all notifications?
-              </span>
-              <div className="flex gap-2">
+        {!loading && notifications.length > 0 && (
+          <div className="border-b border-white/20 p-3 backdrop-blur-md bg-white/30">
+            {showClearConfirm ? (
+              // Inline Confirmation
+              <div className="flex items-start gap-2 animate-fade-in">
+                <span className="text-sm text-gray-700 font-medium">
+                  Delete all notifications?
+                </span>
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    onClick={() => setShowClearConfirm(false)}
+                    className="text-sm text-gray-600 hover:text-gray-800 font-medium bg-gray-100/70 hover:bg-gray-200/70 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleClearAll}
+                    className="text-sm text-white font-medium bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                  >
+                    Yes, delete all
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Normal Actions
+              <div className="flex items-center justify-end gap-3 md:justify-between">
                 <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="text-sm text-gray-600 hover:text-gray-800 font-medium bg-gray-100/70 hover:bg-gray-200/70 px-3 py-1.5 rounded-lg transition-all"
+                  onClick={handleMarkAllRead}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:bg-blue-50/50 px-3 py-1.5 rounded-lg transition-all"
                 >
-                  Cancel
+                  Mark all as read
                 </button>
                 <button
-                  onClick={handleClearAll}
-                  className="text-sm text-white font-medium bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                  onClick={() => setShowClearConfirm(true)}
+                  className="text-sm text-red-600 hover:text-red-800 font-medium hover:bg-red-50/50 px-3 py-1.5 rounded-lg transition-all"
                 >
-                  Yes, delete all
+                  Clear all
                 </button>
               </div>
-            </div>
-          ) : (
-            // Normal Actions
-            <div className="flex justify-between items-center">
-              <button
-                onClick={handleMarkAllRead}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium hover:bg-blue-50/50 px-3 py-1.5 rounded-lg transition-all"
-              >
-                Mark all as read
-              </button>
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="text-sm text-red-600 hover:text-red-800 font-medium hover:bg-red-50/50 px-3 py-1.5 rounded-lg transition-all"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Notification List */}
         <div className="flex-1 overflow-y-auto">

@@ -115,7 +115,7 @@ function NotificationsTab() {
     <div className="px-3 pt-3 min-h-screen">
       <div className="max-w-2xl mx-auto">
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 justify-end md:justify-start">
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-lg backdrop-blur-md transition-all ${
@@ -139,44 +139,46 @@ function NotificationsTab() {
         </div>
 
         {/* Actions */}
-        <div className="rounded-xl p-3 mb-4 backdrop-blur-md bg-white/20 border border-white/20">
-          {showClearConfirm ? (
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm text-white font-medium">
-                Delete all notifications?
-              </span>
-              <div className="flex gap-2">
+        {!loading && notifications.length > 0 && (
+          <div className="rounded-xl p-3 mb-4 backdrop-blur-md bg-white/20 border border-white/20">
+            {showClearConfirm ? (
+              <div className="flex items-start gap-2">
+                <span className="text-sm text-white font-medium">
+                  Delete all notifications?
+                </span>
+                <div className="flex gap-2 ml-auto">
+                  <button
+                    onClick={() => setShowClearConfirm(false)}
+                    className="text-sm text-white/80 hover:text-white font-medium bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleClearAll}
+                    className="text-sm text-white font-medium bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                  >
+                    Yes, delete all
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-3 md:justify-between">
                 <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="text-sm text-white/80 hover:text-white font-medium bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-all"
+                  onClick={handleMarkAllRead}
+                  className="text-sm text-cyan-400 hover:text-cyan-300 font-medium px-3 py-1.5 rounded-lg transition-all"
                 >
-                  Cancel
+                  Mark all as read
                 </button>
                 <button
-                  onClick={handleClearAll}
-                  className="text-sm text-white font-medium bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                  onClick={() => setShowClearConfirm(true)}
+                  className="text-sm text-red-400 hover:text-red-300 font-medium px-3 py-1.5 rounded-lg transition-all"
                 >
-                  Yes, delete all
+                  Clear all
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="flex justify-between items-center">
-              <button
-                onClick={handleMarkAllRead}
-                className="text-sm text-cyan-400 hover:text-cyan-300 font-medium px-3 py-1.5 rounded-lg transition-all"
-              >
-                Mark all as read
-              </button>
-              <button
-                onClick={() => setShowClearConfirm(true)}
-                className="text-sm text-red-400 hover:text-red-300 font-medium px-3 py-1.5 rounded-lg transition-all"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Notification List */}
         <div>
