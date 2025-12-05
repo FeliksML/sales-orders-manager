@@ -608,9 +608,11 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                     )
                   })}
                 </div>
-                {aiMetrics && aiInsights && (
+                {allInsights ? (
                   <span className="text-xs text-emerald-400/70">✨ Free tone switch</span>
-                )}
+                ) : aiInsights ? (
+                  <span className="text-xs text-gray-500">Generate new to enable switching</span>
+                ) : null}
               </div>
             )}
           </div>
