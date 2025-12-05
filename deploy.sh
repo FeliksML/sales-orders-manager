@@ -247,31 +247,7 @@ else
 fi
 echo ""
 
-###############################################################################
-# STEP 5.5: RUN MIGRATIONS (Keeping the database fresh 🔄)
-###############################################################################
-echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "  ${CYAN}🔄 STEP 5.5/9: Running Database Migrations${NC}"
-echo -e "  ${YELLOW}\"Evolution is constant - even for databases\"${NC}"
-echo -e "${MAGENTA}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# Run notification delivery tracking migration
-echo -e "  🔔 Running notification delivery migration..."
-docker compose -f docker-compose.prod.yml run --rm backend python migrate_notification_delivery.py 2>&1
-echo -e "  ${GREEN}✅ Notification delivery migration complete${NC} - Delivery tracking enabled! 📊"
-
-# Run subscriptions migration if it exists
-if [ -f "backend/migrate_subscriptions.py" ]; then
-    echo -e "  💳 Running subscriptions migration..."
-    if docker compose -f docker-compose.prod.yml run --rm backend python migrate_subscriptions.py 2>&1 | grep -q "successfully\|already exists"; then
-        echo -e "  ${GREEN}✅ Subscriptions migration${NC} - Billing tables ready! 💰"
-    else
-        echo -e "  ${YELLOW}⚠️  Subscriptions migration had issues (may already be applied)${NC}"
-    fi
-fi
-
-echo -e "  ${GREEN}✅ All migrations complete!${NC} Database is up to date! 📊"
-echo ""
 
 ###############################################################################
 # STEP 6: LAUNCH ALL SERVICES (3... 2... 1... LIFTOFF! 🚀)
