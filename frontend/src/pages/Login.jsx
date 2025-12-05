@@ -332,10 +332,10 @@ function Login() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-400 bg-transparent cursor-pointer"
+                className="w-5 h-5 rounded border-gray-400 bg-transparent cursor-pointer"
                 disabled={isLoading}
               />
-              <span className="text-gray-300 text-sm">Remember me</span>
+              <span className="text-gray-200 text-base">Remember me</span>
             </label>
             <Link to="/forgot-password" className="text-blue-300 text-sm hover:underline">
               Forgot password?
