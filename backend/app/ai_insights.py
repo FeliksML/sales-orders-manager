@@ -155,6 +155,119 @@ Revenue dropped 18% despite order growth - check your product mix 📊"""
         return ["Unable to generate AI insights at this time."]
 
 
+async def generate_multi_tone_insights(metrics: dict) -> dict[str, list[str]]:
+    """
+    Generate insights for ALL tones (positive, realistic, brutal) in a single API call.
+    
+    Returns:
+        Dictionary mapping tone names to lists of insight strings.
+    """
+    if not GROQ_API_KEY:
+        return {
+            "positive": ["AI insights not configured."],
+            "realistic": ["AI insights not configured."],
+            "brutal": ["AI insights not configured."]
+        }
+    
+    # Combined prompt for all tones
+    prompt = f"""ROLE: You are a versatile sales analyst capable of analyzing performance from multiple perspectives.
+
+DATA:
+- This month: {metrics.get('current_orders', 0)} orders, ${metrics.get('current_revenue', 0):,.0f} revenue, {metrics.get('current_psu', 0)} PSU
+- Last month: {metrics.get('previous_orders', 0)} orders, ${metrics.get('previous_revenue', 0):,.0f} revenue
+- Change: {metrics.get('order_change', 0):+.1f}% orders, {metrics.get('revenue_change', 0):+.1f}% revenue
+- Streak: {metrics.get('streak', 0)} month {"growth" if metrics.get('streak_type') == 'growth' else "decline" if metrics.get('streak_type') == 'decline' else "no"} streak
+- Best ever: {metrics.get('best_orders', 0)} orders ({metrics.get('best_period', 'N/A')})
+- Internet: {metrics.get('current_internet', 0)} ({metrics.get('internet_change', 0):+.1f}%)
+- Mobile: {metrics.get('current_mobile', 0)} ({metrics.get('mobile_change', 0):+.1f}%)
+
+TASK: Generate 3 sets of insights (3 lines each) corresponding to these tones:
+1. POSITIVE: Enthusiastic coach, celebrating wins.
+2. REALISTIC: Pragmatic analyst, factual strengths/weaknesses.
+3. BRUTAL: Harsh drill sergeant, savage and blunt.
+
+OUTPUT FORMAT:
+[POSITIVE]
+Line 1
+Line 2
+Line 3
+[REALISTIC]
+Line 1
+Line 2
+Line 3
+[BRUTAL]
+Line 1
+Line 2
+Line 3
+
+CRITICAL RULES:
+- EXACTLY 3 lines per section
+- NO introductions or extra text
+- Max 18 words per line
+- One emoji max per line
+"""
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                GROQ_URL,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 600,
+                    "temperature": 0.7
+                },
+                timeout=20.0
+            )
+            
+            if response.status_code != 200:
+                print(f"Groq API error: {response.status_code} - {response.text}")
+                return {}
+            
+            result = response.json()
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            # Parse the sections
+            sections = {"positive": [], "realistic": [], "brutal": []}
+            current_section = None
+            
+            for line in content.strip().split("\n"):
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                if "[POSITIVE]" in line.upper():
+                    current_section = "positive"
+                    continue
+                elif "[REALISTIC]" in line.upper():
+                    current_section = "realistic"
+                    continue
+                elif "[BRUTAL]" in line.upper():
+                    current_section = "brutal"
+                    continue
+                    
+                if current_section:
+                    cleaned = _clean_insight(line)
+                    if cleaned and len(cleaned) > 10 and not _is_intro_line(cleaned):
+                        sections[current_section].append(cleaned)
+            
+            # Ensure we have 3 insights for each (pad if needed)
+            for tone in sections:
+                sections[tone] = sections[tone][:3]
+                while len(sections[tone]) < 3:
+                    sections[tone].append("Keep pushing forward! 💪")
+            
+            return sections
+            
+    except Exception as e:
+        print(f"Error generating multi-tone insights: {e}")
+        return {}
+
+
 def is_ai_configured() -> bool:
     """Check if AI insights are configured (API key is set)."""
     return bool(GROQ_API_KEY)

@@ -31,16 +31,16 @@ const METRIC_CONFIG = {
 function ComparisonCard({ metric, current, previous, changePercent, changeAbsolute }) {
   const config = METRIC_CONFIG[metric]
   if (!config) return null
-  
+
   const Icon = config.icon
   const isPositive = changePercent > 0
   const isNeutral = changePercent === 0
-  
+
   const TrendIcon = isPositive ? TrendingUp : isNeutral ? Minus : TrendingDown
   const trendColor = isPositive ? 'text-emerald-400' : isNeutral ? 'text-amber-400' : 'text-rose-400'
   const bgColor = isPositive ? 'rgba(16, 185, 129, 0.1)' : isNeutral ? 'rgba(245, 158, 11, 0.1)' : 'rgba(244, 63, 94, 0.1)'
   const borderColor = isPositive ? 'rgba(16, 185, 129, 0.3)' : isNeutral ? 'rgba(245, 158, 11, 0.3)' : 'rgba(244, 63, 94, 0.3)'
-  
+
   return (
     <div
       className="p-3 xs:p-4 rounded-xl relative overflow-hidden group hover:scale-[1.02] transition-transform"
@@ -52,9 +52,9 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
       {/* Header with icon and label */}
       <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-1 xs:gap-0 mb-3">
         <div className="flex items-center gap-2">
-          <div 
+          <div
             className="p-2 rounded-lg"
-            style={{ 
+            style={{
               background: `${config.color}20`,
               border: `1px solid ${config.color}40`
             }}
@@ -63,7 +63,7 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
           </div>
           <span className="text-sm font-medium text-gray-400">{config.label}</span>
         </div>
-        
+
         {/* Change badge */}
         <div
           className={`self-start xs:self-auto flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${trendColor}`}
@@ -73,23 +73,23 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
           <span>{isPositive ? '+' : ''}{Math.round(changePercent)}%</span>
         </div>
       </div>
-      
+
       {/* Main value */}
       <div className="mb-2">
-        <span 
+        <span
           className="text-2xl xs:text-3xl font-bold text-white"
           style={{ fontFamily: "'Space Mono', monospace" }}
         >
           {config.format(current)}
         </span>
       </div>
-      
+
       {/* Comparison text */}
       <div className="flex items-center gap-2 text-sm">
         <span className="text-gray-500">vs</span>
         <span className="text-gray-400">{config.format(previous)}</span>
         <span className={`font-medium ${trendColor}`}>
-          ({isPositive ? '+' : ''}{typeof changeAbsolute === 'number' ? 
+          ({isPositive ? '+' : ''}{typeof changeAbsolute === 'number' ?
             (metric === 'revenue' ? '$' + changeAbsolute.toLocaleString() : changeAbsolute) : changeAbsolute})
         </span>
       </div>
@@ -100,12 +100,12 @@ function ComparisonCard({ metric, current, previous, changePercent, changeAbsolu
 function TrendChart({ data, selectedMetric, viewMode, animateCharts = true }) {
   const config = METRIC_CONFIG[selectedMetric]
   if (!config || !data || data.length === 0) return null
-  
+
   const chartData = data.map(point => ({
     ...point,
     value: point[selectedMetric]
   }))
-  
+
   return (
     <div className="h-64">
       <ResponsiveContainer width="100%" height="100%">
@@ -117,19 +117,19 @@ function TrendChart({ data, selectedMetric, viewMode, animateCharts = true }) {
             </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-          <XAxis 
-            dataKey="period" 
+          <XAxis
+            dataKey="period"
             stroke="rgba(255,255,255,0.3)"
             tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
             axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
           />
-          <YAxis 
+          <YAxis
             stroke="rgba(255,255,255,0.3)"
             tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
             axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
             tickFormatter={(value) => selectedMetric === 'revenue' ? `$${value}` : value}
           />
-          <Tooltip 
+          <Tooltip
             contentStyle={{
               background: 'rgba(15, 23, 42, 0.95)',
               border: '1px solid rgba(255,255,255,0.1)',
@@ -157,15 +157,15 @@ function RecordCard({ record }) {
   const config = METRIC_CONFIG[record.metric.toLowerCase()]
   const Icon = config?.icon || Trophy
   const color = config?.color || '#f59e0b'
-  
+
   return (
-    <div 
+    <div
       className={`p-3 rounded-xl relative overflow-hidden ${record.is_current_period ? 'ring-2 ring-amber-400/50' : ''}`}
       style={{
-        background: record.is_current_period 
+        background: record.is_current_period
           ? 'linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%)'
           : 'linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%)',
-        border: record.is_current_period 
+        border: record.is_current_period
           ? '1px solid rgba(251, 191, 36, 0.4)'
           : '1px solid rgba(255, 255, 255, 0.1)'
       }}
@@ -175,16 +175,16 @@ function RecordCard({ record }) {
           <Zap className="w-4 h-4 text-amber-400 animate-pulse" />
         </div>
       )}
-      
+
       <div className="flex items-center gap-2 mb-2">
         <Icon className="w-4 h-4" style={{ color }} />
         <span className="text-xs font-medium text-gray-400">Best {record.metric}</span>
       </div>
-      
+
       <div className="text-xl font-bold text-white" style={{ fontFamily: "'Space Mono', monospace" }}>
         {config?.format(record.value) || record.value}
       </div>
-      
+
       <div className="text-xs text-gray-500 mt-1">
         {record.period}
         {record.is_current_period && (
@@ -198,9 +198,9 @@ function RecordCard({ record }) {
 function InsightBubble({ insight, index }) {
   const icons = [Lightbulb, Zap, TrendingUp, Award]
   const Icon = icons[index % icons.length]
-  
+
   return (
-    <div 
+    <div
       className="flex items-start gap-3 p-3 rounded-xl"
       style={{
         background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%)',
@@ -217,17 +217,17 @@ function InsightBubble({ insight, index }) {
 
 function StreakBadge({ streak, type }) {
   if (streak < 2) return null
-  
+
   const isGrowth = type === 'growth'
-  
+
   return (
-    <div 
+    <div
       className="flex items-center gap-2 px-3 py-2 rounded-xl"
       style={{
-        background: isGrowth 
+        background: isGrowth
           ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.1) 100%)'
           : 'linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%)',
-        border: isGrowth 
+        border: isGrowth
           ? '1px solid rgba(16, 185, 129, 0.3)'
           : '1px solid rgba(244, 63, 94, 0.3)'
       }}
@@ -258,10 +258,11 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
   const [aiTone, setAiTone] = useState('positive')
   const [aiResetsAt, setAiResetsAt] = useState(aiStatus?.resets_at ?? null)
   const [aiMetrics, setAiMetrics] = useState(null) // Cached metrics for free tone changes
+  const [allInsights, setAllInsights] = useState(null) // Cache all tones locally
 
   // LocalStorage key for persisting AI insights
   const AI_STORAGE_KEY = 'sales_ai_insights'
-  
+
   // Format reset time as "X hours" or "Tomorrow at midnight"
   const formatResetTime = (isoString) => {
     if (!isoString) return 'tomorrow'
@@ -272,7 +273,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
     if (hoursUntil <= 12) return `in ${hoursUntil} hours`
     return 'at midnight'
   }
-  
+
   // Load persisted AI insights from localStorage
   useEffect(() => {
     try {
@@ -286,6 +287,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           setAiInsights(insights)
           setAiTone(tone || 'positive')
           if (metrics) setAiMetrics(metrics)
+          if (JSON.parse(stored).all_insights) setAllInsights(JSON.parse(stored).all_insights)
         } else {
           // Clear old data
           localStorage.removeItem(AI_STORAGE_KEY)
@@ -295,7 +297,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       console.error('Failed to load persisted AI insights:', err)
     }
   }, [])
-  
+
   // Sync AI status from props when they change
   useEffect(() => {
     if (aiStatus) {
@@ -333,13 +335,15 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       setAiEnabled(result.ai_enabled)
       setAiResetsAt(result.resets_at)
       if (result.metrics) setAiMetrics(result.metrics)
-      
+      if (result.all_insights) setAllInsights(result.all_insights)
+
       // Persist to localStorage (including metrics for free tone changes)
       localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
         insights: result.insights,
         tone: aiTone,
         timestamp: new Date().toISOString(),
-        metrics: result.metrics
+        metrics: result.metrics,
+        all_insights: result.all_insights
       }))
     } catch (err) {
       console.error('Failed to generate AI insights:', err)
@@ -353,13 +357,28 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       setAiLoading(false)
     }
   }
-  
+
   // Handle tone change - use free regeneration if metrics are cached
   const handleToneChange = async (newTone) => {
     if (newTone === aiTone) return
     setAiTone(newTone)
-    
-    // If we have cached metrics and insights, regenerate for free
+
+    // If we have cached all insights locally, switch instantly
+    if (allInsights && allInsights[newTone]) {
+      setAiInsights(allInsights[newTone])
+
+      // Update localStorage with new tone
+      localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
+        insights: allInsights[newTone],
+        tone: newTone,
+        timestamp: new Date().toISOString(),
+        metrics: aiMetrics,
+        all_insights: allInsights
+      }))
+      return
+    }
+
+    // Fallback: If we have cached metrics but not all insights (legacy), regenerate for free
     if (aiMetrics && aiInsights) {
       setAiLoading(true)
       setAiError(null)
@@ -368,7 +387,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
         setAiInsights(result.insights)
         setAiResetsAt(result.resets_at)
         // Note: remaining_today doesn't change (free regeneration)
-        
+
         // Update localStorage with new tone
         localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
           insights: result.insights,
@@ -384,13 +403,13 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       }
     }
   }
-  
+
   // Get display data based on view mode
   const trendData = useMemo(() => {
     if (!insights) return []
     return viewMode === 'monthly' ? insights.monthly_trend : insights.weekly_trend
   }, [insights, viewMode])
-  
+
   if (loading) {
     return (
       <Card>
@@ -401,7 +420,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       </Card>
     )
   }
-  
+
   if (error) {
     return (
       <Card>
@@ -422,7 +441,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       </Card>
     )
   }
-  
+
   if (!insights) {
     return (
       <Card>
@@ -438,12 +457,12 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
       </Card>
     )
   }
-  
+
   const { month_comparison, week_comparison, records, current_streak, streak_type, insights: textInsights } = insights
-  
+
   // Primary metrics for comparison cards
   const primaryMetrics = ['orders', 'psu', 'revenue', 'internet']
-  
+
   return (
     <div className="space-y-6">
       {/* Header Row with Streak */}
@@ -452,10 +471,10 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           <h2 className="text-white text-2xl font-bold">Performance Insights</h2>
           <p className="text-gray-400 text-sm mt-1">Your sales performance at a glance</p>
         </div>
-        
+
         <StreakBadge streak={current_streak} type={streak_type} />
       </div>
-      
+
       {/* Comparison Cards - This Month vs Last Month */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -464,7 +483,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
             This Month vs Last Month
           </h3>
         </div>
-        
+
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {primaryMetrics.map((metric) => (
             <ComparisonCard
@@ -478,7 +497,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           ))}
         </div>
       </div>
-      
+
       {/* Trend Chart */}
       <Card>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -486,7 +505,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             Performance Trend
           </h3>
-          
+
           <div className="flex items-center gap-3">
             {/* Metric Selector */}
             <div className="flex items-center gap-1 rounded-lg p-1 bg-white/5 overflow-x-auto">
@@ -497,11 +516,10 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                   <button
                     key={metric}
                     onClick={() => setSelectedMetric(metric)}
-                    className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      selectedMetric === metric
+                    className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${selectedMetric === metric
                         ? 'bg-white/10 text-white'
                         : 'text-gray-400 hover:text-gray-300'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-3.5 h-3.5" style={{ color: selectedMetric === metric ? config.color : undefined }} />
                     <span className="hidden sm:inline">{config.label}</span>
@@ -509,33 +527,31 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                 )
               })}
             </div>
-            
+
             {/* View Mode Toggle */}
             <div className="flex items-center gap-1 rounded-lg p-1 bg-white/5">
               <button
                 onClick={() => setViewMode('monthly')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  viewMode === 'monthly'
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'monthly'
                     ? 'bg-white/10 text-white'
                     : 'text-gray-400 hover:text-gray-300'
-                }`}
+                  }`}
               >
                 Monthly
               </button>
               <button
                 onClick={() => setViewMode('weekly')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  viewMode === 'weekly'
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'weekly'
                     ? 'bg-white/10 text-white'
                     : 'text-gray-400 hover:text-gray-300'
-                }`}
+                  }`}
               >
                 Weekly
               </button>
             </div>
           </div>
         </div>
-        
+
         <TrendChart
           data={trendData}
           selectedMetric={selectedMetric}
@@ -543,7 +559,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           animateCharts={animateCharts}
         />
       </Card>
-      
+
       {/* Personal Records & Insights Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Personal Records */}
@@ -553,7 +569,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               <Trophy className="w-4 h-4 text-amber-400" />
               Personal Records
             </h3>
-            
+
             <div className="grid grid-cols-2 gap-3">
               {records.slice(0, 4).map((record, idx) => (
                 <RecordCard key={idx} record={record} />
@@ -561,7 +577,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
             </div>
           </Card>
         )}
-        
+
         {/* Smart Insights with AI Generation */}
         <Card>
           <div className="flex flex-col gap-3 mb-4">
@@ -570,16 +586,15 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                 <Lightbulb className="w-4 h-4 text-indigo-400" />
                 Insights
               </h3>
-              
+
               {/* AI Generate Button */}
               <button
                 onClick={handleGenerateAI}
                 disabled={aiLoading || aiRemaining === 0 || !aiEnabled}
-                className={`flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  aiLoading || aiRemaining === 0 || !aiEnabled
+                className={`flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${aiLoading || aiRemaining === 0 || !aiEnabled
                     ? 'bg-white/5 text-gray-500 cursor-not-allowed'
                     : 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-500/30'
-                }`}
+                  }`}
                 title={!aiEnabled ? 'AI not configured' : aiRemaining === 0 ? `Daily limit reached. Resets ${formatResetTime(aiResetsAt)}` : `Generate AI insights (${aiRemaining}/3 remaining today)`}
               >
                 {aiLoading ? (
@@ -593,7 +608,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                 <span className="text-xs opacity-70">({aiRemaining !== null ? aiRemaining : '?'}/3)</span>
               </button>
             </div>
-            
+
             {/* Tone Selector */}
             {aiEnabled && (
               <div className="flex items-center gap-2">
@@ -606,11 +621,10 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                         key={tone}
                         onClick={() => handleToneChange(tone)}
                         disabled={aiLoading}
-                        className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
-                          aiTone === tone
+                        className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${aiTone === tone
                             ? `${config.bg} ${config.color}`
                             : 'text-gray-400 hover:text-gray-300'
-                        } ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          } ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title={aiMetrics && aiInsights ? `Switch to ${config.label} (free)` : config.label}
                       >
                         <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
@@ -625,14 +639,14 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               </div>
             )}
           </div>
-          
+
           {/* AI Error */}
           {aiError && (
             <div className="mb-3 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20">
               <p className="text-sm text-rose-400">{aiError}</p>
             </div>
           )}
-          
+
           {/* AI Generated Insights */}
           {aiInsights && aiInsights.length > 0 && (
             <div className="mb-4">
@@ -642,7 +656,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               </div>
               <div className="space-y-2">
                 {aiInsights.map((insight, idx) => (
-                  <div 
+                  <div
                     key={idx}
                     className="flex items-start gap-3 p-3 rounded-xl"
                     style={{
@@ -659,7 +673,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               </div>
             </div>
           )}
-          
+
           {/* Regular Insights - Only shown when no AI insights */}
           {!aiInsights && textInsights && textInsights.length > 0 && (
             <div className="space-y-3">
@@ -672,7 +686,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
               ))}
             </div>
           )}
-          
+
           {/* Empty state */}
           {(!textInsights || textInsights.length === 0) && !aiInsights && (
             <div className="text-center py-4">
@@ -681,7 +695,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           )}
         </Card>
       </div>
-      
+
       {/* Week Comparison - Secondary */}
       <Card>
         <div className="flex items-center justify-between mb-3">
@@ -690,7 +704,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
             This Week vs Last Week
           </h3>
         </div>
-        
+
         <div className="grid grid-cols-2 xs:grid-cols-4 gap-3">
           {primaryMetrics.map((metric) => {
             const config = METRIC_CONFIG[metric]

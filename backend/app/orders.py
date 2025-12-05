@@ -992,6 +992,7 @@ class AIInsightsResponse(BaseModel):
     ai_enabled: bool
     resets_at: str  # ISO timestamp of next reset (midnight local)
     metrics: Optional[dict] = None  # Metrics used for generation (for tone regeneration)
+    all_insights: Optional[dict] = None  # Map of tone -> insights list
 
 
 class AIInsightsStatusResponse(BaseModel):
@@ -1193,8 +1194,20 @@ async def generate_ai_insights_endpoint(
         "mobile_change": mobile_change,
     }
     
-    # Generate AI insights with selected tone
-    insights = await generate_performance_insights(metrics, tone)
+    # Generate AI insights for ALL tones in a single API call
+    from .ai_insights import generate_multi_tone_insights
+    
+    # Execute single call for all tones
+    all_insights = await generate_multi_tone_insights(metrics)
+    
+    # Get the requested tone's insights for the main list (backward compatibility)
+    # Default to empty list if tone not found
+    insights = all_insights.get(tone, [])
+    if not insights and all_insights:
+        # Fallback to first available if requested tone missing
+        insights = list(all_insights.values())[0]
+    
+
     
     # Update usage count
     current_user.ai_insights_count += 1
@@ -1207,7 +1220,8 @@ async def generate_ai_insights_endpoint(
         remaining_today=remaining,
         ai_enabled=True,
         resets_at=reset_time,
-        metrics=metrics  # Return metrics for free tone regeneration
+        metrics=metrics,  # Return metrics for free tone regeneration
+        all_insights=all_insights  # Return all tones
     )
 
 
