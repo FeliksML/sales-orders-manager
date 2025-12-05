@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import notificationService from '../services/notificationService';
+import bellIcon from '../assets/bell-icon.png';
 
 const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
   const [notifications, setNotifications] = useState([]);
@@ -117,7 +118,7 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
       case 'followup_due':
         return '📞';
       default:
-        return '🔔';
+        return <img src={bellIcon} alt="Notification" className="w-6 h-6 object-contain" />;
     }
   };
 
@@ -149,21 +150,19 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
           <div className="flex gap-2 justify-end md:justify-start">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-1 rounded-full backdrop-blur-md transition-all ${
-                filter === 'all'
-                  ? 'bg-white/95 text-blue-700 font-semibold shadow-lg'
-                  : 'bg-white/25 text-white hover:bg-white/40'
-              }`}
+              className={`px-4 py-1 rounded-full backdrop-blur-md transition-all ${filter === 'all'
+                ? 'bg-white/95 text-blue-700 font-semibold shadow-lg'
+                : 'bg-white/25 text-white hover:bg-white/40'
+                }`}
             >
               All
             </button>
             <button
               onClick={() => setFilter('unread')}
-              className={`px-4 py-1 rounded-full backdrop-blur-md transition-all ${
-                filter === 'unread'
-                  ? 'bg-white/95 text-blue-700 font-semibold shadow-lg'
-                  : 'bg-white/25 text-white hover:bg-white/40'
-              }`}
+              className={`px-4 py-1 rounded-full backdrop-blur-md transition-all ${filter === 'unread'
+                ? 'bg-white/95 text-blue-700 font-semibold shadow-lg'
+                : 'bg-white/25 text-white hover:bg-white/40'
+                }`}
             >
               Unread
             </button>
@@ -222,7 +221,7 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
             </div>
           ) : notifications.length === 0 ? (
             <div className="flex flex-col justify-center items-center h-full text-gray-400">
-              <div className="text-6xl mb-4">🔔</div>
+              <img src={bellIcon} alt="No notifications" className="w-16 h-16 mb-4 opacity-50" />
               <p className="text-lg">No notifications</p>
               <p className="text-sm">You're all caught up!</p>
             </div>
@@ -232,9 +231,8 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
                 <div
                   key={notification.notificationid}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 hover:bg-white/50 transition-all backdrop-blur-md rounded-2xl mx-3 my-1.5 ${
-                    !notification.is_read ? 'bg-white/40 border-l-4 border-blue-500 shadow-sm' : 'bg-white/20'
-                  } ${notification.orderid ? 'cursor-pointer' : ''}`}
+                  className={`p-4 hover:bg-white/50 transition-all backdrop-blur-md rounded-2xl mx-3 my-1.5 ${!notification.is_read ? 'bg-white/40 border-l-4 border-blue-500 shadow-sm' : 'bg-white/20'
+                    } ${notification.orderid ? 'cursor-pointer' : ''}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Icon */}
@@ -246,11 +244,10 @@ const NotificationCenter = ({ isOpen, onClose, onViewOrder }) => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h3
-                          className={`font-semibold text-sm ${
-                            !notification.is_read
-                              ? 'text-blue-900'
-                              : 'text-gray-900'
-                          }`}
+                          className={`font-semibold text-sm ${!notification.is_read
+                            ? 'text-blue-900'
+                            : 'text-gray-900'
+                            }`}
                         >
                           {notification.title}
                         </h3>
