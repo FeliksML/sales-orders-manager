@@ -279,7 +279,9 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
     try {
       const stored = localStorage.getItem(AI_STORAGE_KEY)
       if (stored) {
-        const { insights, tone, timestamp, metrics } = JSON.parse(stored)
+        const parsed = JSON.parse(stored)
+        const { insights, tone, timestamp, metrics, all_insights } = parsed
+
         // Only restore if from today (same day)
         const storedDate = new Date(timestamp).toDateString()
         const todayDate = new Date().toDateString()
@@ -287,7 +289,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
           setAiInsights(insights)
           setAiTone(tone || 'positive')
           if (metrics) setAiMetrics(metrics)
-          if (JSON.parse(stored).all_insights) setAllInsights(JSON.parse(stored).all_insights)
+          if (all_insights) setAllInsights(all_insights)
         } else {
           // Clear old data
           localStorage.removeItem(AI_STORAGE_KEY)
@@ -376,34 +378,6 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
         all_insights: allInsights
       }))
       return
-    }
-
-    // Fallback: If we have cached metrics but not all insights (legacy), regenerate for free
-    // This allows users with old data to still switch tones without using quota
-    if (aiMetrics && aiInsights) {
-      setAiLoading(true)
-      setAiError(null)
-      try {
-        const result = await orderService.regenerateAITone(newTone, aiMetrics)
-        setAiInsights(result.insights)
-        setAiResetsAt(result.resets_at)
-        // Note: remaining_today doesn't change (free regeneration)
-
-        // Update localStorage with new tone
-        localStorage.setItem(AI_STORAGE_KEY, JSON.stringify({
-          insights: result.insights,
-          tone: newTone,
-          timestamp: new Date().toISOString(),
-          metrics: aiMetrics,
-          // Keep existing all_insights if any (though likely null here)
-          all_insights: allInsights
-        }))
-      } catch (err) {
-        console.error('Failed to regenerate with new tone:', err)
-        setAiError('Failed to change tone. Try again.')
-      } finally {
-        setAiLoading(false)
-      }
     }
   }
 
@@ -623,12 +597,12 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                       <button
                         key={tone}
                         onClick={() => handleToneChange(tone)}
-                        disabled={aiLoading}
+                        disabled={aiLoading || (!allInsights && aiInsights)}
                         className={`flex items-center justify-center sm:justify-start gap-0 sm:gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${aiTone === tone
                           ? `${config.bg} ${config.color}`
                           : 'text-gray-400 hover:text-gray-300'
-                          } ${aiLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={allInsights ? `Switch to ${config.label}` : 'Switch tone (free)'}
+                          } ${aiLoading || (!allInsights && aiInsights) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={allInsights ? `Switch to ${config.label}` : 'Generate new insights to enable tone switching'}
                       >
                         <Icon className="w-3.5 h-3.5 sm:w-3 sm:h-3" />
                         <span className="hidden sm:inline">{config.label}</span>
@@ -639,7 +613,7 @@ function PerformanceInsights({ insights, loading, aiStatus, aiStatusLoading, err
                 {allInsights ? (
                   <span className="text-xs text-emerald-400/70">✨ Free tone switch</span>
                 ) : aiInsights ? (
-                  <span className="text-xs text-emerald-400/70">✨ Free tone switch (Network)</span>
+                  <span className="text-xs text-gray-500">Generate new to enable switching</span>
                 ) : null}
               </div>
             )}
